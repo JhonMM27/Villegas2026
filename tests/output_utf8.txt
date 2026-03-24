@@ -1,0 +1,15 @@
+﻿--- Iniciando Verificaci├│n de Fix Kardex (KG vs Saco) ---
+Logueado como: Administrador
+1. Producto creado: PRODUCTO TEST KG FIX 1773335588 (ID: 163, Empaque: 50kg)
+2. Registrando ingreso de 100kg a $2 cada uno (Total $200)...
+   - Movimiento registrado (Entrada Base): 2.0000 sacos
+   - Costo Unitario guardado en Movimiento: $100.0000 (Esperado: $100)
+   - Costo Unitario del Producto: $100.0000 (Esperado: $100)
+3. Registrando salida de 1 saco...
+   - Costo Unitario de la salida: $100.0000 (Esperado: $100)
+   - Costo Total de la salida: $100.0000 (Esperado: $100)
+4. Probando rec├ílculo de Kardex...
+   - Costo Unitario tras rec├ílculo: $100.0000 (Esperado: $100)
+
+--- VERIFICACI├ôN EXITOSA ---
+DB Rolled back.

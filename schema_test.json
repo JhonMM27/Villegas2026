@@ -1,0 +1,1 @@
+[{"Field":"estado","Type":"enum('registrada','anulada','rectificada')","Null":"NO","Key":"","Default":"registrada","Extra":""}]

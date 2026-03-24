@@ -1,0 +1,87 @@
+/* ========================================
+   GUÍA DE USO DEL SISTEMA DE ESTILOS
+   ======================================== 
+   
+   🚨 LEE ESTO ANTES DE MODIFICAR CSS 🚨
+   
+   ESTRUCTURA ACTUALIZADA:
+   -----------------------
+   ✅ adminlte.css (~420KB) - Framework base + TODOS los estilos personalizados integrados
+   ❌ custom.css - ELIMINADO (consolidado en adminlte.css)
+   
+   REGLA DE ORO:
+   -------------
+   ❌ NO crear nuevos archivos CSS
+   ✅ SOLO editar la sección "ESTILOS PERSONALIZADOS" al final de adminlte.css
+   
+   ORDEN DE CARGA (simplificado):
+   -------------------------------
+   1. Bootstrap Icons
+   2. OverlayScrollbars
+   3. AdminLTE (incluye todos los estilos personalizados al final)
+   4. DataTables Bootstrap5
+   
+   SISTEMA DE TEMAS:
+   -----------------
+   Variables CSS definidas al final de adminlte.css (busca "ESTILOS PERSONALIZADOS"):
+   
+   :root {
+     --bg-primary: #ffffff;
+     --text-primary: #212529;
+     --btn-primary: #6f42c1;
+     ... etc
+   }
+   
+   [data-theme="dark"] {
+     --bg-primary: #2a3140;
+     --text-primary: #f1f3f5;
+     ... etc
+   }
+   
+   CÓMO AÑADIR ESTILOS:
+   --------------------
+   1. Abre: /public/css/adminlte.css
+   2. Busca la sección "ESTILOS PERSONALIZADOS - SISTEMA DE VENTAS" (al final)
+   3. Encuentra el bloque relevante (ej: BOTONES, TABLAS, etc)
+   4. Añade tu CSS usando variables CSS cuando sea posible
+   5. NO necesitas !important (los estilos están en orden correcto)
+   6. Añade versión [data-theme="dark"] si es necesario
+   
+   EJEMPLO:
+   --------
+   /* Nueva clase de botón */
+   .btn-mi-estilo {
+     background-color: var(--btn-primary) !important;
+     color: var(--btn-primary-text) !important;
+   }
+   
+   [data-theme="dark"] .btn-mi-estilo {
+     background-color: var(--btn-primary) !important;
+   }
+   
+   SOLUCIÓN DE PROBLEMAS:
+   ----------------------
+   ❓ "Mi estilo no se aplica"
+     → Añade !important
+     → Verifica que custom.css esté después de adminlte.css
+     → Limpia caché del navegador (Cmd+Shift+R)
+   
+   ❓ "El dark mode no funciona"
+     → Verifica que usas variables CSS (--variable)
+     → Añade regla [data-theme="dark"]
+     → Verifica que el body tenga data-theme="dark"
+   
+   ❓ "Los estilos se sobreescriben"
+     → custom.css DEBE cargarse último
+     → Usa !important en custom.css
+   
+   RESPALDO:
+   ---------
+   Los archivos antiguos (theme.css, datatables-custom.css) 
+   están en: /public/css/backup_old_styles/
+   
+   NO los uses, solo son referencia histórica.
+   
+   ========================================
+   Última actualización: 9 nov 2025
+   ======================================== */

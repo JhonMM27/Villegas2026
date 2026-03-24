@@ -1,0 +1,598 @@
+/* ========================================
+   OVERRIDE: Evitar flash en modo DARK
+   Desactivamos transiciones que afectan background-color en tablas/filas
+   para evitar el breve parpadeo blanco al re-renderizar o navegar.
+   Es específico a elementos de tabla y cajas relacionadas, no global.
+   ======================================== */
+[data-bs-theme="dark"] table,
+[data-bs-theme="dark"] table *,
+[data-bs-theme="dark"] .dataTable,
+[data-bs-theme="dark"] .dataTable *,
+[data-bs-theme="dark"] .card,
+[data-bs-theme="dark"] .card * {
+    /* Desactivar transiciones que incluyan background-color */
+    transition-property: none !important;
+    transition: none !important;
+}
+
+/* Más específico: asegurar que filas y celdas no animen el color */
+[data-bs-theme="dark"] table.dataTable tbody tr,
+[data-bs-theme="dark"] table.dataTable tbody tr > td,
+[data-bs-theme="dark"] table.dataTable tbody tr > th {
+    transition: none !important;
+}
+/* ========================================
+   DATATABLES - DISEÑO PROFESIONAL COMPACTO
+   Sistema de Gestión - Estilos Globales
+   Soporte para temas Light y Dark
+   ======================================== */
+
+/* Variables para tema Light */
+[data-bs-theme="light"] {
+    --dt-bg-primary: #fff;
+    --dt-bg-secondary: #f9fafb;
+    --dt-bg-hover: #eff6ff;
+    --dt-bg-header: linear-gradient(180deg, #f9fafb 0%, #f3f4f6 100%);
+    --dt-border-color: #e5e7eb;
+    --dt-border-strong: #d1d5db;
+    --dt-text-primary: #111827;
+    --dt-text-secondary: #374151;
+    --dt-text-muted: #6b7280;
+    --dt-input-bg: #fff;
+    --dt-input-border: #d1d5db;
+    --dt-input-focus: #3b82f6;
+    --dt-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Variables para tema Dark */
+[data-bs-theme="dark"] {
+    --dt-bg-primary: #1f2937;
+    --dt-bg-secondary: #111827;
+    --dt-bg-hover: #1e3a8a;
+    --dt-bg-header: linear-gradient(180deg, #374151 0%, #1f2937 100%);
+    --dt-border-color: #374151;
+    --dt-border-strong: #4b5563;
+    --dt-text-primary: #f9fafb;
+    --dt-text-secondary: #e5e7eb;
+    --dt-text-muted: #9ca3af;
+    --dt-input-bg: #374151;
+    --dt-input-border: #4b5563;
+    --dt-input-focus: #60a5fa;
+    --dt-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+/* Wrapper principal */
+.dataTables_wrapper {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* Más compacto globalmente */
+    font-size: 0.7rem;
+}
+
+/* Control de registros por página */
+.dataTables_wrapper .dataTables_length {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-bottom: 0.35rem;
+}
+
+.dataTables_wrapper .dataTables_length label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0;
+    font-weight: 500;
+    font-size: 0.9375rem;
+    color: var(--dt-text-secondary);
+}
+
+.dataTables_wrapper .dataTables_length select,
+select.form-select,
+select.form-select-sm {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    min-width: 50px;
+    height: 20px;
+    padding: 0.06rem 1.1rem 0.06rem 0.3rem;
+    border: 1px solid var(--dt-input-border);
+    border-radius: 2px;
+    background-color: var(--dt-input-bg);
+    color: var(--dt-text-primary);
+    background-repeat: no-repeat;
+    background-position: right 0.3rem center;
+    background-size: 7px 4px;
+    font-size: 0.9375rem;
+    line-height: 1.05;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+[data-bs-theme="light"] .dataTables_wrapper .dataTables_length select,
+[data-bs-theme="light"] select.form-select,
+[data-bs-theme="light"] select.form-select-sm {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236b7280' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+}
+
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_length select,
+[data-bs-theme="dark"] select.form-select,
+[data-bs-theme="dark"] select.form-select-sm {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%239ca3af' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+}
+
+.dataTables_wrapper .dataTables_length select:hover {
+    border-color: var(--dt-border-strong);
+}
+
+.dataTables_wrapper .dataTables_length select:focus {
+    outline: none;
+    border-color: var(--dt-input-focus);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_length select:focus {
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+
+.dataTables_wrapper .dataTables_length select::-ms-expand {
+    display: none;
+}
+
+/* Campo de búsqueda */
+.dataTables_wrapper .dataTables_filter {
+    margin-bottom: 0.35rem;
+}
+
+.dataTables_wrapper .dataTables_filter label {
+    margin: 0;
+    font-weight: 500;
+    font-size: 0.9375rem;
+    color: var(--dt-text-secondary);
+}
+
+.dataTables_wrapper .dataTables_filter input {
+    margin-left: 0.25rem;
+    padding: 0.2rem 0.4rem;
+    border: 1px solid var(--dt-input-border);
+    border-radius: 3px;
+    background-color: var(--dt-input-bg);
+    color: var(--dt-text-primary);
+    font-size: 0.9375rem;
+    height: 24px;
+    transition: all 0.15s ease;
+}
+
+.dataTables_wrapper .dataTables_filter input::placeholder {
+    color: var(--dt-text-muted);
+}
+
+.dataTables_wrapper .dataTables_filter input:focus {
+    outline: none;
+    border-color: var(--dt-input-focus);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_filter input:focus {
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+
+/* ========================================
+   TABLA - ESTILO PROFESIONAL Y COMPACTO
+   ======================================== */
+
+.dataTable {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--dt-bg-primary);
+    border: 1px solid var(--dt-border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* Encabezados */
+.dataTable thead th {
+    background: var(--dt-bg-header);
+    color: var(--dt-text-primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    padding: 0.02rem 0.25rem;
+    border-bottom: 1px solid var(--dt-border-color);
+    white-space: nowrap;
+    vertical-align: middle;
+    height: 16px;
+    line-height: 0.95;
+}
+
+.dataTable thead th:first-child {
+    border-top-left-radius: 7px;
+}
+
+.dataTable thead th:last-child {
+    border-top-right-radius: 7px;
+}
+
+/* Celdas del cuerpo */
+.dataTable tbody td {
+    padding: 0.02rem 0.25rem;
+    border-bottom: 1px solid var(--dt-border-color);
+    color: var(--dt-text-secondary);
+    font-size: 0.9375rem;
+    vertical-align: middle;
+    line-height: 0.95;
+    /* filas ligeramente más compactas */
+    height: 19px;
+    max-height: 19px;
+}
+
+/* Forzar filas muy bajas */
+.dataTable tbody tr {
+    /* reducir un poco la altura de fila para diseño más compacto */
+    height: 18px;
+    max-height: 18px;
+}
+
+/* Filas alternadas */
+.dataTable tbody tr:nth-child(odd) {
+    background-color: var(--dt-bg-primary);
+}
+
+.dataTable tbody tr:nth-child(even) {
+    background-color: var(--dt-bg-secondary);
+}
+
+/* Hover en filas
+   - Animación sólo en modo light. En modo dark desactivamos la transición
+     para evitar un "flash" blanco al cambiar opciones/estado que re-renderizan
+     la tabla (las variables CSS cambian y la transición animaba desde blanco).
+*/
+[data-bs-theme="light"] .dataTable tbody tr:hover {
+    background-color: var(--dt-bg-hover);
+    /* Código existente para el diseño responsivo */
+    transition: background-color 0.15s ease;
+}
+
+[data-bs-theme="dark"] .dataTable tbody tr:hover {
+    /* Mantener el mismo color de hover pero sin transición para evitar flash */
+    background-color: var(--dt-bg-hover);
+    transition: none !important;
+}
+
+/* Última fila sin borde inferior */
+.dataTable tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* ========================================
+   COLUMNA DE ACCIONES - ICONOS CENTRADOS
+   ======================================== */
+
+.dataTable tbody td:last-child {
+    text-align: center;
+    padding: 0.15rem 0.25rem;
+}
+
+/* Contenedor de botones de acción */
+.dataTable .btn-group {
+    display: inline-flex;
+    gap: 0.12rem;
+    align-items: center;
+    justify-content: center;
+    /* contenedor reducido para iconos más pequeños */
+    height: 28px;
+}
+
+/* Botones de acción */
+.dataTable .btn-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* tamaño reducido ligeramente */
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    text-decoration: none;
+}
+
+.dataTable .btn-action svg,
+.dataTable .btn-action i {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.12s ease;
+}
+
+/* Fallback: colores por defecto para botones de acción cuando
+   no existe el atributo [data-bs-theme] en el elemento raíz.
+   Esto asegura que los iconos (que usan stroke=currentColor)
+   sean visibles en instalaciones que no usan el atributo. */
+.dataTable .btn-action.btn-edit {
+    background-color: #ffed6f;
+    color: #212529;
+    border-color: #ffed6f;
+}
+.dataTable .btn-action.btn-edit:hover {
+    background-color: #ffe84d;
+    border-color: #ffe84d;
+    color: #212529;
+}
+.dataTable .btn-action.btn-delete {
+    background-color: #dc3545;
+    color: #ffffff;
+    border-color: #dc3545;
+}
+.dataTable .btn-action.btn-delete:hover {
+    background-color: #c82333;
+    border-color: #c82333;
+    color: #ffffff;
+}
+.dataTable .btn-action.btn-view {
+    background-color: #0885c9;
+    color: #ffffff;
+    border-color: #0885c9;
+}
+.dataTable .btn-action.btn-view:hover {
+    background-color: #0670ab;
+    border-color: #0670ab;
+    color: #ffffff;
+}
+/* Botón Editar - Light Mode */
+[data-bs-theme="light"] .dataTable .btn-action.btn-edit {
+    background-color: #ffed6f;
+    color: #212529;
+    border-color: #ffed6f;
+}
+
+[data-bs-theme="light"] .dataTable .btn-action.btn-edit:hover {
+    background-color: #ffe84d;
+    border-color: #ffe84d;
+    color: #212529;
+}
+
+/* Botón Editar - Dark Mode */
+[data-bs-theme="dark"] .dataTable .btn-action.btn-edit {
+    background-color: #ffed6f;
+    color: #212529;
+    border-color: #ffed6f;
+}
+
+[data-bs-theme="dark"] .dataTable .btn-action.btn-edit:hover {
+    background-color: #ffe84d;
+    border-color: #ffe84d;
+    color: #212529;
+}
+
+.dataTable .btn-action.btn-edit:hover svg,
+.dataTable .btn-action.btn-edit:hover i {
+    transform: scale(1.1);
+}
+
+/* Botón Eliminar - Light Mode */
+[data-bs-theme="light"] .dataTable .btn-action.btn-delete {
+    background-color: #dc3545;
+    color: #ffffff;
+    border-color: #dc3545;
+}
+
+[data-bs-theme="light"] .dataTable .btn-action.btn-delete:hover {
+    background-color: #c82333;
+    border-color: #c82333;
+    color: #ffffff;
+}
+
+/* Botón Eliminar - Dark Mode */
+[data-bs-theme="dark"] .dataTable .btn-action.btn-delete {
+    background-color: #dc3545;
+    color: #ffffff;
+    border-color: #dc3545;
+}
+
+[data-bs-theme="dark"] .dataTable .btn-action.btn-delete:hover {
+    background-color: #c82333;
+    border-color: #c82333;
+    color: #fca5a5;
+}
+
+.dataTable .btn-action.btn-delete:hover svg,
+.dataTable .btn-action.btn-delete:hover i {
+    transform: scale(1.1);
+}
+
+/* Botón Ver - Light Mode */
+[data-bs-theme="light"] .dataTable .btn-action.btn-view {
+    color: #10b981;
+}
+
+[data-bs-theme="light"] .dataTable .btn-action.btn-view:hover {
+    background-color: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #059669;
+}
+
+/* Botón Ver - Dark Mode */
+[data-bs-theme="dark"] .dataTable .btn-action.btn-view {
+    color: #34d399;
+}
+
+[data-bs-theme="dark"] .dataTable .btn-action.btn-view:hover {
+    background-color: #064e3b;
+    border-color: #10b981;
+    color: #6ee7b7;
+}
+
+.dataTable .btn-action.btn-view:hover svg,
+.dataTable .btn-action.btn-view:hover i {
+    transform: scale(1.1);
+}
+
+/* ========================================
+   INFORMACIÓN Y PAGINACIÓN
+   ======================================== */
+
+.dataTables_wrapper .dataTables_info {
+    float: left;
+    margin-top: 0.25rem;
+    padding-top: 0;
+    color: var(--dt-text-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.dataTables_wrapper .dataTables_paginate {
+    float: right;
+    margin-top: 0.25rem;
+    padding-top: 0;
+}
+
+/* Botones de paginación (mínimos) */
+.dataTables_wrapper .dataTables_paginate .pagination {
+    gap: 0.06rem;
+    margin-bottom: 0;
+}
+
+.dataTables_wrapper .dataTables_paginate .page-item .page-link {
+    min-width: 20px;
+    height: 20px;
+    padding: 0.08rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--dt-border-color);
+    border-radius: 2px;
+    background-color: var(--dt-bg-primary);
+    color: var(--dt-text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.12s ease;
+    text-decoration: none;
+}
+
+.dataTables_wrapper .dataTables_paginate .page-item .page-link:hover {
+    background-color: var(--dt-bg-secondary);
+    border-color: var(--dt-border-strong);
+    color: var(--dt-text-primary);
+}
+
+.dataTables_wrapper .dataTables_paginate .page-item.active .page-link {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+    color: #fff;
+    font-weight: 600;
+}
+
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_paginate .page-item.active .page-link {
+    background-color: #60a5fa;
+    border-color: #60a5fa;
+}
+
+.dataTables_wrapper .dataTables_paginate .page-item.disabled .page-link {
+    background-color: var(--dt-bg-secondary);
+    border-color: var(--dt-border-color);
+    color: var(--dt-text-muted);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* ========================================
+   INDICADOR DE PROCESAMIENTO
+   ======================================== */
+
+.dataTables_wrapper .dataTables_processing {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 1rem 1.5rem;
+    background: var(--dt-bg-primary);
+    border: 1px solid var(--dt-border-color);
+    border-radius: 8px;
+    box-shadow: var(--dt-shadow);
+    color: var(--dt-text-secondary);
+    font-weight: 500;
+    font-size: 0.875rem;
+    z-index: 1000;
+}
+
+[data-bs-theme="light"] .dataTables_wrapper .dataTables_processing {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_processing {
+    background: rgba(31, 41, 55, 0.95);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+    .dataTable {
+        font-size: 0.6875rem;
+    }
+    
+    .dataTable thead th {
+        padding: 0.02rem 0.2rem;
+        height: 16px;
+    }
+    
+    .dataTable tbody td {
+        padding: 0.02rem 0.2rem;
+        height: 16px;
+    }
+    
+    .dataTable tbody tr {
+        height: 16px;
+    }
+
+    /* botones reducidos en móvil */
+    .dataTable .btn-action {
+        width: 16px;
+        height: 16px;
+    }
+
+    .dataTable .btn-action svg,
+    .dataTable .btn-action i {
+        width: 9px;
+        height: 9px;
+    }
+}
+
+/* ========================================
+   HORIZONTAL SCROLL HELPERS
+   Forzar scroll horizontal cuando la tabla
+   no cabe en su contenedor (evita colapso)
+   ======================================== */
+
+/* Asegurar que el contenedor permita scroll horizontal */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Evitar que el contenido de celdas haga wrap; así la tabla
+   mantendrá su ancho natural y el contenedor mostrará el scroll */
+.dataTable thead th,
+.dataTable tbody td {
+    white-space: nowrap;
+}
+
+/* Permitir que la tabla crezca si es necesario. No forzamos
+   un ancho fijo (solo un mínimo razonable) para no romper layouts */
+.dataTable {
+    min-width: 720px;
+}
+
+/* En pantallas muy pequeñas mantener la posibilidad de scroll
+   y reducir tamaño de letra si es necesario */
+@media (max-width: 480px) {
+    .dataTable {
+        min-width: 600px;
+        font-size: 0.78rem;
+    }
+}
