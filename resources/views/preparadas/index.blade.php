@@ -573,7 +573,13 @@ class PreparadaManager extends CrudManager {
             document.getElementById('es_rectificacion').value = '1';
             document.getElementById('preparada_anulada_id').value = id;
 
-            document.getElementById('fecha').value = this.obtenerFechaHoraActual();
+            // Formatear fecha original para datetime-local input
+            const formatDateTimeLocal = (fecha) => {
+                if (!fecha || fecha.startsWith('-000') || fecha === 'null') return '';
+                if (typeof fecha !== 'string') return '';
+                return fecha.replace(' ', 'T').substring(0, 16);
+            };
+            document.getElementById('fecha').value = formatDateTimeLocal(response.fecha);
             const info = document.getElementById('info_formulacion');
             info.classList.remove('d-none');
 

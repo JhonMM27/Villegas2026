@@ -1113,6 +1113,13 @@
                     this.isEditing = false; // Queremos que se comporte como un registro NUEVO
                     this.resetForm();
                     
+                    // Formatear fecha para datetime-local input
+                    const formatDateTimeLocal = (fecha) => {
+                        if (!fecha || fecha.startsWith('-000') || fecha === 'null') return '';
+                        if (typeof fecha !== 'string') return '';
+                        return fecha.replace(' ', 'T').substring(0, 16);
+                    };
+                    
                     this.elements.modalTitle.textContent = 'Rectificar Préstamo: '+ response.comprobante_tipo_codigo + ' ' + response.serie + '-' + response.correlativo;
                     this.elements.methodField.value = 'POST';
                     document.getElementById('es_rectificacion').value = '1';
@@ -1120,7 +1127,7 @@
                     
                     // Asignar tipo movimiento
                     document.getElementById('movimiento_tipo').value = response.movimiento_tipo || '';
-                    document.getElementById('fecha_prestamo').value = response.fecha_prestamo || '';
+                    document.getElementById('fecha_prestamo').value = formatDateTimeLocal(response.fecha_prestamo);
 
                     // Llenar cliente
                     document.getElementById('cliente_id').value = response.cliente_origen_id && response.cliente_origen_id !== 11 ? response.cliente_origen_id : (response.cliente_destino_id || '');
@@ -1129,6 +1136,12 @@
                         ? `${response.cliente_origen_id} - ${response.cliente_origen?.razon_social || ''}`
                         : `${response.cliente_destino_id} - ${response.cliente_destino?.razon_social || ''}`;
                     document.getElementById('cliente_razon_social').value = clienteTexto;
+
+                    // Cargar prestamo_referencia_id si existe (para DD/DA tipo devoluciones)
+                    const prestamoRefIdInput = document.getElementById('prestamo_referencia_id');
+                    if (prestamoRefIdInput) {
+                        prestamoRefIdInput.value = response.prestamo_referencia_id || '';
+                    }
 
                     // Asignar comprobante
                     document.getElementById('comprobante_tipo_codigo').value = response.comprobante_tipo_codigo || '';
@@ -1154,7 +1167,7 @@
 
                 } catch (error) {
                     console.error('Error al cargar préstamo:', error);
-                    Swal.fire('Error', 'No se pudo cargar la información para rectificar', 'error');
+                    Swal.fire('Error', 'No se cargar la información para rectificar', 'error');
                 }
             }
         }

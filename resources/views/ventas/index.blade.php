@@ -448,7 +448,16 @@
                 document.getElementById('op_inafecta').value = op_inafecta.toFixed(2);
                 document.getElementById('impuesto').value = totalImpuesto.toFixed(2);
                 document.getElementById('total').value = total.toFixed(2);
-                this.updateCobranza();
+                if (this.isRectifying) {
+                    // En rectificación, solo recalcular automaticamente si es Principal
+                    const tipoActual = document.getElementById('cobranza_tipo_id')?.value || '1';
+                    if (tipoActual === '1') {
+                        this.updateCobranza(tipoActual);
+                    }
+                    // Para Deposito (2) y Consortium (3) no hacer nada - mantienen sus valores manuales
+                } else {
+                    this.updateCobranza();
+                }
             }
 
             initializeDataTable() {
@@ -569,6 +578,7 @@
 
             showCreateModal() {
                 super.showCreateModal();
+                this.isRectifying = false;
                 this.bindPagoFormaChange();
                 this.bindCobranzaInputs();
                 this.elements.modalTitle.textContent = 'Nueva Venta';
@@ -728,6 +738,7 @@
                     const response = await this.fetchData(`${this.baseUrl}/${id}`);
 
                     this.isEditing = true;
+                    this.isRectifying = false;
                     this.resetForm();
                     this.bindPagoFormaChange();
                     this.bindCobranzaInputs();
@@ -809,7 +820,7 @@
 
                 // Total cobranza (recién aquí)
                 totalCobranzaEl.value = monto.toFixed(2);
-                recalcularTotalCobranza();
+                this.recalcularTotalCobranza();
             }
 
             bindCobranzaInputs() {
@@ -848,6 +859,7 @@
                     const response = await this.fetchData(`${this.baseUrl}/${id}`);
 
                     this.isEditing = false;
+                    this.isRectifying = true;
                     this.resetForm();
 
                     this.elements.modalTitle.textContent =
@@ -857,19 +869,39 @@
                     this.elements.methodField.value = 'POST';
 
                     document.getElementById('pago_forma_codigo').value = response.pago_forma_codigo || '';
-                    document.getElementById('cobranza_tipo_id').value = response.cobranza_tipo_id || '1';
+                    // Determinar cobranza_tipo_id desde los datos de pago
+                    let cobranzaTipoId = '1';
+                    const importeP = parseFloat(response.importe_p) || 0;
+                    const importeD = parseFloat(response.importe_d) || 0;
+                    const importeC = parseFloat(response.importe_c) || 0;
+                    const acuenta = parseFloat(response.acuenta) || 0;
+                    if (importeC > 0 && Math.abs(importeC - acuenta) < 0.01) cobranzaTipoId = '3';
+                    else if (importeD > 0 && Math.abs(importeD - acuenta) < 0.01) cobranzaTipoId = '2';
+                    document.getElementById('cobranza_tipo_id').value = cobranzaTipoId;
                     document.getElementById('comprobante_tipo_codigo').value = response.comprobante_tipo_codigo || '';
                     // Preservar serie y correlativo originales de la venta anulada
                     document.getElementById('serie').value = response.serie || '';
                     document.getElementById('correlativo').value = response.correlativo || '';
                     document.getElementById('cliente_id').value = response.cliente_id || '';
                     document.getElementById('cliente_razon_social').value = response.cliente_nombre || '';
-                    document.getElementById('fecha_venta').value = this.obtenerFechaHoraActual();
-                    document.getElementById('fecha_vencimiento').value = this.obtenerFechaActual();
+                    document.getElementById('fecha_venta').value = this.formatDateTimeLocal(response.fecha_venta);
+                    document.getElementById('fecha_vencimiento').value = response.fecha_vencimiento;
                     document.getElementById('usuario_nombre').textContent = response.user_nombre || '';
+                    document.getElementById('docpagoi').value = response.docpagoi || '';
 
-                    // Llenar tabla de detalles (productos)
+                    // Guardar valores originales de cobranza ANTES de updateDetailsTable
+                    const originalPrincipal = parseFloat(response.importe_p).toFixed(2);
+                    const originalDeposito = parseFloat(response.importe_d).toFixed(2);
+                    const originalConsorcio = parseFloat(response.importe_c).toFixed(2);
+                    const originalTotalCobranza = (
+                        Number(response.importe_p) + Number(response.importe_d) + Number(response.importe_c)
+                    ).toFixed(2);
+
+                    // Llenar tabla de detalles (productos) - deshabilitar temporalmente updateCobranza
+                    const wasRectifying = this.isRectifying;
+                    this.isRectifying = false;
                     this.updateDetailsTable(response.detalles);
+                    this.isRectifying = wasRectifying;
 
                     this.bindPagoFormaChange();
                     this.bindCobranzaInputs();
@@ -881,23 +913,17 @@
                     document.getElementById('impuesto').value = parseFloat(response.impuesto).toFixed(2);
                     document.getElementById('total').value = parseFloat(response.total).toFixed(2);
 
-                    this.updateCobranza();
+                    // Restaurar valores originales de cobranza
+                    document.getElementById('principal').value = originalPrincipal;
+                    document.getElementById('deposito').value = originalDeposito;
+                    document.getElementById('consorcio').value = originalConsorcio;
+                    document.getElementById('total_cobranza').value = originalTotalCobranza;
 
-                    // Llenar totales
-                    document.getElementById('op_gravada').value = parseFloat(response.op_gravada).toFixed(2);
-                    document.getElementById('op_exonerada').value = parseFloat(response.op_exonerada).toFixed(2);
-                    document.getElementById('op_inafecta').value = parseFloat(response.op_inafecta).toFixed(2);
-                    document.getElementById('impuesto').value = parseFloat(response.impuesto).toFixed(2);
-                    document.getElementById('total').value = parseFloat(response.total).toFixed(2);
-
-                    document.getElementById('principal').value = parseFloat(response.importe_p).toFixed(2);
-                    document.getElementById('deposito').value = parseFloat(response.importe_d).toFixed(2);
-                    document.getElementById('consorcio').value = parseFloat(response.importe_c).toFixed(2);
-                    document.getElementById('total_cobranza').value = (
-                        Number(response.importe_p) + Number(response.importe_d) + Number(response.importe_c)
-                    ).toFixed(2);
-
-                    this.updateCobranza();
+                    // En rectificación no llamamos aplicarCobranza - ya cargamos los valores originales
+                    // y calculateTotals se encargará de recalcular si es Principal
+                    if (!this.isRectifying) {
+                        this.aplicarCobranza(cobranzaTipoId, response.acuenta);
+                    }
 
                     // ⚠️ La ruta de acción es RECTIFICAR
                     this.form.action = `${this.baseUrl}/${id}/rectificar`;
@@ -905,7 +931,7 @@
                     this.modal.show();
 
                 } catch (error) {
-                    this.showNotification('error', 'Error al cargar los datos para rectificar');
+                    this.showNotification('error', 'Error al cargar los datos para rectificar: ' + error.message);
                     console.error(error);
                 }
             }
@@ -1211,10 +1237,13 @@
             }
 
             formatDateTimeLocal(fecha) {
-                if (!fecha || fecha.startsWith('-000')) return '';
+                if (!fecha || fecha.startsWith('-000') || fecha === 'null') return '';
+                if (typeof fecha !== 'string') return '';
 
                 // "2025-12-29 09:58:00" → "2025-12-29T09:58"
-                return fecha.replace(' ', 'T').substring(0, 16);
+                // "2025-12-29T09:58:00" stays the same
+                const normalized = fecha.replace(' ', 'T').substring(0, 16);
+                return normalized;
             }
 
         }

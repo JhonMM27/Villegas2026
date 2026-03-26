@@ -52,6 +52,13 @@ class CrudManager {
         }
         if (this.elements.form) {
             this.elements.form.addEventListener('submit', (e) => this.handleSubmit(e));
+            // Prevenir submit con Enter (excepto en textarea)
+            this.elements.form.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
+                    e.preventDefault();
+                    return false;
+                }
+            });
         }
         
         // Delegación de eventos para botones dinámicos

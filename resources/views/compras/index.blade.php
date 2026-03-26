@@ -425,7 +425,16 @@ class CompraManager extends CrudManager {
         document.getElementById('op_inafecta').value = op_inafecta.toFixed(2);
         document.getElementById('impuesto').value = totalImpuesto.toFixed(2);
         document.getElementById('total').value = total.toFixed(2);
-        this.updateCobranza();
+        if (this.isRectifying) {
+            // En rectificación, solo recalcular automaticamente si es Principal
+            const tipoActual = document.getElementById('cobranza_tipo_id')?.value || '1';
+            if (tipoActual === '1') {
+                this.updateCobranza(tipoActual);
+            }
+            // Para Deposito (2) y Consortium (3) no hacer nada - mantienen sus valores manuales
+        } else {
+            this.updateCobranza();
+        }
     }
 
     initializeDataTable() {
@@ -470,6 +479,7 @@ class CompraManager extends CrudManager {
 
     showCreateModal(){
         super.showCreateModal();
+        this.isRectifying = false;
         this.bindPagoFormaChange();
         this.bindCobranzaInputs();
         this.elements.modalTitle.textContent = 'Nueva Compra';
@@ -590,6 +600,7 @@ class CompraManager extends CrudManager {
             const response = await this.fetchData(`${this.baseUrl}/${id}`);
             
             this.isEditing = true;
+            this.isRectifying = false;
             this.resetForm();
             this.bindPagoFormaChange();
             this.bindCobranzaInputs();
@@ -612,6 +623,7 @@ class CompraManager extends CrudManager {
             const response = await this.fetchData(`${this.baseUrl}/${id}`);
             
             this.isEditing = false; // Queremos que se comporte como un registro NUEVO
+            this.isRectifying = true;
             this.resetForm();
             this.bindPagoFormaChange();
             this.bindCobranzaInputs();
@@ -643,6 +655,13 @@ class CompraManager extends CrudManager {
                 throw new Error("Respuesta vacía del servidor");
             }
 
+            // Formatear fecha para datetime-local input
+            const formatDateTimeLocal = (fecha) => {
+                if (!fecha || fecha.startsWith('-000') || fecha === 'null') return '';
+                if (typeof fecha !== 'string') return '';
+                return fecha.replace(' ', 'T').substring(0, 16);
+            };
+
             // Campos principales
             document.getElementById('pago_forma_codigo').value = response.pago_forma_codigo || '';
             document.getElementById('comprobante_tipo_codigo').value = response.comprobante_tipo_codigo || '';
@@ -656,16 +675,35 @@ class CompraManager extends CrudManager {
                 : '';
             document.getElementById('proveedor_razon_social').value = proveedorTexto;
 
-            document.getElementById('fecha_compra').value = response.fecha_compra || '';
+            document.getElementById('fecha_compra').value = formatDateTimeLocal(response.fecha_compra);
             document.getElementById('fecha_vencimiento').value = response.fecha_vencimiento || '';
             document.getElementById('usuario_nombre').textContent = response.user_nombre || '';
 
-            // Tabla detalles
+            // Determinar cobranza_tipo_id desde los datos de pago
+            let cobranzaTipoId = '1';
+            const importeP = parseFloat(response.importe_p) || 0;
+            const importeD = parseFloat(response.importe_d) || 0;
+            const importeC = parseFloat(response.importe_c) || 0;
+            const acuenta = parseFloat(response.acuenta) || 0;
+            if (importeC > 0 && Math.abs(importeC - acuenta) < 0.01) cobranzaTipoId = '3';
+            else if (importeD > 0 && Math.abs(importeD - acuenta) < 0.01) cobranzaTipoId = '2';
+            document.getElementById('cobranza_tipo_id').value = cobranzaTipoId;
+
+            // Guardar valores originales de cobranza ANTES de updateDetailsTable
+            const originalPrincipal = importeP.toFixed(2);
+            const originalDeposito = importeD.toFixed(2);
+            const originalConsorcio = importeC.toFixed(2);
+            const originalTotalCobranza = (importeP + importeD + importeC).toFixed(2);
+
+            // Tabla detalles - deshabilitar temporalmente updateCobranza
+            const wasRectifying = this.isRectifying;
+            this.isRectifying = false;
             if (Array.isArray(response.detalles)) {
                 this.updateDetailsTable(response.detalles);
             } else {
                 this.updateDetailsTable([]);
             }
+            this.isRectifying = wasRectifying;
 
             // Totales
             const op_gravada = parseFloat(response.op_gravada) || 0;
@@ -680,17 +718,17 @@ class CompraManager extends CrudManager {
             document.getElementById('impuesto').value = impuesto.toFixed(2);
             document.getElementById('total').value = total.toFixed(2);
 
-            // Cobranza
-            const importe_p = parseFloat(response.importe_p) || 0;
-            const importe_d = parseFloat(response.importe_d) || 0;
-            const importe_c = parseFloat(response.importe_c) || 0;
+            // Restaurar valores originales de cobranza
+            document.getElementById('principal').value = originalPrincipal;
+            document.getElementById('deposito').value = originalDeposito;
+            document.getElementById('consorcio').value = originalConsorcio;
+            document.getElementById('total_cobranza').value = originalTotalCobranza;
 
-            document.getElementById('principal').value = importe_p.toFixed(2);
-            document.getElementById('deposito').value = importe_d.toFixed(2);
-            document.getElementById('consorcio').value = importe_c.toFixed(2);
-
-            const totalCobranza = importe_p + importe_d + importe_c;
-            document.getElementById('total_cobranza').value = totalCobranza.toFixed(2);
+            // En rectificación no llamamos aplicarCobranza - ya cargamos los valores originales
+            // y calculateTotals se encargará de recalcular si es Principal
+            if (!this.isRectifying) {
+                this.aplicarCobranza(cobranzaTipoId, response.acuenta);
+            }
 
             // Acción del formulario
             if (this.elements.methodField.value === 'PUT' && response.id) {
@@ -739,7 +777,7 @@ class CompraManager extends CrudManager {
 
         // Total cobranza (recién aquí)
         totalCobranzaEl.value = monto.toFixed(2);
-        recalcularTotalCobranza();
+        this.recalcularTotalCobranza();
     }
 
     bindCobranzaInputs() {
