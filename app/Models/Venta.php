@@ -37,23 +37,24 @@ class Venta extends Model
         'saldo',
         'rentabilidad',
         'estado',
+        'rectificacion_count',
     ];
 
     protected $casts = [
         'fecha_venta' => 'datetime:Y-m-d H:i:s',
         'fecha_vencimiento' => 'datetime:Y-m-d',
-        'op_gravada'        => 'decimal:2',
-        'op_exonerada'      => 'decimal:2',
-        'op_inafecta'       => 'decimal:2',
-        'impuesto'          => 'decimal:2',
-        'total'             => 'decimal:2',
-        'importe_p'        => 'decimal:2',
-        'importe_d'        => 'decimal:2',
-        'importe_c'        => 'decimal:2',
-        'acuenta'           => 'decimal:2',
-        'abonos'            => 'decimal:2',
-        'saldo'             => 'decimal:2',
-        'rentabilidad'      => 'decimal:2',
+        'op_gravada' => 'decimal:2',
+        'op_exonerada' => 'decimal:2',
+        'op_inafecta' => 'decimal:2',
+        'impuesto' => 'decimal:2',
+        'total' => 'decimal:2',
+        'importe_p' => 'decimal:2',
+        'importe_d' => 'decimal:2',
+        'importe_c' => 'decimal:2',
+        'acuenta' => 'decimal:2',
+        'abonos' => 'decimal:2',
+        'saldo' => 'decimal:2',
+        'rentabilidad' => 'decimal:2',
     ];
 
     public function user()
@@ -90,7 +91,7 @@ class Venta extends Model
     {
         return $this->hasMany(VentaProvisionalDetalle::class, 'venta_id');
     }
-    
+
     public function entregas()
     {
         return $this->hasMany(VentaEntrega::class, 'venta_id');

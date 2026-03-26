@@ -16,11 +16,10 @@
 
 namespace App\Services;
 
-use App\Models\Preparada;
 use App\Models\Formulacion;
-use App\Models\Producto;
 use App\Models\Movimiento;
-use App\Services\MovimientoService;
+use App\Models\Preparada;
+use App\Models\Producto;
 use Illuminate\Support\Facades\DB;
 
 class PreparadaService
@@ -40,7 +39,7 @@ class PreparadaService
      * 3. Registra movimientos de SALIDA por cada insumo en el kardex
      * 4. Registra movimiento de INGRESO del producto final en el kardex
      *
-     * @param  array     $data Datos validados del request
+     * @param  array  $data  Datos validados del request
      * @return Preparada La preparada recién creada (con detalles cargados)
      *
      * @throws \Exception Si ocurre cualquier error
@@ -67,34 +66,34 @@ class PreparadaService
                 }
 
                 $this->movimientoService->registrarSalida([
-                    'tipo'              => MovimientoService::TIPO_PREPARADA_SALIDA,
-                    'fecha'             => $preparada->fecha,
-                    'transaccion_tipo'  => 'preparadas',
-                    'transaccion_id'    => $preparada->id,
-                    'detalle_id'        => $detalle->id,
-                    'producto_id'       => $detalle->producto_id,
-                    'producto_nombre'   => $detalle->producto_nombre,
-                    'empaque'           => $detalle->producto_empaque,
-                    'unidad_codigo'     => null,
-                    'cantidad'          => $detalle->salida_saco,
-                    'cantidad_kg'       => $detalle->salida_kg,
+                    'tipo' => MovimientoService::TIPO_PREPARADA_SALIDA,
+                    'fecha' => $preparada->fecha,
+                    'transaccion_tipo' => 'preparadas',
+                    'transaccion_id' => $preparada->id,
+                    'detalle_id' => $detalle->id,
+                    'producto_id' => $detalle->producto_id,
+                    'producto_nombre' => $detalle->producto_nombre,
+                    'empaque' => $detalle->producto_empaque,
+                    'unidad_codigo' => null,
+                    'cantidad' => $detalle->salida_saco,
+                    'cantidad_kg' => $detalle->salida_kg,
                 ]);
             }
 
             // 4) Registrar INGRESO del producto final en el kardex
             $this->movimientoService->registrarIngreso([
-                'tipo'              => MovimientoService::TIPO_PREPARADA_INGRESO,
-                'fecha'             => $preparada->fecha,
-                'transaccion_tipo'  => 'preparadas',
-                'transaccion_id'    => $preparada->id,
-                'detalle_id'        => null,
-                'producto_id'       => $preparada->producto_id,
-                'producto_nombre'   => $preparada->producto_nombre,
-                'empaque'           => $preparada->producto_empaque,
-                'unidad_codigo'     => null,
-                'cantidad'          => $preparada->ingreso_saco,
-                'cantidad_kg'       => $preparada->ingreso_kg,
-                'costo_unitario'    => $preparada->costo_unitario,
+                'tipo' => MovimientoService::TIPO_PREPARADA_INGRESO,
+                'fecha' => $preparada->fecha,
+                'transaccion_tipo' => 'preparadas',
+                'transaccion_id' => $preparada->id,
+                'detalle_id' => null,
+                'producto_id' => $preparada->producto_id,
+                'producto_nombre' => $preparada->producto_nombre,
+                'empaque' => $preparada->producto_empaque,
+                'unidad_codigo' => null,
+                'cantidad' => $preparada->ingreso_saco,
+                'cantidad_kg' => $preparada->ingreso_kg,
+                'costo_unitario' => $preparada->costo_unitario,
             ]);
 
             return $preparada;
@@ -109,7 +108,7 @@ class PreparadaService
      * 4. Por el producto final producido: registra SALIDA (descuenta del almacén)
      * 5. Recalcula el kardex en cascada para todos los productos afectados
      *
-     * @param  int       $id ID de la preparada a anular
+     * @param  int  $id  ID de la preparada a anular
      * @return Preparada La preparada anulada
      *
      * @throws \Exception Si la preparada ya está anulada o si ocurre error
@@ -124,6 +123,14 @@ class PreparadaService
                 throw new \Exception('Esta preparada ya fue anulada.');
             }
 
+            // Si está rectificada, permitir anular para volver a rectificar (si count < 3)
+            if ($preparada->estado === 'rectificada') {
+                if ($preparada->rectificacion_count >= 3) {
+                    throw new \Exception('Esta preparada ya no puede ser rectificada. Máximo 3 rectificaciones permitidas.');
+                }
+                // Permitir: se volverá a 'anulada' para poder rectificar de nuevo
+            }
+
             // 1) Cambiar estado a 'anulada'
             $preparada->update(['estado' => 'anulada']);
 
@@ -135,13 +142,13 @@ class PreparadaService
                 if ((float) $detalle->salida_kg <= 0 || (int) $detalle->producto_id === 77) {
                     continue;
                 }
-                if (!in_array($detalle->producto_id, $productosAfectados)) {
+                if (! in_array($detalle->producto_id, $productosAfectados)) {
                     $productosAfectados[] = $detalle->producto_id;
                 }
             }
 
             // Producto final producido
-            if (!in_array($preparada->producto_id, $productosAfectados)) {
+            if (! in_array($preparada->producto_id, $productosAfectados)) {
                 $productosAfectados[] = $preparada->producto_id;
             }
 
@@ -156,7 +163,7 @@ class PreparadaService
                     ->pluck('id')
                     ->toArray();
 
-                if (!empty($movIds)) {
+                if (! empty($movIds)) {
                     $this->movimientoService->recalcularKardexExcluyendo(
                         $productoId,
                         $movIds
@@ -172,9 +179,8 @@ class PreparadaService
      * Rectifica una preparada previamente anulada (Actualización in-situ).
      * Modifica el registro existente en lugar de crear uno nuevo.
      *
-     * @param int $preparadaId ID de la preparada anulada
-     * @param array $data Datos validados del request
-     * @return array
+     * @param  int  $preparadaId  ID de la preparada anulada
+     * @param  array  $data  Datos validados del request
      */
     public function rectificarPreparada(int $preparadaId, array $data): array
     {
@@ -185,16 +191,23 @@ class PreparadaService
                 throw new \Exception('Solo se pueden rectificar preparadas en estado anulada.');
             }
 
+            if ($preparada->rectificacion_count >= 3) {
+                throw new \Exception('Esta preparada ya no puede ser rectificada. Máximo 3 rectificaciones permitidas.');
+            }
+
             // 1) Procesar datos (cabecera + detalles calculados)
             $preparadaDataRaw = $this->proccessPreparadaData($data, false);
-            $preparadaData    = $preparadaDataRaw['preparada'];
-            
+            $preparadaData = $preparadaDataRaw['preparada'];
+
             // Forzamos estado y trazabilidad
             $preparadaData['estado'] = 'rectificada';
-            $preparadaData['nota']   = trim(($data['nota'] ?? $preparada->nota) . " | Rectificada el " . now()->format('d/m/Y H:i'));
+            $preparadaData['nota'] = trim(($data['nota'] ?? $preparada->nota).' | Rectificada el '.now()->format('d/m/Y H:i'));
 
             // 2) Actualizar la cabecera del registro existente
             $preparada->update($preparadaData);
+
+            // Incrementar contador de rectificaciones
+            $preparada->update(['rectificacion_count' => $preparada->rectificacion_count + 1]);
 
             // 3) Reemplazar detalles
             $preparada->detalles()->delete();
@@ -219,40 +232,40 @@ class PreparadaService
 
                 if ($movNeutralizado) {
                     $producto = Producto::find($detalle->producto_id);
-                    $empaqueBase = (float)($producto->empaque ?? 1);
-                    $empaqueFinal = (float)($detalle->producto_empaque ?? 1);
-                    $cantidad = (float)$detalle->salida_saco;
+                    $empaqueBase = (float) ($producto->empaque ?? 1);
+                    $empaqueFinal = (float) ($detalle->producto_empaque ?? 1);
+                    $cantidad = (float) $detalle->salida_saco;
                     $cantidadStock = ($empaqueFinal == $empaqueBase)
                         ? $cantidad
                         : round($cantidad * ($empaqueFinal / $empaqueBase), 4);
 
                     $movNeutralizado->update([
-                        'detalle_id'      => $detalle->id,
-                        'fecha'           => $preparada->fecha,
+                        'detalle_id' => $detalle->id,
+                        'fecha' => $preparada->fecha,
                         'producto_nombre' => $detalle->producto_nombre,
-                        'empaque'         => $empaqueFinal,
-                        'unidad_codigo'   => null,
-                        'cantidad'        => $cantidad,
-                        'cantidad_kg'     => $detalle->salida_kg,
-                        'entrada'         => 0,
-                        'salida'          => $cantidadStock,
-                        'comentario'      => 'Rectificación de preparada (Actualizado)',
+                        'empaque' => $empaqueFinal,
+                        'unidad_codigo' => null,
+                        'cantidad' => $cantidad,
+                        'cantidad_kg' => $detalle->salida_kg,
+                        'entrada' => 0,
+                        'salida' => $cantidadStock,
+                        'comentario' => 'Rectificación de preparada (Actualizado)',
                     ]);
                     $productosAfectados[] = $detalle->producto_id;
                 } else {
                     $this->movimientoService->registrarSalida([
-                        'tipo'              => MovimientoService::TIPO_PREPARADA_SALIDA,
-                        'fecha'             => $preparada->fecha,
-                        'transaccion_tipo'  => 'preparadas',
-                        'transaccion_id'    => $preparada->id,
-                        'detalle_id'        => $detalle->id,
-                        'producto_id'       => $detalle->producto_id,
-                        'producto_nombre'   => $detalle->producto_nombre,
-                        'empaque'           => $detalle->producto_empaque,
-                        'unidad_codigo'     => null,
-                        'cantidad'          => $detalle->salida_saco,
-                        'cantidad_kg'       => $detalle->salida_kg,
-                        'comentario'        => 'Rectificación de preparada',
+                        'tipo' => MovimientoService::TIPO_PREPARADA_SALIDA,
+                        'fecha' => $preparada->fecha,
+                        'transaccion_tipo' => 'preparadas',
+                        'transaccion_id' => $preparada->id,
+                        'detalle_id' => $detalle->id,
+                        'producto_id' => $detalle->producto_id,
+                        'producto_nombre' => $detalle->producto_nombre,
+                        'empaque' => $detalle->producto_empaque,
+                        'unidad_codigo' => null,
+                        'cantidad' => $detalle->salida_saco,
+                        'cantidad_kg' => $detalle->salida_kg,
+                        'comentario' => 'Rectificación de preparada',
                     ]);
                     $productosAfectados[] = $detalle->producto_id;
                 }
@@ -269,46 +282,46 @@ class PreparadaService
 
             if ($movNeutralizadoProd) {
                 $productoFinal = Producto::find($preparada->producto_id);
-                $empaqueBase = (float)($productoFinal->empaque ?? 1);
-                $empaqueFinal = (float)($preparada->producto_empaque ?? 1);
-                $cantidad = (float)$preparada->ingreso_saco;
-                
+                $empaqueBase = (float) ($productoFinal->empaque ?? 1);
+                $empaqueFinal = (float) ($preparada->producto_empaque ?? 1);
+                $cantidad = (float) $preparada->ingreso_saco;
+
                 $cantidadStock = ($empaqueFinal == $empaqueBase)
                     ? $cantidad
                     : round($cantidad * ($empaqueFinal / $empaqueBase), 4);
 
-                $costoTotalPrep = (float)($cantidad * $preparada->costo_unitario);
-                $costoUnitarioBase = $cantidadStock > 0 ? $costoTotalPrep / $cantidadStock : (float)$preparada->costo_unitario;
+                $costoTotalPrep = (float) ($cantidad * $preparada->costo_unitario);
+                $costoUnitarioBase = $cantidadStock > 0 ? $costoTotalPrep / $cantidadStock : (float) $preparada->costo_unitario;
 
                 $movNeutralizadoProd->update([
-                    'fecha'           => $preparada->fecha,
+                    'fecha' => $preparada->fecha,
                     'producto_nombre' => $preparada->producto_nombre,
-                    'empaque'         => $empaqueFinal,
-                    'unidad_codigo'   => null,
-                    'cantidad'        => $cantidad,
-                    'cantidad_kg'     => $preparada->ingreso_kg,
-                    'entrada'         => $cantidadStock,
-                    'salida'          => 0,
-                    'costo_unitario'  => round($costoUnitarioBase, 4),
-                    'costo_total'     => round($costoTotalPrep, 4),
-                    'comentario'      => 'Rectificación de preparada (Actualizado)',
+                    'empaque' => $empaqueFinal,
+                    'unidad_codigo' => null,
+                    'cantidad' => $cantidad,
+                    'cantidad_kg' => $preparada->ingreso_kg,
+                    'entrada' => $cantidadStock,
+                    'salida' => 0,
+                    'costo_unitario' => round($costoUnitarioBase, 4),
+                    'costo_total' => round($costoTotalPrep, 4),
+                    'comentario' => 'Rectificación de preparada (Actualizado)',
                 ]);
                 $productosAfectados[] = $preparada->producto_id;
             } else {
                 $this->movimientoService->registrarIngreso([
-                    'tipo'              => MovimientoService::TIPO_PREPARADA_INGRESO,
-                    'fecha'             => $preparada->fecha,
-                    'transaccion_tipo'  => 'preparadas',
-                    'transaccion_id'    => $preparada->id,
-                    'detalle_id'        => null,
-                    'producto_id'       => $preparada->producto_id,
-                    'producto_nombre'   => $preparada->producto_nombre,
-                    'empaque'           => $preparada->producto_empaque,
-                    'unidad_codigo'     => null,
-                    'cantidad'          => $preparada->ingreso_saco,
-                    'cantidad_kg'       => $preparada->ingreso_kg,
-                    'costo_unitario'    => $preparada->costo_unitario,
-                    'comentario'        => 'Rectificación de preparada',
+                    'tipo' => MovimientoService::TIPO_PREPARADA_INGRESO,
+                    'fecha' => $preparada->fecha,
+                    'transaccion_tipo' => 'preparadas',
+                    'transaccion_id' => $preparada->id,
+                    'detalle_id' => null,
+                    'producto_id' => $preparada->producto_id,
+                    'producto_nombre' => $preparada->producto_nombre,
+                    'empaque' => $preparada->producto_empaque,
+                    'unidad_codigo' => null,
+                    'cantidad' => $preparada->ingreso_saco,
+                    'cantidad_kg' => $preparada->ingreso_kg,
+                    'costo_unitario' => $preparada->costo_unitario,
+                    'comentario' => 'Rectificación de preparada',
                 ]);
                 $productosAfectados[] = $preparada->producto_id;
             }
@@ -326,11 +339,10 @@ class PreparadaService
 
             return [
                 'preparada' => $preparada,
-                'detalles'  => $detallesNuevos
+                'detalles' => $detallesNuevos,
             ];
         });
     }
-
 
     /* ============================================================
      * COMENTADO: Migrado a sistema de Kardex Valorizado.
@@ -406,8 +418,8 @@ class PreparadaService
      * calcula los costos de cada insumo y genera los arrays listos
      * para Preparada::create() y detalles()->createMany().
      *
-     * @param  array $data  Datos validados del request
-     * @param  bool  $isNew true=nuevo registro (asigna user_id), false=edición
+     * @param  array  $data  Datos validados del request
+     * @param  bool  $isNew  true=nuevo registro (asigna user_id), false=edición
      * @return array ['preparada' => [...], 'detalles' => [...]]
      */
     private function proccessPreparadaData(array $data, bool $isNew = true): array
@@ -423,8 +435,8 @@ class PreparadaService
 
         // Producto final relacionado con la formulación
         $producto = $formulacion->producto;
-        $data['producto_id']      = $producto->id ?? null;
-        $data['producto_nombre']  = $producto->nombre ?? '';
+        $data['producto_id'] = $producto->id ?? null;
+        $data['producto_nombre'] = $producto->nombre ?? '';
         $data['producto_empaque'] = $producto->empaque ?? '';
 
         // Cliente relacionado con la formulación
@@ -432,14 +444,14 @@ class PreparadaService
             ->findOrFail($data['formulacion_id']);
 
         $cliente = $formulacion->cliente;
-        $data['cliente_id']     = $cliente?->id;
+        $data['cliente_id'] = $cliente?->id;
         $data['cliente_nombre'] = $cliente?->razon_social ?? '';
 
         // Inicializar totales acumulados
         $totales = [
-            'ingreso_saco'  => 0,
-            'ingreso_kg'    => 0,
-            'ingreso_soles' => 0
+            'ingreso_saco' => 0,
+            'ingreso_kg' => 0,
+            'ingreso_soles' => 0,
         ];
 
         // Calcular cada línea de detalle (insumos)
@@ -458,32 +470,32 @@ class PreparadaService
 
         // Construir array de la cabecera
         $preparadaData = [
-            'fecha'            => $data['fecha'] ?? now(),
-            'numero_interno'   => $data['numero_interno'] ?? '',
-            'formulacion_id'   => $data['formulacion_id'] ?? null,
-            'producto_id'      => $data['producto_id'] ?? null,
-            'producto_nombre'  => $data['producto_nombre'] ?? '',
+            'fecha' => $data['fecha'] ?? now(),
+            'numero_interno' => $data['numero_interno'] ?? '',
+            'formulacion_id' => $data['formulacion_id'] ?? null,
+            'producto_id' => $data['producto_id'] ?? null,
+            'producto_nombre' => $data['producto_nombre'] ?? '',
             'producto_empaque' => $data['producto_empaque'] ?? 0,
-            'items'            => count($detallesCalculados),
-            'cliente_id'       => $data['cliente_id'],
-            'cliente_nombre'   => $data['cliente_nombre'] ?? '',
-            'costo_unitario'   => round($totales['ingreso_soles'] / $data['ingreso_saco'], 4) ?? 0,
+            'items' => count($detallesCalculados),
+            'cliente_id' => $data['cliente_id'],
+            'cliente_nombre' => $data['cliente_nombre'] ?? '',
+            'costo_unitario' => round($totales['ingreso_soles'] / $data['ingreso_saco'], 4) ?? 0,
 
             // Valores de ingreso (input del usuario)
-            'ingreso_saco'  => $data['ingreso_saco'] ?? 0,
-            'ingreso_kg'    => $data['ingreso_kg'] ?? 0,
+            'ingreso_saco' => $data['ingreso_saco'] ?? 0,
+            'ingreso_kg' => $data['ingreso_kg'] ?? 0,
             'ingreso_soles' => $data['ingreso_soles'] ?? 0,
         ];
 
         // Campos exclusivos de creación
         if ($isNew) {
-            $preparadaData['user_id']     = auth()->id();
+            $preparadaData['user_id'] = auth()->id();
             $preparadaData['user_nombre'] = auth()->user()->name;
         }
 
         return [
             'preparada' => $preparadaData,
-            'detalles'  => $detallesCalculados
+            'detalles' => $detallesCalculados,
         ];
     }
 
@@ -496,18 +508,18 @@ class PreparadaService
      * Nota: El producto con ID 77 tiene un cálculo especial donde
      * salida_soles = precio_unitario directamente.
      *
-     * @param  Producto $producto           Producto insumo
-     * @param  float    $salida_saco        Cantidad en sacos
-     * @param  float    $salida_kg          Cantidad en kilogramos
-     * @param  float    $salida_soles       Costo en soles
-     * @param  float    $precio_unitario_input Precio unitario del insumo
-     * @param  array    &$totales           Array de totales acumulados (referencia)
-     * @return array    Detalle listo para createMany()
+     * @param  Producto  $producto  Producto insumo
+     * @param  float  $salida_saco  Cantidad en sacos
+     * @param  float  $salida_kg  Cantidad en kilogramos
+     * @param  float  $salida_soles  Costo en soles
+     * @param  float  $precio_unitario_input  Precio unitario del insumo
+     * @param  array  &$totales  Array de totales acumulados (referencia)
+     * @return array Detalle listo para createMany()
      */
     private function calculateDetail($producto, $salida_saco, $salida_kg, $salida_soles, $precio_unitario_input, array &$totales): array
     {
         $totales['ingreso_saco'] += $salida_saco;
-        $totales['ingreso_kg']   += $salida_kg;
+        $totales['ingreso_kg'] += $salida_kg;
 
         // Producto con ID 77 tiene cálculo especial
         if ((int) $producto->id === 77) {
@@ -521,13 +533,13 @@ class PreparadaService
         $totales['ingreso_soles'] += $salida_soles;
 
         return [
-            'producto_id'      => $producto->id,
-            'producto_nombre'  => $producto->nombre,
+            'producto_id' => $producto->id,
+            'producto_nombre' => $producto->nombre,
             'producto_empaque' => $producto->empaque ?? 0,
-            'salida_saco'      => $salida_saco,
-            'salida_kg'        => $salida_kg,
-            'salida_soles'     => $salida_soles,
-            'precio_unitario'  => $precio_unitario_input,
+            'salida_saco' => $salida_saco,
+            'salida_kg' => $salida_kg,
+            'salida_soles' => $salida_soles,
+            'precio_unitario' => $precio_unitario_input,
         ];
     }
 }

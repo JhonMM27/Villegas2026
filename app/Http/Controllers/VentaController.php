@@ -53,6 +53,7 @@ class VentaController extends Controller
                 DB::raw('DATE(fecha_venta) as fecha_venta'), 'fecha_vencimiento', 'moneda', 'op_gravada',
                 'op_exonerada', 'op_inafecta', 'impuesto', 'total', 'estado', 'abonos', 'saldo',
                 'importe_p', 'importe_d', 'importe_c', 'acuenta', 'docpagoi',
+                'rectificacion_count',
             ])->orderBy('id', 'desc');
 
             return DataTables::of($data)
@@ -76,8 +77,15 @@ class VentaController extends Controller
                          </button>';
                     }
 
-                    // Botón Rectificar (solo si está anulada)
-                    if ($row->estado === 'anulada' && auth()->user()->can('ventas_edit') && \Carbon\Carbon::parse($row->fecha_venta)->format('Y-m-d') >= '2026-03-24') {
+                    // Botón Anular (si está rectificada y aún puede rectificar más, para volver a 'anulada')
+                    if ($row->estado === 'rectificada' && $row->rectificacion_count < 3 && auth()->user()->can('ventas_delete') && \Carbon\Carbon::parse($row->fecha_venta)->format('Y-m-d') >= '2026-03-24') {
+                        $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-venta" data-id="'.$row->id.'" title="Anular para rectificar">
+                            <i class="bi bi-x-circle"></i>
+                         </button>';
+                    }
+
+                    // Botón Rectificar (solo si está anulada y rectificacion_count < 3)
+                    if ($row->estado === 'anulada' && $row->rectificacion_count < 3 && auth()->user()->can('ventas_edit') && \Carbon\Carbon::parse($row->fecha_venta)->format('Y-m-d') >= '2026-03-24') {
                         $buttons[] = '<button class="btn btn-sm btn-warning btn-rectificar-venta" data-id="'.$row->id.'" title="Rectificar Venta">
                             <i class="bi bi-arrow-repeat"></i>
                          </button>';

@@ -199,6 +199,14 @@
                             <tr><td colspan="6" class="text-center text-muted">Sin ventas</td></tr>
                             @endforelse
                         </tbody>
+                        <tfoot class="table-secondary fw-bold">
+                            <tr>
+                                <td colspan="6" class="text-end">TOTALES:</td>
+                                <td class="text-end">{{ number_format((float)(($ventasList ?? collect())->sum('importe_p')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($ventasList ?? collect())->sum('importe_d')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($ventasList ?? collect())->sum('importe_c')),2,'.','') }}</td>
+                            </tr>
+                        </tfoot>
                     </table>
 
                 </div>
@@ -274,6 +282,14 @@
                             <tr><td colspan="6" class="text-center text-muted">Sin compras</td></tr>
                             @endforelse
                         </tbody>
+                        <tfoot class="table-secondary fw-bold">
+                            <tr>
+                                <td colspan="6" class="text-end">TOTALES:</td>
+                                <td class="text-end">{{ number_format((float)(($comprasList ?? collect())->sum('importe_p')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($comprasList ?? collect())->sum('importe_d')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($comprasList ?? collect())->sum('importe_c')),2,'.','') }}</td>
+                            </tr>
+                        </tfoot>
                     </table>
 
                 </div>
@@ -345,6 +361,14 @@
                             <tr><td colspan="4" class="text-center text-muted">Sin provisionales</td></tr>
                             @endforelse
                         </tbody>
+                        <tfoot class="table-secondary fw-bold">
+                            <tr>
+                                <td colspan="4" class="text-end">TOTALES:</td>
+                                <td class="text-end">{{ number_format((float)(($ventaProvisionalesList ?? collect())->sum('importe_p')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($ventaProvisionalesList ?? collect())->sum('importe_d')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($ventaProvisionalesList ?? collect())->sum('importe_c')),2,'.','') }}</td>
+                            </tr>
+                        </tfoot>
                     </table>
 
                 </div>
@@ -416,6 +440,14 @@
                             <tr><td colspan="4" class="text-center text-muted">Sin provisionales</td></tr>
                             @endforelse
                         </tbody>
+                        <tfoot class="table-secondary fw-bold">
+                            <tr>
+                                <td colspan="4" class="text-end">TOTALES:</td>
+                                <td class="text-end">{{ number_format((float)(($compraProvisionalesList ?? collect())->sum('importe_p')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($compraProvisionalesList ?? collect())->sum('importe_d')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($compraProvisionalesList ?? collect())->sum('importe_c')),2,'.','') }}</td>
+                            </tr>
+                        </tfoot>
                     </table>
 
                 </div>
@@ -486,6 +518,14 @@
                             <tr><td colspan="4" class="text-center text-muted">Sin gastos</td></tr>
                             @endforelse
                         </tbody>
+                        <tfoot class="table-secondary fw-bold">
+                            <tr>
+                                <td colspan="4" class="text-end">TOTALES:</td>
+                                <td class="text-end">{{ number_format((float)(($gastosList ?? collect())->sum('importe_p')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($gastosList ?? collect())->sum('importe_d')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($gastosList ?? collect())->sum('importe_c')),2,'.','') }}</td>
+                            </tr>
+                        </tfoot>
                     </table>
 
                 </div>

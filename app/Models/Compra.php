@@ -33,8 +33,10 @@ class Compra extends Model
         'acuenta',
         'abonos',
         'saldo',
-        'estado'
+        'estado',
+        'rectificacion_count',
     ];
+
     /*
     protected $casts = [
         'fecha_venta' => 'datetime:Y-m-d H:i:s',

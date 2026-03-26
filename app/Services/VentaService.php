@@ -15,15 +15,14 @@
 
 namespace App\Services;
 
-use App\Models\Venta;
 use App\Models\Cliente;
-use App\Models\ComprobanteTipo;
 use App\Models\ComprobanteSerie;
-use App\Models\PagoForma;
-use App\Models\Producto;
+use App\Models\ComprobanteTipo;
 use App\Models\Cotizacion;
 use App\Models\Movimiento;
-use App\Services\MovimientoService;
+use App\Models\PagoForma;
+use App\Models\Producto;
+use App\Models\Venta;
 use Illuminate\Support\Facades\DB;
 
 class VentaService
@@ -45,12 +44,12 @@ class VentaService
      * 5. Incrementa el correlativo de la serie
      * 6. Actualiza la cotización asociada si aplica
      *
-     * @param  array    $data             Datos validados del request
-     * @param  int|null $cotizacionRefId  ID de cotización a vincular (opcional)
-     * @return Venta    La venta recién creada
+     * @param  array  $data  Datos validados del request
+     * @param  int|null  $cotizacionRefId  ID de cotización a vincular (opcional)
+     * @return Venta La venta recién creada
      *
      * @throws \Illuminate\Database\QueryException Si hay conflicto de correlativo
-     * @throws \Exception                          Si ocurre cualquier otro error
+     * @throws \Exception Si ocurre cualquier otro error
      */
     public function createVenta(array $data, ?int $cotizacionRefId = null): Venta
     {
@@ -76,23 +75,23 @@ class VentaService
             // 5) Registrar movimientos de SALIDA en el kardex por cada detalle
             foreach ($detallesCreados as $detalle) {
                 $this->movimientoService->registrarSalida([
-                    'tipo'              => MovimientoService::TIPO_VENTA,
-                    'fecha'             => $venta->fecha_venta,
-                    'transaccion_tipo'  => 'ventas',
-                    'transaccion_id'    => $venta->id,
-                    'detalle_id'        => $detalle->id,
-                    'producto_id'       => $detalle->producto_id,
-                    'producto_nombre'   => $detalle->producto_nombre,
-                    'empaque'           => $detalle->producto_empaque,
-                    'unidad_codigo'     => $detalle->unidad_codigo,
-                    'cantidad'          => $detalle->cantidad,
-                    'cantidad_kg'       => $detalle->salida_kg,
+                    'tipo' => MovimientoService::TIPO_VENTA,
+                    'fecha' => $venta->fecha_venta,
+                    'transaccion_tipo' => 'ventas',
+                    'transaccion_id' => $venta->id,
+                    'detalle_id' => $detalle->id,
+                    'producto_id' => $detalle->producto_id,
+                    'producto_nombre' => $detalle->producto_nombre,
+                    'empaque' => $detalle->producto_empaque,
+                    'unidad_codigo' => $detalle->unidad_codigo,
+                    'cantidad' => $detalle->cantidad,
+                    'cantidad_kg' => $detalle->salida_kg,
                 ]);
             }
 
             // 6) Incrementar correlativo en comprobante_series
             $serieConfig->update([
-                'correlativo' => $correlativo + 1
+                'correlativo' => $correlativo + 1,
             ]);
 
             // 7) Actualizar cotización si viene de una cotización
@@ -100,7 +99,7 @@ class VentaService
                 Cotizacion::where('id', $cotizacionRefId)
                     ->update([
                         'venta_id' => $venta->id,
-                        'estado'   => 'PROCESADO'
+                        'estado' => 'PROCESADO',
                     ]);
             }
 
@@ -118,8 +117,8 @@ class VentaService
      *    de la venta para actualizar CPP en todas las transacciones
      *    posteriores (incluyendo compras nuevas que dependen del stock restaurado)
      *
-     * @param  int $id ID de la venta a anular
-     * @return Venta  La venta anulada
+     * @param  int  $id  ID de la venta a anular
+     * @return Venta La venta anulada
      *
      * @throws \Exception Si la venta ya está anulada o si ocurre error
      */
@@ -128,12 +127,17 @@ class VentaService
         return DB::transaction(function () use ($id) {
             $venta = Venta::with('detalles')->findOrFail($id);
 
-            // Validar que no esté ya anulada o rectificada
+            // Validar que no esté ya anulada
             if ($venta->estado === 'anulada') {
                 throw new \Exception('Esta venta ya fue anulada.');
             }
+
+            // Si está rectificada, permitir anular para volver a rectificar (si count < 3)
             if ($venta->estado === 'rectificada') {
-                throw new \Exception('Esta venta ya fue rectificada.');
+                if ($venta->rectificacion_count >= 3) {
+                    throw new \Exception('Esta venta ya no puede ser rectificada. Máximo 3 rectificaciones permitidas.');
+                }
+                // Permitir: se volverá a 'anulada' para poder rectificar de nuevo
             }
 
             // 1) Cambiar estado a 'anulada'
@@ -142,7 +146,7 @@ class VentaService
             // 2) Recopilar IDs de productos afectados
             $productosAfectados = [];
             foreach ($venta->detalles as $detalle) {
-                if (!in_array($detalle->producto_id, $productosAfectados)) {
+                if (! in_array($detalle->producto_id, $productosAfectados)) {
                     $productosAfectados[] = $detalle->producto_id;
                 }
             }
@@ -155,7 +159,7 @@ class VentaService
                     ->pluck('id')
                     ->toArray();
 
-                if (!empty($movIds)) {
+                if (! empty($movIds)) {
                     $this->movimientoService->recalcularKardexExcluyendo(
                         $productoId,
                         $movIds
@@ -170,10 +174,6 @@ class VentaService
     /**
      * Rectifica una venta previamente anulada (Actualización in-situ).
      * Modifica el registro existente en lugar de crear uno nuevo.
-     *
-     * @param int $ventaId
-     * @param array $data
-     * @return Venta
      */
     public function rectificarVenta(int $ventaId, array $data): Venta
     {
@@ -184,18 +184,25 @@ class VentaService
                 throw new \Exception('Solo se pueden rectificar ventas en estado anulada.');
             }
 
+            if ($venta->rectificacion_count >= 3) {
+                throw new \Exception('Esta venta ya no puede ser rectificada. Máximo 3 rectificaciones permitidas.');
+            }
+
             // 1) Procesar los datos de la venta
             $ventaDataRaw = $this->processVentaData($data, false);
             $ventaData = $ventaDataRaw['venta'];
-            
+
             // Forzar serie y correlativo originales de la venta (se preservan en rectificación)
-            $ventaData['serie']       = $venta->serie;
+            $ventaData['serie'] = $venta->serie;
             $ventaData['correlativo'] = $venta->correlativo;
             $ventaData['estado'] = 'rectificada';
-            $ventaData['nota']   = trim(($data['nota'] ?? $venta->nota) . " | Rectificada el " . now()->format('d/m/Y H:i'));
+            $ventaData['nota'] = trim(($data['nota'] ?? $venta->nota).' | Rectificada el '.now()->format('d/m/Y H:i'));
 
             // 2) Actualizar la cabecera del registro existente
             $venta->update($ventaData);
+
+            // Incrementar contador de rectificaciones
+            $venta->update(['rectificacion_count' => $venta->rectificacion_count + 1]);
 
             // 3) Gestionar detalles y movimientos
             // Eliminamos detalles antiguos para reemplazarlos (más limpio que update individual)
@@ -214,32 +221,32 @@ class VentaService
 
                 if ($movNeutralizado) {
                     $movNeutralizado->update([
-                        'detalle_id'     => $detalle->id,
-                        'fecha'          => $venta->fecha_venta,
-                        'empaque'        => $detalle->producto_empaque,
-                        'unidad_codigo'  => $detalle->unidad_codigo,
-                        'cantidad'       => $detalle->cantidad,
-                        'salida'         => $detalle->salida_saco,
-                        'cantidad_kg'    => $detalle->salida_kg,
+                        'detalle_id' => $detalle->id,
+                        'fecha' => $venta->fecha_venta,
+                        'empaque' => $detalle->producto_empaque,
+                        'unidad_codigo' => $detalle->unidad_codigo,
+                        'cantidad' => $detalle->cantidad,
+                        'salida' => $detalle->salida_saco,
+                        'cantidad_kg' => $detalle->salida_kg,
                         'costo_unitario' => $detalle->costo_unitario,
-                        'costo_total'    => $detalle->costo_total,
-                        'comentario'     => 'Rectificación de venta (Actualizado)',
+                        'costo_total' => $detalle->costo_total,
+                        'comentario' => 'Rectificación de venta (Actualizado)',
                     ]);
                     $productosAfectados[] = $detalle->producto_id;
                 } else {
                     // Si no había movimiento previo, registramos una nueva salida
                     $this->movimientoService->registrarSalida([
-                        'tipo'              => MovimientoService::TIPO_VENTA,
-                        'fecha'             => $venta->fecha_venta,
-                        'transaccion_tipo'  => 'ventas',
-                        'transaccion_id'    => $venta->id,
-                        'detalle_id'        => $detalle->id,
-                        'producto_id'       => $detalle->producto_id,
-                        'producto_nombre'   => $detalle->producto_nombre,
-                        'empaque'           => $detalle->producto_empaque,
-                        'unidad_codigo'     => $detalle->unidad_codigo,
-                        'cantidad'          => $detalle->cantidad,
-                        'cantidad_kg'       => $detalle->salida_kg,
+                        'tipo' => MovimientoService::TIPO_VENTA,
+                        'fecha' => $venta->fecha_venta,
+                        'transaccion_tipo' => 'ventas',
+                        'transaccion_id' => $venta->id,
+                        'detalle_id' => $detalle->id,
+                        'producto_id' => $detalle->producto_id,
+                        'producto_nombre' => $detalle->producto_nombre,
+                        'empaque' => $detalle->producto_empaque,
+                        'unidad_codigo' => $detalle->unidad_codigo,
+                        'cantidad' => $detalle->cantidad,
+                        'cantidad_kg' => $detalle->salida_kg,
                     ]);
                     $productosAfectados[] = $detalle->producto_id;
                 }
@@ -333,8 +340,8 @@ class VentaService
      * Consulta las entidades relacionadas (cliente, comprobante, pago, productos)
      * y genera los arrays listos para Venta::create() y detalles()->createMany().
      *
-     * @param  array $data  Datos validados del request
-     * @param  bool  $isNew true=nuevo registro (asigna user_id y estado), false=edición
+     * @param  array  $data  Datos validados del request
+     * @param  bool  $isNew  true=nuevo registro (asigna user_id y estado), false=edición
      * @return array ['venta' => [...], 'detalles' => [...]]
      */
     private function processVentaData(array $data, bool $isNew = true): array
@@ -354,12 +361,12 @@ class VentaService
 
         // Totales recibidos del frontend (se confía en el cálculo del frontend)
         $totales = [
-            'op_gravada'   => $data['op_gravada'],
+            'op_gravada' => $data['op_gravada'],
             'op_exonerada' => $data['op_exonerada'],
-            'op_inafecta'  => $data['op_inafecta'],
-            'impuesto'     => $data['impuesto'],
-            'total'        => $data['total'],
-            'rentabilidad' => 0.00
+            'op_inafecta' => $data['op_inafecta'],
+            'impuesto' => $data['impuesto'],
+            'total' => $data['total'],
+            'rentabilidad' => 0.00,
         ];
 
         // Calcular cada línea de detalle
@@ -375,43 +382,43 @@ class VentaService
 
         // Construir array de la cabecera
         $ventaData = [
-            'cliente_id'              => $data['cliente_id'],
-            'cliente_nombre'          => $cliente->razon_social ?? '',
-            'items'                   => $totalItems,
+            'cliente_id' => $data['cliente_id'],
+            'cliente_nombre' => $cliente->razon_social ?? '',
+            'items' => $totalItems,
             'comprobante_tipo_codigo' => $data['comprobante_tipo_codigo'],
             'comprobante_tipo_nombre' => $comprobanteTipo->codigo ?? '',
-            'serie'                   => $data['serie'],
-            'correlativo'             => $data['correlativo'],
-            'docpagoi'                => $data['docpagoi'],
-            'fecha_venta'             => $data['fecha_venta'] ?? now(),
-            'fecha_vencimiento'       => $data['fecha_vencimiento'] ?? null,
-            'pago_forma_codigo'       => $data['pago_forma_codigo'],
-            'pago_forma_nombre'       => $pagoForma->descripcion ?? '',
-            'moneda'                  => $moneda,
-            'op_gravada'              => round($totales['op_gravada'], 2),
-            'op_exonerada'            => round($totales['op_exonerada'], 2),
-            'op_inafecta'             => round($totales['op_inafecta'], 2),
-            'impuesto'                => round($totales['impuesto'], 2),
-            'total'                   => round($totales['total'], 2),
-            'importe_p'               => $data['principal'] ?? 0,
-            'importe_d'               => $data['deposito'] ?? 0,
-            'importe_c'               => $data['consorcio'] ?? 0,
-            'acuenta'                 => $data['total_cobranza'] ?? '',
-            'saldo'                   => round($totales['total'], 2) - ($data['total_cobranza'] ?? 0),
-            'abonos'                  => 0.00,
-            'rentabilidad'            => round($totales['rentabilidad'], 4)
+            'serie' => $data['serie'],
+            'correlativo' => $data['correlativo'],
+            'docpagoi' => $data['docpagoi'],
+            'fecha_venta' => $data['fecha_venta'] ?? now(),
+            'fecha_vencimiento' => $data['fecha_vencimiento'] ?? null,
+            'pago_forma_codigo' => $data['pago_forma_codigo'],
+            'pago_forma_nombre' => $pagoForma->descripcion ?? '',
+            'moneda' => $moneda,
+            'op_gravada' => round($totales['op_gravada'], 2),
+            'op_exonerada' => round($totales['op_exonerada'], 2),
+            'op_inafecta' => round($totales['op_inafecta'], 2),
+            'impuesto' => round($totales['impuesto'], 2),
+            'total' => round($totales['total'], 2),
+            'importe_p' => $data['principal'] ?? 0,
+            'importe_d' => $data['deposito'] ?? 0,
+            'importe_c' => $data['consorcio'] ?? 0,
+            'acuenta' => $data['total_cobranza'] ?? '',
+            'saldo' => round($totales['total'], 2) - ($data['total_cobranza'] ?? 0),
+            'abonos' => 0.00,
+            'rentabilidad' => round($totales['rentabilidad'], 4),
         ];
 
         // Campos exclusivos de creación
         if ($isNew) {
-            $ventaData['estado']      = 'registrada';
-            $ventaData['user_id']     = auth()->id();
+            $ventaData['estado'] = 'registrada';
+            $ventaData['user_id'] = auth()->id();
             $ventaData['user_nombre'] = auth()->user()->name;
         }
 
         return [
-            'venta'    => $ventaData,
-            'detalles' => $detallesCalculados
+            'venta' => $ventaData,
+            'detalles' => $detallesCalculados,
         ];
     }
 
@@ -421,24 +428,24 @@ class VentaService
      * Determina: subtotal, impuesto, rentabilidad, conversión de empaque,
      * salida en sacos y kg, y costo unitario/total.
      *
-     * @param  Producto $producto Producto con su afectacionTipo cargada
-     * @param  array    $detalle  Datos del detalle desde el request
-     * @param  array    &$totales Array de totales acumulados (se modifica por referencia)
-     * @return array    Detalle listo para createMany()
+     * @param  Producto  $producto  Producto con su afectacionTipo cargada
+     * @param  array  $detalle  Datos del detalle desde el request
+     * @param  array  &$totales  Array de totales acumulados (se modifica por referencia)
+     * @return array Detalle listo para createMany()
      */
     private function calculateDetail($producto, $detalle, array &$totales): array
     {
-        $unidad_codigo   = $detalle['unidad_codigo'];
+        $unidad_codigo = $detalle['unidad_codigo'];
         $precio_unitario = $detalle['precio_unitario'];
-        $entregado       = $detalle['entrega'] ?? $detalle['cantidad'];
-        $cantidad        = $detalle['cantidad'];
-        $empaque         = $detalle['empaque'];
-        $detalleTotal    = $detalle['total'];
+        $entregado = $detalle['entrega'] ?? $detalle['cantidad'];
+        $cantidad = $detalle['cantidad'];
+        $empaque = $detalle['empaque'];
+        $detalleTotal = $detalle['total'];
 
         // Cálculo de costo unitario considerando conversión de empaque
-        $costoBase       = (float) ($producto->costo_unitario ?? 0);
+        $costoBase = (float) ($producto->costo_unitario ?? 0);
         $empaqueProducto = (float) ($producto->empaque ?? 1);
-        $empaqueDetalle  = (float) ($empaque ?? 1);
+        $empaqueDetalle = (float) ($empaque ?? 1);
 
         // Evitar división entre cero
         if ($empaqueProducto <= 0) {
@@ -446,40 +453,39 @@ class VentaService
         }
 
         $costo_unitario = round(($costoBase / $empaqueProducto) * $empaqueDetalle, 4);
-        $costo_total    = round($costo_unitario * $cantidad, 4);
-
+        $costo_total = round($costo_unitario * $cantidad, 4);
 
         $detalleTotalRound = round($detalleTotal, 4);
-        $rentabilidad    = $detalleTotalRound - $costo_total;
+        $rentabilidad = $detalleTotalRound - $costo_total;
         $rentabilidadRed = round($rentabilidad, 4);
 
         // Cálculo de impuesto según tipo de afectación
         $porcentajeImpuesto = optional($producto->afectacionTipo)->porcentaje ?? 0;
-        $subtotal           = $porcentajeImpuesto > 0 ? $detalleTotal / (1 + $porcentajeImpuesto) : $detalleTotal;
-        $detalleImpuesto    = $detalleTotal - $subtotal;
+        $subtotal = $porcentajeImpuesto > 0 ? $detalleTotal / (1 + $porcentajeImpuesto) : $detalleTotal;
+        $detalleImpuesto = $detalleTotal - $subtotal;
 
         // Acumular rentabilidad en totales
         $totales['rentabilidad'] += $rentabilidadRed;
 
         return [
-            'detalle'              => 1,
-            'producto_id'          => $producto->id,
-            'producto_nombre'      => $producto->nombre,
-            'producto_empaque'     => $empaque ?? 0,
-            'unidad_codigo'        => $unidad_codigo ?? '',
-            'salida_saco'          => ($cantidad * $empaque) / $producto->empaque,
-            'salida_kg'            => $cantidad * $empaque,
-            'cantidad'             => $cantidad,
-            'entregado'            => $entregado,
-            'saldo'                => $cantidad - $entregado,
-            'precio_unitario'      => round($precio_unitario, 4),
-            'subtotal'             => round($subtotal, 2),
-            'porcentaje_impuesto'  => $porcentajeImpuesto,
-            'impuesto'             => round($detalleImpuesto, 2),
-            'total'                => round($detalleTotal, 2),
-            'costo_unitario'       => round($costo_unitario, 4),
-            'costo_total'          => round($costo_total, 4),
-            'rentabilidad'         => round($rentabilidadRed, 4)
+            'detalle' => 1,
+            'producto_id' => $producto->id,
+            'producto_nombre' => $producto->nombre,
+            'producto_empaque' => $empaque ?? 0,
+            'unidad_codigo' => $unidad_codigo ?? '',
+            'salida_saco' => ($cantidad * $empaque) / $producto->empaque,
+            'salida_kg' => $cantidad * $empaque,
+            'cantidad' => $cantidad,
+            'entregado' => $entregado,
+            'saldo' => $cantidad - $entregado,
+            'precio_unitario' => round($precio_unitario, 4),
+            'subtotal' => round($subtotal, 2),
+            'porcentaje_impuesto' => $porcentajeImpuesto,
+            'impuesto' => round($detalleImpuesto, 2),
+            'total' => round($detalleTotal, 2),
+            'costo_unitario' => round($costo_unitario, 4),
+            'costo_total' => round($costo_total, 4),
+            'rentabilidad' => round($rentabilidadRed, 4),
         ];
     }
 }

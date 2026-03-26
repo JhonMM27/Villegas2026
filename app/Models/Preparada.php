@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Preparada extends Model
 {
-    //use HasFactory;
+    // use HasFactory;
 
     protected $table = 'preparadas';
 
@@ -27,10 +27,11 @@ class Preparada extends Model
         'ingreso_soles',
         'items',
         'estado',
+        'rectificacion_count',
     ];
 
     protected $casts = [
-        //'fecha' => 'datetime',
+        // 'fecha' => 'datetime',
         'costo_unitario' => 'decimal:4',
         'ingreso_saco' => 'decimal:4',
         'ingreso_kg' => 'decimal:4',

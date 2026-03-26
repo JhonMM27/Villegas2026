@@ -13,35 +13,30 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Formulacion;
 use App\Models\Preparada;
-use App\Models\PreparadaDetalle;
-use App\Models\Cliente;
-use App\Services\PreparadaService;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Yajra\DataTables\DataTables;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\DB;
 use App\Models\Producto;
+use App\Services\PreparadaService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Yajra\DataTables\DataTables;
 
 class PreparadaController extends Controller
 {
-
     /**
      * Constructor: inyecta el servicio de preparadas y define los middleware de permisos.
      *
-     * @param PreparadaService $preparadaService Servicio con la lógica de negocio de preparadas
+     * @param  PreparadaService  $preparadaService  Servicio con la lógica de negocio de preparadas
      */
     public function __construct(
         protected PreparadaService $preparadaService
-    ){
-        $this->middleware('can:preparadas_list')->only(['index', 'view','printTicket']);
+    ) {
+        $this->middleware('can:preparadas_list')->only(['index', 'view', 'printTicket']);
         $this->middleware('can:preparadas_create')->only(['store']);
         $this->middleware('can:preparadas_edit')->only(['show', 'update']);
         $this->middleware('can:preparadas_delete')->only(['destroy']);
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -49,28 +44,29 @@ class PreparadaController extends Controller
     {
         if ($request->ajax()) {
             $data = Preparada::with('detalles')
-            ->select([
-                'id',
-                'fecha',
-                'numero_interno',
-                'producto_nombre',
-                'cliente_nombre',
-                'ingreso_kg',
-                'ingreso_soles',
-                'ingreso_saco',
-                'producto_empaque',
-                'formulacion_id',
-                'user_nombre',
-                'items',
-                'estado',
-            ])
-            ->orderBy('id', 'desc');
+                ->select([
+                    'id',
+                    'fecha',
+                    'numero_interno',
+                    'producto_nombre',
+                    'cliente_nombre',
+                    'ingreso_kg',
+                    'ingreso_soles',
+                    'ingreso_saco',
+                    'producto_empaque',
+                    'formulacion_id',
+                    'user_nombre',
+                    'items',
+                    'estado',
+                    'rectificacion_count',
+                ])
+                ->orderBy('id', 'desc');
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
                     $buttons = [];
 
-                    /* 
+                    /*
                     // El usuario solicitó comentar iconos Editar/Delete
                     if (auth()->user()->can('preparadas_edit')) {
                          $buttons[] = '<button class="btn btn-sm btn-info btn-edit-preparada" data-id="' . $row->id . '"><i class="bi bi-pencil"></i></button>';
@@ -82,46 +78,53 @@ class PreparadaController extends Controller
 
                     // Botón Anular (solo si está registrada)
                     if ($row->estado === 'registrada' && auth()->user()->can('preparadas_delete') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
-                        $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-preparada" data-id="' . $row->id . '" title="Anular Preparada">
+                        $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-preparada" data-id="'.$row->id.'" title="Anular Preparada">
                             <i class="bi bi-x-circle"></i>
                          </button>';
                     }
 
-                    // Botón Rectificar (solo si está anulada)
-                    if ($row->estado === 'anulada' && auth()->user()->can('preparadas_edit') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
-                        $buttons[] = '<button class="btn btn-sm btn-warning btn-rectificar-preparada" data-id="' . $row->id . '" title="Rectificar Preparada">
+                    // Botón Anular (si está rectificada y aún puede rectificar más)
+                    if ($row->estado === 'rectificada' && $row->rectificacion_count < 3 && auth()->user()->can('preparadas_delete') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
+                        $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-preparada" data-id="'.$row->id.'" title="Anular para rectificar">
+                            <i class="bi bi-x-circle"></i>
+                         </button>';
+                    }
+
+                    // Botón Rectificar (solo si está anulada y rectificacion_count < 3)
+                    if ($row->estado === 'anulada' && $row->rectificacion_count < 3 && auth()->user()->can('preparadas_edit') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
+                        $buttons[] = '<button class="btn btn-sm btn-warning btn-rectificar-preparada" data-id="'.$row->id.'" title="Rectificar Preparada">
                             <i class="bi bi-arrow-repeat"></i>
                          </button>';
                     }
 
                     // Botón Imprimir
-                    $buttons[] = '<a href="' . route('preparadas.imprimir', $row->id) . '" target="_blank" class="btn btn-sm btn-secondary" title="Imprimir"><i class="bi bi-printer"></i></a>';
+                    $buttons[] = '<a href="'.route('preparadas.imprimir', $row->id).'" target="_blank" class="btn btn-sm btn-secondary" title="Imprimir"><i class="bi bi-printer"></i></a>';
 
                     // Botón Ver
-                    $buttons[] = '<button class="btn btn-sm btn-info btn-view-preparada" data-id="' . $row->id . '" title="Ver Preparada"><i class="bi bi-eye"></i></button>';
+                    $buttons[] = '<button class="btn btn-sm btn-info btn-view-preparada" data-id="'.$row->id.'" title="Ver Preparada"><i class="bi bi-eye"></i></button>';
 
-                    return '<div class="btn-group">' . implode('', $buttons) . '</div>';
+                    return '<div class="btn-group">'.implode('', $buttons).'</div>';
                 })
                 ->rawColumns(['action', 'estado'])
                 ->editColumn('estado', function ($row) {
-                    $color = match($row->estado) {
+                    $color = match ($row->estado) {
                         'anulada' => 'danger',
                         'rectificada' => 'info',
                         default => 'success'
                     };
-                    return '<span class="badge bg-' . $color . '">' . $row->estado . '</span>';
+
+                    return '<span class="badge bg-'.$color.'">'.$row->estado.'</span>';
                 })
-                ->addColumn('item', fn($row) => $row->detalles->count())
+                ->addColumn('item', fn ($row) => $row->detalles->count())
                 ->editColumn('fecha', function ($row) {
                     return \Carbon\Carbon::parse($row->fecha)->format('Y-m-d');
                 })
-                ->addColumn('usuario', fn($row) => $row->user_nombre ?? '')
+                ->addColumn('usuario', fn ($row) => $row->user_nombre ?? '')
                 ->make(true);
         }
 
         return view('preparadas.index');
     }
-
 
     /**
      * Show the form for creating a new resource.
@@ -141,7 +144,7 @@ class PreparadaController extends Controller
         // Convertir fechas antes de validar
         if ($request->filled('fecha')) {
             $request->merge([
-                'fecha' => str_replace('T', ' ', $request->fecha) . ':00'
+                'fecha' => str_replace('T', ' ', $request->fecha).':00',
             ]);
         }
 
@@ -164,12 +167,12 @@ class PreparadaController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $message,
-                'preparada_id' => $preparada->id
+                'preparada_id' => $preparada->id,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al crear el registro: ' . $e->getMessage()
+                'message' => 'Error al crear el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -186,7 +189,7 @@ class PreparadaController extends Controller
                 },
                 'cliente' => function ($query) {
                     $query->select('id', 'razon_social');
-                }
+                },
             ])->findOrFail($id);
 
             return response()->json($registro);
@@ -208,16 +211,16 @@ class PreparadaController extends Controller
      * Revierte insumos (INGRESO) y producto final (SALIDA) en kardex
      * y recalcula el CPP en cascada para todos los productos afectados.
      *
-     * @param  int $id ID de la preparada a anular
-     * @return JsonResponse
+     * @param  int  $id  ID de la preparada a anular
      */
     public function anular(int $id): JsonResponse
     {
         try {
             $this->preparadaService->anularPreparada($id);
+
             return response()->json([
                 'success' => true,
-                'message' => 'Preparada #' . $id . ' anulada correctamente.',
+                'message' => 'Preparada #'.$id.' anulada correctamente.',
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -249,9 +252,9 @@ class PreparadaController extends Controller
     /**
      * Valida los datos del request para una preparada (cabecera + detalles).
      *
-     * @param  Request  $request Datos de la petición HTTP
-     * @param  int|null $id      ID de la preparada (para validación en edición)
-     * @return array             Datos validados
+     * @param  Request  $request  Datos de la petición HTTP
+     * @param  int|null  $id  ID de la preparada (para validación en edición)
+     * @return array Datos validados
      */
     protected function validateData(Request $request, $id = null)
     {
@@ -275,26 +278,27 @@ class PreparadaController extends Controller
     /**
      * Genera y devuelve el ticket PDF de una preparada.
      *
-     * @param  int $id ID de la preparada
+     * @param  int  $id  ID de la preparada
      * @return \Illuminate\Http\Response PDF streamed
      */
-    public function printTicket($id){
+    public function printTicket($id)
+    {
         $preparada = Preparada::with([
-                'detalles.producto' => function ($query) {
-                    $query->select('id','nombre','codigo','costo_unitario');
-                },
-                'cliente' => function($query) {
-                    $query->select('id','razon_social','documento_numero');
-                }
-            ])->findOrFail($id);
+            'detalles.producto' => function ($query) {
+                $query->select('id', 'nombre', 'codigo', 'costo_unitario');
+            },
+            'cliente' => function ($query) {
+                $query->select('id', 'razon_social', 'documento_numero');
+            },
+        ])->findOrFail($id);
 
-        $empresa = (object)[
+        $empresa = (object) [
             'razon_social' => 'Consorcios Villegas E.I.R.L.',
             'direccion' => 'Cal. Inca Roca Nro. 1210 - La Victoria - Chiclayo',
-            'ruc' => '20538937321'
+            'ruc' => '20538937321',
         ];
 
-        $pdf = Pdf::loadView('preparadas.ticket', compact('preparada','empresa'))
+        $pdf = Pdf::loadView('preparadas.ticket', compact('preparada', 'empresa'))
             ->setPaper([0, 0, 226.77, 600], 'portrait')
             ->setOption('isRemoteEnabled', true)
             ->setOption('defaultFont', 'DejaVu Sans');
@@ -305,7 +309,7 @@ class PreparadaController extends Controller
     /**
      * Devuelve la vista parcial con el detalle de una preparada.
      *
-     * @param  int $id ID de la preparada
+     * @param  int  $id  ID de la preparada
      * @return \Illuminate\Contracts\View\View|JsonResponse
      */
     public function view($id)
@@ -313,12 +317,12 @@ class PreparadaController extends Controller
         try {
             $preparada = Preparada::with([
                 'detalles.producto' => function ($query) {
-                    $query->select('id','nombre','codigo','costo_unitario','linea_id')
+                    $query->select('id', 'nombre', 'codigo', 'costo_unitario', 'linea_id')
                         ->with('linea:id,nombre');
                 },
-                'cliente' => function($query) {
-                    $query->select('id','razon_social','documento_numero');
-                }
+                'cliente' => function ($query) {
+                    $query->select('id', 'razon_social', 'documento_numero');
+                },
             ])->findOrFail($id);
 
             // Devolver vista parcial

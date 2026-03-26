@@ -12,26 +12,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Prestamo;
-use App\Models\PrestamoDetalle;
 use App\Models\Cliente;
-use App\Models\ComprobanteTipo;
 use App\Models\ComprobanteSerie;
-use App\Services\PrestamoService;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Yajra\DataTables\DataTables;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\DB;
+use App\Models\ComprobanteTipo;
+use App\Models\Prestamo;
 use App\Models\Producto;
-
+use App\Services\PrestamoService;
 use Barryvdh\DomPDF\Facade\Pdf;
-
-use BaconQrCode\Renderer\ImageRenderer;
-use BaconQrCode\Renderer\Image\ImagickImageBackEnd;
-use BaconQrCode\Renderer\Image\SvgImageBackEnd;
-use BaconQrCode\Renderer\RendererStyle\RendererStyle;
-use BaconQrCode\Writer;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Yajra\DataTables\DataTables;
 
 class PrestamoController extends Controller
 {
@@ -45,12 +35,13 @@ class PrestamoController extends Controller
     public function __construct(
         protected PrestamoService $prestamoService
     ) {
-        $this->middleware('can:prestamos_list')->only(['index', 'view','printTicket', 'getSerie']);
+        $this->middleware('can:prestamos_list')->only(['index', 'view', 'printTicket', 'getSerie']);
         $this->middleware('can:prestamos_create')->only(['store']);
         $this->middleware('can:prestamos_edit')->only(['show', 'update']);
         $this->middleware('can:prestamos_delete')->only(['destroy']);
         $this->middleware('can:prestamos_delete')->only(['anular']);
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -60,7 +51,7 @@ class PrestamoController extends Controller
             $data = Prestamo::with([
                 'clienteOrigen',
                 'clienteDestino',
-                'comprobanteTipo'
+                'comprobanteTipo',
             ])->select([
                 'id',
                 'user_id',
@@ -73,8 +64,9 @@ class PrestamoController extends Controller
                 'correlativo',
                 'fecha_prestamo',
                 'total',
-                'estado'
-            ])->orderBy('id','desc');
+                'estado',
+                'rectificacion_count',
+            ])->orderBy('id', 'desc');
 
             // 🔹 Filtro por menú
             // ID del cliente de la empresa en la tabla clientes
@@ -86,20 +78,20 @@ class PrestamoController extends Controller
                             ->where('cliente_origen_id', $this->empresa_cliente_id);
                         break;
 
-                    // PRÉSTAMO DE → Me prestaron / me deben
+                        // PRÉSTAMO DE → Me prestaron / me deben
                     case 'PD':
                         $data->where('movimiento_tipo', 'PD')
                             ->where('cliente_destino_id', $this->empresa_cliente_id)
                             ->whereIn('estado', ['registrada']);
                         break;
 
-                    // DEVOLUCIÓN DE → Me devuelven
+                        // DEVOLUCIÓN DE → Me devuelven
                     case 'DD':
                         $data->where('movimiento_tipo', 'DD')
                             ->where('cliente_destino_id', $this->empresa_cliente_id);
                         break;
 
-                    // DEVOLUCIÓN A → Yo devuelvo
+                        // DEVOLUCIÓN A → Yo devuelvo
                     case 'DA':
                         $data->where('movimiento_tipo', 'DA')
                             ->where('cliente_origen_id', $this->empresa_cliente_id);
@@ -112,7 +104,7 @@ class PrestamoController extends Controller
                 ->addColumn('action', function ($row) {
                     $buttons = [];
 
-                    /* 
+                    /*
                     // El usuario solicitó comentar iconos Editar/Delete
                     if (auth()->user()->can('prestamos_edit')) {
                          $buttons[] = '<button class="btn btn-sm btn-info btn-edit-prestamo" data-id="' . $row->id . '"><i class="bi bi-pencil"></i></button>';
@@ -124,39 +116,46 @@ class PrestamoController extends Controller
 
                     // Botón Anular (solo si está registrada)
                     if ($row->estado === 'registrada' && auth()->user()->can('prestamos_delete') && \Carbon\Carbon::parse($row->fecha_prestamo)->format('Y-m-d') >= '2026-03-24') {
-                        $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-prestamo" data-id="' . $row->id . '" title="Anular Préstamo">
+                        $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-prestamo" data-id="'.$row->id.'" title="Anular Préstamo">
                             <i class="bi bi-x-circle"></i>
                          </button>';
                     }
 
-                    // Botón Rectificar (solo si está anulada)
-                    if ($row->estado === 'anulada' && auth()->user()->can('prestamos_edit') && \Carbon\Carbon::parse($row->fecha_prestamo)->format('Y-m-d') >= '2026-03-24') {
-                        $buttons[] = '<button class="btn btn-sm btn-warning btn-rectificar-prestamo" data-id="' . $row->id . '" title="Rectificar Préstamo">
+                    // Botón Anular (si está rectificada y aún puede rectificar más)
+                    if ($row->estado === 'rectificada' && $row->rectificacion_count < 3 && auth()->user()->can('prestamos_delete') && \Carbon\Carbon::parse($row->fecha_prestamo)->format('Y-m-d') >= '2026-03-24') {
+                        $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-prestamo" data-id="'.$row->id.'" title="Anular para rectificar">
+                            <i class="bi bi-x-circle"></i>
+                         </button>';
+                    }
+
+                    // Botón Rectificar (solo si está anulada y rectificacion_count < 3)
+                    if ($row->estado === 'anulada' && $row->rectificacion_count < 3 && auth()->user()->can('prestamos_edit') && \Carbon\Carbon::parse($row->fecha_prestamo)->format('Y-m-d') >= '2026-03-24') {
+                        $buttons[] = '<button class="btn btn-sm btn-warning btn-rectificar-prestamo" data-id="'.$row->id.'" title="Rectificar Préstamo">
                             <i class="bi bi-arrow-repeat"></i>
                          </button>';
                     }
 
                     // Botón Imprimir (ticket/comprobante)
-                    $buttons[] = '<a href="' . route('prestamos.imprimir', $row->id) . '" target="_blank" class="btn btn-sm btn-secondary" title="Ver Comprobante"><i class="bi bi-printer"></i></a>';
+                    $buttons[] = '<a href="'.route('prestamos.imprimir', $row->id).'" target="_blank" class="btn btn-sm btn-secondary" title="Ver Comprobante"><i class="bi bi-printer"></i></a>';
 
                     // Botón Ver
-                    $buttons[] = '<button class="btn btn-sm btn-info btn-view-prestamo" data-id="' . $row->id . '" title="Ver Préstamo"><i class="bi bi-eye"></i></button>';
+                    $buttons[] = '<button class="btn btn-sm btn-info btn-view-prestamo" data-id="'.$row->id.'" title="Ver Préstamo"><i class="bi bi-eye"></i></button>';
 
-                    return '<div class="btn-group">' . implode('', $buttons) . '</div>';
+                    return '<div class="btn-group">'.implode('', $buttons).'</div>';
                 })
-                //->addColumn('usuario', fn($row) => optional($row->user)->name)
-                ->addColumn('usuario', fn($row) => $row->user_nombre ?? '')
-                ->addColumn('origen', fn($r) => optional($r->clienteOrigen)->razon_social)
-                ->addColumn('destino', fn($r) => optional($r->clienteDestino)->razon_social)
+                // ->addColumn('usuario', fn($row) => optional($row->user)->name)
+                ->addColumn('usuario', fn ($row) => $row->user_nombre ?? '')
+                ->addColumn('origen', fn ($r) => optional($r->clienteOrigen)->razon_social)
+                ->addColumn('destino', fn ($r) => optional($r->clienteDestino)->razon_social)
                 ->rawColumns(['action', 'estado'])
                 ->editColumn('estado', function ($row) {
                     $color = match ($row->estado) {
-                        'anulada'      => 'danger',
-                        'registrada'   => 'success',
-                        'rectificada'  => 'warning text-dark',
-                        'parcial'      => 'info',
-                        'devuelto'     => 'secondary',
-                        default        => 'primary',
+                        'anulada' => 'danger',
+                        'registrada' => 'success',
+                        'rectificada' => 'warning text-dark',
+                        'parcial' => 'info',
+                        'devuelto' => 'secondary',
+                        default => 'primary',
                     };
 
                     return '<span class="badge bg-'.$color.'">'.ucfirst($row->estado).'</span>';
@@ -184,14 +183,14 @@ class PrestamoController extends Controller
      * Valida los datos del request y delega la creación
      * al servicio PrestamoService::createPrestamo().
      *
-     * @param  Request      $request Datos del formulario
+     * @param  Request  $request  Datos del formulario
      * @return JsonResponse Respuesta con el resultado de la operación
      */
     public function store(Request $request): JsonResponse
     {
         if ($request->filled('fecha_prestamo')) {
             $request->merge([
-                'fecha_prestamo' => str_replace('T', ' ', $request->fecha_prestamo) . ':00'
+                'fecha_prestamo' => str_replace('T', ' ', $request->fecha_prestamo).':00',
             ]);
         }
 
@@ -212,25 +211,25 @@ class PrestamoController extends Controller
             }
 
             return response()->json([
-                'success'      => true,
-                'message'      => 'Registro creado satisfactoriamente',
-                'prestamo_id'  => $result['prestamo']->id,
-                'correlativo'  => $result['correlativo'],
+                'success' => true,
+                'message' => 'Registro creado satisfactoriamente',
+                'prestamo_id' => $result['prestamo']->id,
+                'correlativo' => $result['correlativo'],
             ]);
 
         } catch (\Illuminate\Database\QueryException $e) {
             // Log para depuración: muestra el error SQL real
-            \Log::error('Prestamo store QueryException: ' . $e->getMessage());
+            \Log::error('Prestamo store QueryException: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Error de base de datos: ' . $e->getMessage()
+                'message' => 'Error de base de datos: '.$e->getMessage(),
             ], 409);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al crear el registro: ' . $e->getMessage()
+                'message' => 'Error al crear el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -254,7 +253,7 @@ class PrestamoController extends Controller
                 },
                 'clienteDestino' => function ($query) {
                     $query->select('id', 'razon_social');
-                }
+                },
             ])->findOrFail($id);
 
             // Calcular saldos pendientes
@@ -269,8 +268,9 @@ class PrestamoController extends Controller
 
             return response()->json($data);
         } catch (\Exception $e) {
-            \Log::error('PrestamoController show error: ' . $e->getMessage());
-            return response()->json(['error' => 'Registro no encontrado: ' . $e->getMessage()], 404);
+            \Log::error('PrestamoController show error: '.$e->getMessage());
+
+            return response()->json(['error' => 'Registro no encontrado: '.$e->getMessage()], 404);
         }
     }
 
@@ -282,8 +282,6 @@ class PrestamoController extends Controller
         //
     }
 
-
-
     /**
      * Update the specified resource in storage.
      */
@@ -293,15 +291,15 @@ class PrestamoController extends Controller
      * Valida los datos del request y delega la actualización
      * al servicio PrestamoService::updatePrestamo().
      *
-     * @param  Request      $request Datos del formulario
-     * @param  int          $id      ID del préstamo a actualizar
+     * @param  Request  $request  Datos del formulario
+     * @param  int  $id  ID del préstamo a actualizar
      * @return JsonResponse Respuesta con el resultado de la operación
      */
     public function update(Request $request, $id): JsonResponse
     {
         if ($request->filled('fecha_prestamo')) {
             $request->merge([
-                'fecha_prestamo' => str_replace('T', ' ', $request->fecha_prestamo) . ':00'
+                'fecha_prestamo' => str_replace('T', ' ', $request->fecha_prestamo).':00',
             ]);
         }
 
@@ -312,12 +310,12 @@ class PrestamoController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro actualizado satisfactoriamente'
+                'message' => 'Registro actualizado satisfactoriamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al actualizar el registro: ' . $e->getMessage()
+                'message' => 'Error al actualizar el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -331,7 +329,7 @@ class PrestamoController extends Controller
      * Delega la eliminación y reversión de stock
      * al servicio PrestamoService::deletePrestamo().
      *
-     * @param  int          $id ID del préstamo a eliminar
+     * @param  int  $id  ID del préstamo a eliminar
      * @return JsonResponse Respuesta con el resultado de la operación
      */
     public function destroy($id): JsonResponse
@@ -341,12 +339,12 @@ class PrestamoController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Prestamo eliminado satisfactoriamente.'
+                'message' => 'Prestamo eliminado satisfactoriamente.',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al eliminar el registro: ' . $e->getMessage()
+                'message' => 'Error al eliminar el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -355,8 +353,7 @@ class PrestamoController extends Controller
      * Anula un préstamo registrando movimientos de reversión
      * y recalculando el kardex en cascada.
      *
-     * @param  int $id ID del préstamo a anular
-     * @return JsonResponse
+     * @param  int  $id  ID del préstamo a anular
      */
     public function anular($id): JsonResponse
     {
@@ -365,12 +362,12 @@ class PrestamoController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Préstamo anulado correctamente. El kardex fue recalculado.'
+                'message' => 'Préstamo anulado correctamente. El kardex fue recalculado.',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al anular: ' . $e->getMessage()
+                'message' => 'Error al anular: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -458,12 +455,12 @@ class PrestamoController extends Controller
             'detalles.*.cantidad' => 'required|numeric|min:0.01',
             'detalles.*.precio_unitario' => 'required|numeric|min:0.01',
             'detalles.*.unidad_codigo' => 'nullable|string|max:3',
-            'detalles.*.empaque' => 'nullable|numeric|min:0'
+            'detalles.*.empaque' => 'nullable|numeric|min:0',
         ]);
     }
 
-
-    public function printTicket($id){
+    public function printTicket($id)
+    {
         $prestamo = Prestamo::with([
             'detalles' => function ($query) {
                 $query->select('id', 'prestamo_id', 'producto_nombre', 'cantidad', 'valor_unitario', 'total');
@@ -472,13 +469,13 @@ class PrestamoController extends Controller
             'clienteDestino:id,razon_social,documento_numero,direccion',
         ])->findOrFail($id);
 
-        $empresa = (object)[
+        $empresa = (object) [
             'razon_social' => 'Consorcios Villegas E.I.R.L.',
             'direccion' => 'Cal. Inca Roca Nro. 1210 - La Victoria - Chiclayo',
-            'ruc' => '20538937321'
+            'ruc' => '20538937321',
         ];
 
-        $pdf = Pdf::loadView('prestamos.ticket', compact('prestamo','empresa'))
+        $pdf = Pdf::loadView('prestamos.ticket', compact('prestamo', 'empresa'))
             ->setPaper([0, 0, 226.77, 600], 'portrait')
             ->setOption('isRemoteEnabled', true)
             ->setOption('defaultFont', 'DejaVu Sans');
@@ -491,24 +488,24 @@ class PrestamoController extends Controller
         try {
             $prestamo = Prestamo::with([
                 'detalles.producto' => function ($query) {
-                    $query->select('id', 'afectacion_tipo_codigo', 'codigo', 'nombre', 'costo_unitario','unidad_codigo');
+                    $query->select('id', 'afectacion_tipo_codigo', 'codigo', 'nombre', 'costo_unitario', 'unidad_codigo');
                 },
                 'detalles.producto.afectacionTipo' => function ($query) {
                     $query->select('codigo', 'descripcion', 'porcentaje');
                 },
                 'clienteOrigen' => function ($query) {
-                    $query->select('id', 'razon_social','direccion','documento_tipo_codigo','documento_numero');
+                    $query->select('id', 'razon_social', 'direccion', 'documento_tipo_codigo', 'documento_numero');
                 },
                 'clienteDestino' => function ($query) {
-                    $query->select('id', 'razon_social','direccion','documento_tipo_codigo','documento_numero');
+                    $query->select('id', 'razon_social', 'direccion', 'documento_tipo_codigo', 'documento_numero');
                 },
                 'prestamoReferencia' => function ($query) {
-                    $query->select('id', 'comprobante_tipo_codigo','serie','correlativo');
-                }
+                    $query->select('id', 'comprobante_tipo_codigo', 'serie', 'correlativo');
+                },
             ])->findOrFail($id);
 
             // Devolver vista parcial
-            //return $prestamo;
+            // return $prestamo;
             $saldos = [];
             if (in_array($prestamo->movimiento_tipo, ['PA', 'PD'])) {
                 $saldos = app(\App\Services\PrestamoService::class)->obtenerSaldosPendientes($id);
@@ -523,7 +520,7 @@ class PrestamoController extends Controller
     public function getSerie(Request $request)
     {
         $request->validate([
-            'comprobante_tipo_codigo' => 'required|exists:comprobante_tipos,codigo'
+            'comprobante_tipo_codigo' => 'required|exists:comprobante_tipos,codigo',
         ]);
 
         $codigo = $request->comprobante_tipo_codigo;
@@ -532,17 +529,17 @@ class PrestamoController extends Controller
         $serieConfig = ComprobanteSerie::where('comprobante_tipo_codigo', $codigo)->first();
 
         // Si no existe, devolver null
-        if (!$serieConfig) {
+        if (! $serieConfig) {
             return response()->json([
                 'serie' => null,
-                'numero' => null
+                'numero' => null,
             ]);
         }
 
         // Devolver los valores almacenados en la tabla
         return response()->json([
             'serie' => $serieConfig->serie,
-            'numero' => $serieConfig->correlativo
+            'numero' => $serieConfig->correlativo,
         ]);
     }
 }

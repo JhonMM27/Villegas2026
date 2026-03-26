@@ -14,30 +14,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Nucleo;
 use App\Models\NucleoPreparada;
-use App\Models\NucleoPreparadaDetalle;
 use App\Services\NucleoPreparadaService;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Yajra\DataTables\DataTables;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\DB;
-use App\Models\Producto;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Yajra\DataTables\DataTables;
 
 class NucleoPreparadaController extends Controller
 {
-
     /**
      * Constructor: inyecta el servicio y define los middleware de permisos.
-     *
-     * @param NucleoPreparadaService $service
      */
     public function __construct(
         protected NucleoPreparadaService $service
-    ){
-        $this->middleware('can:nucleo_preparadas_list')->only(['index', 'view','printTicket']);
+    ) {
+        $this->middleware('can:nucleo_preparadas_list')->only(['index', 'view', 'printTicket']);
         $this->middleware('can:nucleo_preparadas_create')->only(['store']);
         $this->middleware('can:nucleo_preparadas_edit')->only(['show', 'update']);
         $this->middleware('can:nucleo_preparadas_delete')->only(['destroy']);
@@ -62,9 +54,10 @@ class NucleoPreparadaController extends Controller
                 'ingreso_kg',
                 'items',
                 'ingreso_soles',
-                'estado'
+                'estado',
+                'rectificacion_count',
             ])
-            ->orderBy('id', 'desc');
+                ->orderBy('id', 'desc');
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
@@ -72,43 +65,51 @@ class NucleoPreparadaController extends Controller
 
                     // Botón Anular (solo si está registrada)
                     if ($row->estado === 'registrada' && auth()->user()->can('nucleo_preparadas_delete') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
-                        $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-nucleo-preparada" data-id="' . $row->id . '" title="Anular">
+                        $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-nucleo-preparada" data-id="'.$row->id.'" title="Anular">
                             <i class="bi bi-x-circle"></i>
                          </button>';
                     }
 
-                    // Botón Rectificar (solo si está anulada)
-                    if ($row->estado === 'anulada' && auth()->user()->can('nucleo_preparadas_edit') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
-                        $buttons[] = '<button class="btn btn-sm btn-warning btn-rectificar-nucleo-preparada" data-id="' . $row->id . '" title="Rectificar">
+                    // Botón Anular (si está rectificada y aún puede rectificar más)
+                    if ($row->estado === 'rectificada' && $row->rectificacion_count < 3 && auth()->user()->can('nucleo_preparadas_delete') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
+                        $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-nucleo-preparada" data-id="'.$row->id.'" title="Anular para rectificar">
+                            <i class="bi bi-x-circle"></i>
+                         </button>';
+                    }
+
+                    // Botón Rectificar (solo si está anulada y rectificacion_count < 3)
+                    if ($row->estado === 'anulada' && $row->rectificacion_count < 3 && auth()->user()->can('nucleo_preparadas_edit') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
+                        $buttons[] = '<button class="btn btn-sm btn-warning btn-rectificar-nucleo-preparada" data-id="'.$row->id.'" title="Rectificar">
                             <i class="bi bi-arrow-repeat"></i>
                          </button>';
                     }
 
                     // Botón Imprimir
-                    $buttons[] = '<a href="' . route('nucleo-preparadas.imprimir', $row->id) . '" target="_blank" class="btn btn-sm btn-secondary" title="Imprimir">
+                    $buttons[] = '<a href="'.route('nucleo-preparadas.imprimir', $row->id).'" target="_blank" class="btn btn-sm btn-secondary" title="Imprimir">
                         <i class="bi bi-printer"></i>
                     </a>';
 
                     // Botón Ver
-                    $buttons[] = '<button class="btn btn-sm btn-info btn-view-nucleo-preparada" data-id="' . $row->id . '" title="Ver">
+                    $buttons[] = '<button class="btn btn-sm btn-info btn-view-nucleo-preparada" data-id="'.$row->id.'" title="Ver">
                         <i class="bi bi-eye"></i>
                     </button>';
 
-                    return '<div class="btn-group">' . implode('', $buttons) . '</div>';
+                    return '<div class="btn-group">'.implode('', $buttons).'</div>';
                 })
                 ->editColumn('estado', function ($row) {
-                    $color = match($row->estado) {
-                        'anulada'     => 'danger',
+                    $color = match ($row->estado) {
+                        'anulada' => 'danger',
                         'rectificada' => 'info',
-                        default       => 'success'
+                        default => 'success'
                     };
-                    return '<span class="badge bg-' . $color . '">' . ucfirst($row->estado) . '</span>';
+
+                    return '<span class="badge bg-'.$color.'">'.ucfirst($row->estado).'</span>';
                 })
-                ->addColumn('item', fn($row) => $row->detalles->count())
+                ->addColumn('item', fn ($row) => $row->detalles->count())
                 ->editColumn('fecha', function ($row) {
                     return \Carbon\Carbon::parse($row->fecha)->format('Y-m-d');
                 })
-                ->addColumn('usuario', fn($row) => $row->user_nombre ?? '')
+                ->addColumn('usuario', fn ($row) => $row->user_nombre ?? '')
                 ->rawColumns(['action', 'estado'])
                 ->make(true);
         }
@@ -131,7 +132,7 @@ class NucleoPreparadaController extends Controller
     {
         if ($request->filled('fecha')) {
             $request->merge([
-                'fecha' => str_replace('T', ' ', $request->fecha) . ':00'
+                'fecha' => str_replace('T', ' ', $request->fecha).':00',
             ]);
         }
 
@@ -154,12 +155,12 @@ class NucleoPreparadaController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $message,
-                'nucleo_preparada_id' => $preparada->id
+                'nucleo_preparada_id' => $preparada->id,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al crear el registro: ' . $e->getMessage()
+                'message' => 'Error al crear el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -173,7 +174,7 @@ class NucleoPreparadaController extends Controller
             $registro = NucleoPreparada::with([
                 'detalles.producto' => function ($query) {
                     $query->select('id', 'codigo', 'nombre', 'costo_unitario');
-                }
+                },
             ])->findOrFail($id);
 
             return response()->json($registro);
@@ -193,16 +194,16 @@ class NucleoPreparadaController extends Controller
     /**
      * Anula una nucleo_preparada existente.
      *
-     * @param  int $id ID de la nucleo_preparada a anular
-     * @return JsonResponse
+     * @param  int  $id  ID de la nucleo_preparada a anular
      */
     public function anular(int $id): JsonResponse
     {
         try {
             $this->service->anularNucleoPreparada($id);
+
             return response()->json([
                 'success' => true,
-                'message' => 'Preparación de Núcleo #' . $id . ' anulada correctamente.',
+                'message' => 'Preparación de Núcleo #'.$id.' anulada correctamente.',
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -219,17 +220,17 @@ class NucleoPreparadaController extends Controller
     public function update(Request $request, $id)
     {
         $preparada = NucleoPreparada::findOrFail($id);
-        
+
         if ($preparada->estado !== 'registrada') {
             return response()->json([
                 'success' => false,
-                'message' => 'Solo se pueden editar Preparaciones de Núcleo en estado registrada.'
+                'message' => 'Solo se pueden editar Preparaciones de Núcleo en estado registrada.',
             ], 403);
         }
-        
+
         return response()->json([
             'success' => false,
-            'message' => 'Las Preparaciones de Núcleo no se pueden editar directamente. Use rectificación.'
+            'message' => 'Las Preparaciones de Núcleo no se pueden editar directamente. Use rectificación.',
         ], 403);
     }
 
@@ -244,8 +245,7 @@ class NucleoPreparadaController extends Controller
     /**
      * Valida los datos del request.
      *
-     * @param  Request  $request
-     * @param  int|null $id
+     * @param  int|null  $id
      * @return array
      */
     protected function validateData(Request $request, $id = null)
@@ -272,7 +272,7 @@ class NucleoPreparadaController extends Controller
     /**
      * Genera y devuelve el ticket PDF.
      *
-     * @param  int $id
+     * @param  int  $id
      * @return \Illuminate\Http\Response
      */
     public function printTicket($id)
@@ -280,17 +280,17 @@ class NucleoPreparadaController extends Controller
         $preparada = NucleoPreparada::with([
             'detalles.producto' => function ($query) {
                 $query->select('id', 'nombre', 'codigo', 'costo_unitario');
-            }
+            },
         ])->findOrFail($id);
 
-        $empresa = (object)[
+        $empresa = (object) [
             'razon_social' => 'CONSORCIOS VILLEGAS E.I.R.L.',
-            'direccion' => 'Carretera Pomalca KM 3' . "\n" . 'A espaldas de Ferretería Herrera',
+            'direccion' => 'Carretera Pomalca KM 3'."\n".'A espaldas de Ferretería Herrera',
             'ruc' => '20538937321',
-            'celular'=>'967984895 - 978431737 - 915177079',
+            'celular' => '967984895 - 978431737 - 915177079',
         ];
 
-        $pdf = Pdf::loadView('nucleo-preparadas.ticket', compact('preparada','empresa'))
+        $pdf = Pdf::loadView('nucleo-preparadas.ticket', compact('preparada', 'empresa'))
             ->setPaper([0, 0, 226.77, 600], 'portrait')
             ->setOption('isRemoteEnabled', true)
             ->setOption('defaultFont', 'DejaVu Sans');
@@ -301,7 +301,7 @@ class NucleoPreparadaController extends Controller
     /**
      * Devuelve la vista parcial con el detalle.
      *
-     * @param  int $id
+     * @param  int  $id
      * @return \Illuminate\Contracts\View\View|JsonResponse
      */
     public function view($id)
@@ -311,7 +311,7 @@ class NucleoPreparadaController extends Controller
                 'detalles.producto' => function ($query) {
                     $query->select('id', 'nombre', 'codigo', 'costo_unitario', 'linea_id')
                         ->with('linea:id,nombre');
-                }
+                },
             ])->findOrFail($id);
 
             return view('nucleo-preparadas.view', compact('preparada'));

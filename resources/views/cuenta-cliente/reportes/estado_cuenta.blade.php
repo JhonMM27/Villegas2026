@@ -20,8 +20,12 @@
         table.report th, table.report td{ border:1px solid #ddd; padding:6px 6px; vertical-align: top; }
         table.report th{ background:#f3f3f3; font-weight:700; font-size: 11px; }
 
+        table.main-report th { background: #add8e6; }
+
         .num{ text-align:right; white-space: nowrap; }
         .nowrap{ white-space: nowrap; }
+        .text-center { text-align: center; }
+        .text-red { color: red !important; }
 
         .page-number:before { content: counter(page); }
 
@@ -69,6 +73,54 @@
     $saldoFinalReporte = $saldoInicial + $totCreditoMostrado - $totPagoRango;
 
     // ==========================================================
+    // NUEVO: AGRUPAR PAGOS POR DOCUMENTO DE LA VENTA ASOCIADA
+    // ==========================================================
+    $movimientos = collect();
+    foreach($ventas ?? [] as $v) {
+        $docVenta = $v->documento ??
+            trim(($v->comprobante_tipo_codigo ? $v->comprobante_tipo_codigo.' ' : '').$v->serie.'-'.$v->correlativo);
+
+        // Agregar la venta
+        $movimientos->push((object)[
+            'tipo'              => 'VENTA',
+            'fecha'             => \Carbon\Carbon::parse($v->fecha_venta),
+            'documento'         => $docVenta,
+            'fecha_vencimiento' => $v->fecha_vencimiento,
+            'credito_base'      => (float)($v->credito_base ?? 0)
+        ]);
+
+        // Agrupar pagos por numero_recibo dentro de esta venta
+        $pagosPorRecibo = collect($v->pagos ?? [])->groupBy(function($p) {
+            return $p->numero_recibo ?? 'sin_recibo';
+        });
+
+        foreach($pagosPorRecibo as $numRecibo => $pagosDelRecibo) {
+            $montoTotal = $pagosDelRecibo->sum(function($p) {
+                return (float)($p->monto ?? 0);
+            });
+
+            $primerPago = $pagosDelRecibo->first();
+            $fechaPago = $primerPago->fecha_provisional ?? $v->fecha_venta;
+
+            // Usar el documento de la venta como referencia del pago
+            $movimientos->push((object)[
+                'tipo'           => 'PAGO',
+                'fecha'          => \Carbon\Carbon::parse($fechaPago),
+                'documento_pago' => $docVenta, // Usar documento de la venta asociada
+                'monto'          => $montoTotal
+            ]);
+        }
+    }
+
+    // Ordenar: primero ventas, luego pagos de cada fecha
+    $movimientosFinal = $movimientos->sort(function($a, $b) {
+        if ($a->fecha->equalTo($b->fecha)) {
+            return $a->tipo === 'VENTA' ? -1 : 1;
+        }
+        return $a->fecha->lessThan($b->fecha) ? -1 : 1;
+    });
+
+    // ==========================================================
     // 2) ACUMULADOR PARA LA TABLA (DEBE TERMINAR EN saldoFinalReporte)
     // ==========================================================
     $saldoAcum = $saldoInicial;
@@ -109,7 +161,7 @@
     </table>
 </div>
 
-<table class="report">
+<table class="report main-report">
     <thead>
     <tr>
         <th class="nowrap">Fecha</th>
@@ -127,53 +179,47 @@
     {{-- SALDO ANTERIOR --}}
     <tr class="row-saldo-anterior">
         <td class="nowrap">{{ $ini->copy()->subDay()->format('d/m/Y') }}</td>
-        <td colspan="3">SALDO ANTERIOR</td>
+        <td>SALDO ANTERIOR</td>
+        <td class="nowrap">{{ $ini->format('d/m/Y') }}</td>
+        <td></td>
         <td class="num">0.00</td>
         <td class="num">0.00</td>
         <td class="num">{{ number_format($saldoAcum, 2) }}</td>
     </tr>
 
-    {{-- VENTAS + PAGOS (SALDO ACUMULADO) --}}
-    @forelse($ventas as $v)
-        @php
-            $creditoVenta = (float)($v->credito_base ?? 0);
-            $saldoAcum += $creditoVenta;
-        @endphp
-
-        <tr class="row-venta">
-            <td class="nowrap">{{ \Carbon\Carbon::parse($v->fecha_venta)->format('d/m/Y') }}</td>
-            <td>{{ $v->documento }}</td>
-            <td class="nowrap">
-                {{ $v->fecha_vencimiento ? \Carbon\Carbon::parse($v->fecha_vencimiento)->format('d/m/Y') : '-' }}
-            </td>
-            <td>VENTA</td>
-            <td class="num">{{ number_format($creditoVenta, 2) }}</td>
-            <td class="num">0.00</td>
-            <td class="num">{{ number_format($saldoAcum, 2) }}</td>
-        </tr>
-
-        @foreach(($v->pagos ?? []) as $p)
+    {{-- VENTAS + PAGOS AGRUPADOS (SALDO ACUMULADO) --}}
+    @forelse($movimientosFinal as $mov)
+        @if($mov->tipo === 'VENTA')
             @php
-                $montoPago = (float)($p->monto ?? 0);
-
-                $docPago = (!empty($p->serie) && !empty($p->correlativo))
-                    ? trim(($p->comprobante_tipo_codigo ? $p->comprobante_tipo_codigo.' ' : '').$p->serie.'-'.$p->correlativo)
-                    : ('REC '.($p->numero_recibo ?? ''));
-
-                $saldoAcum -= $montoPago;
+                $creditoVenta = $mov->credito_base;
+                $saldoAcum += $creditoVenta;
             @endphp
-
-            <tr class="row-pago">
-                <td class="nowrap">{{ \Carbon\Carbon::parse($p->fecha_provisional)->format('d/m/Y') }}</td>
-                <td class="nowrap">RC-{{ $p->numero_recibo }}</td>
-                <td class="nowrap"></td>
-                <td>PAGO CLIENTE</td>
-                <td class="num"></td>
-                <td class="num">{{ number_format($montoPago, 2) }}</td>
+            <tr class="row-venta">
+                <td class="nowrap">{{ $mov->fecha->format('d/m/Y') }}</td>
+                <td>{{ $mov->documento }}</td>
+                <td class="nowrap">
+                    {{ $mov->fecha_vencimiento ? \Carbon\Carbon::parse($mov->fecha_vencimiento)->format('d/m/Y') : '-' }}
+                </td>
+                <td>ventas</td>
+                <td class="num">{{ number_format($creditoVenta, 2) }}</td>
+                <td class="num">0.00</td>
                 <td class="num">{{ number_format($saldoAcum, 2) }}</td>
             </tr>
-        @endforeach
-
+        @else
+            @php
+                $montoPago = $mov->monto;
+                $saldoAcum -= $montoPago;
+            @endphp
+            <tr class="row-pago">
+                <td class="nowrap text-red">{{ $mov->fecha->format('d/m/Y') }}</td>
+                <td class="nowrap text-red">{{ $mov->documento_pago }}</td>
+                <td class="nowrap"></td>
+                <td class="text-red">Pago / Cobro - Venta</td>
+                <td class="num"></td>
+                <td class="num text-red">{{ number_format($montoPago, 2) }}</td>
+                <td class="num">{{ number_format($saldoAcum, 2) }}</td>
+            </tr>
+        @endif
     @empty
         <tr>
             <td colspan="7" class="text-right muted">Sin ventas/pagos enlazados en el rango.</td>
@@ -216,7 +262,7 @@
         </tr>
     @empty
         <tr>
-            <td colspan="4" class="text-right muted">Sin abonos sueltos en el rango.</td>
+            <td colspan="4" class="text-center muted">Sin abonos sueltos en el rango.</td>
         </tr>
     @endforelse
     </tbody>
@@ -226,15 +272,15 @@
 <table class="report" style="margin-top:10px;">
     <tbody>
     <tr class="total-row">
-        <td colspan="4" rowspan="2" class="text-right">TOTALES DEL RANGO</td>
+        <td colspan="4" rowspan="2" style="border:none !important; background:transparent !important;"></td>
         <td class="num">Créditos</td>
         <td class="num">Pagos</td>
         <td class="num">Saldo</td>
     </tr>
     <tr class="total-row">
-        <td class="num">{{ number_format($totCreditoMostrado, 2) }}</td>
-        <td class="num">{{ number_format($totPagoRango, 2) }}</td>
-        <td class="num">{{ number_format($saldoFinalReporte, 2) }}</td>
+        <td class="num">S/ {{ number_format($totCreditoMostrado, 2) }}</td>
+        <td class="num text-red">S/ {{ number_format($totPagoRango, 2) }}</td>
+        <td class="num">S/ {{ number_format($saldoFinalReporte, 2) }}</td>
     </tr>
     </tbody>
 </table>

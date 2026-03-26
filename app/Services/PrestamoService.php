@@ -21,12 +21,11 @@
 
 namespace App\Services;
 
+use App\Models\ComprobanteSerie;
+use App\Models\ComprobanteTipo;
+use App\Models\Movimiento;
 use App\Models\Prestamo;
 use App\Models\Producto;
-use App\Models\ComprobanteTipo;
-use App\Models\ComprobanteSerie;
-use App\Models\Movimiento;
-use App\Services\MovimientoService;
 use Illuminate\Support\Facades\DB;
 
 class PrestamoService
@@ -50,7 +49,7 @@ class PrestamoService
      * 4. Registra movimientos en el kardex (ingreso o salida según tipo)
      * 5. Incrementa correlativo de la serie (si aplica)
      *
-     * @param  array $data Datos validados del request
+     * @param  array  $data  Datos validados del request
      * @return array ['prestamo' => Prestamo, 'correlativo' => int|null]
      *
      * @throws \Illuminate\Database\QueryException Si hay conflicto de correlativo
@@ -103,7 +102,7 @@ class PrestamoService
             // 6) Incrementar correlativo al final (dentro de la transacción)
             if ($usaSerie && $serieConfig) {
                 $serieConfig->update([
-                    'correlativo' => $correlativo + 1
+                    'correlativo' => $correlativo + 1,
                 ]);
             }
 
@@ -113,7 +112,7 @@ class PrestamoService
             }
 
             return [
-                'prestamo'    => $prestamo,
+                'prestamo' => $prestamo,
                 'correlativo' => $correlativo,
             ];
         });
@@ -127,8 +126,8 @@ class PrestamoService
      * 4. Elimina movimientos anteriores y recalcula kardex (excluyendo)
      * 5. Registra nuevos movimientos según el nuevo tipo
      *
-     * @param  int   $id   ID del préstamo a actualizar
-     * @param  array $data Datos validados del request
+     * @param  int  $id  ID del préstamo a actualizar
+     * @param  array  $data  Datos validados del request
      * @return Prestamo El préstamo actualizado
      *
      * @throws \Exception Si ocurre cualquier error
@@ -200,8 +199,7 @@ class PrestamoService
      * 2. Neutraliza movimientos y recalcula kardex
      * 3. Elimina el registro (cascade elimina detalles)
      *
-     * @param  int  $id ID del préstamo a eliminar
-     * @return void
+     * @param  int  $id  ID del préstamo a eliminar
      *
      * @throws \Exception Si ocurre cualquier error
      */
@@ -244,8 +242,6 @@ class PrestamoService
      * Anula un préstamo existente dentro de una transacción.
      * Cambia el estado a 'anulada' y neutraliza sus movimientos.
      *
-     * @param int $id
-     * @return Prestamo
      * @throws \Exception
      */
     public function anularPrestamo(int $id): Prestamo
@@ -256,8 +252,13 @@ class PrestamoService
             if ($prestamo->estado === 'anulada') {
                 throw new \Exception('Este préstamo ya fue anulado.');
             }
+
+            // Si está rectificada, permitir anular para volver a rectificar (si count < 3)
             if ($prestamo->estado === 'rectificada') {
-                throw new \Exception('Este préstamo ya fue rectificado.');
+                if ($prestamo->rectificacion_count >= 3) {
+                    throw new \Exception('Este préstamo ya no puede ser rectificado. Máximo 3 rectificaciones permitidas.');
+                }
+                // Permitir: se volverá a 'anulada' para poder rectificar de nuevo
             }
 
             $prestamo->update(['estado' => 'anulada']);
@@ -271,7 +272,7 @@ class PrestamoService
                     ->pluck('id')
                     ->toArray();
 
-                if (!empty($movIds)) {
+                if (! empty($movIds)) {
                     $this->movimientoService->recalcularKardexExcluyendo(
                         $productoId,
                         $movIds
@@ -292,23 +293,16 @@ class PrestamoService
      * Rectifica un préstamo previamente anulado.
      * Restaura los movimientos neutralizados para mantener la historia.
      *
-     * @param int $prestamoAnuladoId
-     * @param array $data
-     * @param string $comprobanteTipoCodigo
-     * @param string $serie
-     * @param string $correlativo
-     * @return array
+     * @param  int  $prestamoAnuladoId
+     * @param  string  $serie
+     * @param  string  $correlativo
      */
     /**
      * Rectifica un préstamo previamente anulado (Actualización in-situ).
      * Modifica el registro existente en lugar de crear uno nuevo.
      *
-     * @param int $prestamoId
-     * @param array $data
-     * @param string $comprobanteTipoCodigo
-     * @param string $serie (Ignorado para forzar 01-R)
-     * @param int $correlativo (Ignorado para mantener original)
-     * @return array
+     * @param  string  $serie  (Ignorado para forzar 01-R)
+     * @param  int  $correlativo  (Ignorado para mantener original)
      */
     public function rectificarPrestamo(
         int $prestamoId,
@@ -326,14 +320,18 @@ class PrestamoService
                 throw new \Exception('Solo se pueden rectificar préstamos en estado anulada.');
             }
 
+            if ($prestamo->rectificacion_count >= 3) {
+                throw new \Exception('Este préstamo ya no puede ser rectificado. Máximo 3 rectificaciones permitidas.');
+            }
+
             $prestamoDataRaw = $this->processPrestamoData($data, false);
             $prestamoData = $prestamoDataRaw['prestamo'];
-            
+
             // Forzamos serie de rectificación, estado y trazabilidad
             $prestamoData['comprobante_tipo_codigo'] = $comprobanteTipoCodigo;
-            $prestamoData['serie']       = '01';
-            $prestamoData['estado']      = 'rectificada';
-            $prestamoData['nota']        = trim(($data['nota'] ?? $prestamo->nota) . " | Rectificada el " . now()->format('d/m/Y H:i'));
+            $prestamoData['serie'] = '01';
+            $prestamoData['estado'] = 'rectificada';
+            $prestamoData['nota'] = trim(($data['nota'] ?? $prestamo->nota).' | Rectificada el '.now()->format('d/m/Y H:i'));
 
             if ($prestamoData['prestamo_referencia_id']) {
                 $this->validarCantidadesDevolucion(
@@ -344,6 +342,9 @@ class PrestamoService
 
             // 1) Actualizar la cabecera del registro existente
             $prestamo->update($prestamoData);
+
+            // Incrementar contador de rectificaciones
+            $prestamo->update(['rectificacion_count' => $prestamo->rectificacion_count + 1]);
 
             // 2) Reemplazar detalles
             $prestamo->detalles()->delete();
@@ -363,29 +364,29 @@ class PrestamoService
 
                 if ($movNeutralizado) {
                     $producto = Producto::find($detalle->producto_id);
-                    $empaqueBase = (float)($producto->empaque > 0 ? $producto->empaque : 1);
-                    $empaqueFinal = (float)($detalle->producto_empaque ?? 1);
+                    $empaqueBase = (float) ($producto->empaque > 0 ? $producto->empaque : 1);
+                    $empaqueFinal = (float) ($detalle->producto_empaque ?? 1);
                     $cantidadBase = round($detalle->cantidad * ($empaqueFinal / $empaqueBase), 4);
                     $costoTotalMov = $detalle->total ?? ($detalle->cantidad * $detalle->valor_unitario);
-                    $costoUnitarioBase = $cantidadBase > 0 ? $costoTotalMov / $cantidadBase : (float)$detalle->valor_unitario;
-                    
+                    $costoUnitarioBase = $cantidadBase > 0 ? $costoTotalMov / $cantidadBase : (float) $detalle->valor_unitario;
+
                     $updateParams = [
-                        'detalle_id'      => $detalle->id,
-                        'fecha'           => $prestamo->fecha_prestamo,
-                        'empaque'         => $empaqueFinal,
-                        'unidad_codigo'   => $detalle->unidad_codigo,
-                        'cantidad'        => $detalle->cantidad,
-                        'cantidad_kg'     => $detalle->cantidad_kgm,
-                        'costo_unitario'  => round($costoUnitarioBase, 4),
-                        'costo_total'     => round($costoTotalMov, 4),
-                        'comentario'      => 'Rectificación de préstamo (Actualizado)',
+                        'detalle_id' => $detalle->id,
+                        'fecha' => $prestamo->fecha_prestamo,
+                        'empaque' => $empaqueFinal,
+                        'unidad_codigo' => $detalle->unidad_codigo,
+                        'cantidad' => $detalle->cantidad,
+                        'cantidad_kg' => $detalle->cantidad_kgm,
+                        'costo_unitario' => round($costoUnitarioBase, 4),
+                        'costo_total' => round($costoTotalMov, 4),
+                        'comentario' => 'Rectificación de préstamo (Actualizado)',
                     ];
 
                     if ($newIncrease) {
                         $updateParams['entrada'] = $cantidadBase;
-                        $updateParams['salida']  = 0;
+                        $updateParams['salida'] = 0;
                     } else {
-                        $updateParams['salida']  = $cantidadBase;
+                        $updateParams['salida'] = $cantidadBase;
                         $updateParams['entrada'] = 0;
                     }
 
@@ -416,7 +417,7 @@ class PrestamoService
             }
 
             return [
-                'prestamo'    => $prestamo,
+                'prestamo' => $prestamo,
                 'correlativo' => $prestamo->correlativo,
             ];
         });
@@ -430,28 +431,27 @@ class PrestamoService
      * Si $increase es true (PD, DD) → registrarIngreso (stock sube)
      * Si $increase es false (PA, DA) → registrarSalida (stock baja)
      *
-     * @param  Prestamo $prestamo  El préstamo cabecera
-     * @param  mixed    $detalle   El detalle creado (modelo PrestamoDetalle)
-     * @param  bool     $increase  true=ingreso, false=salida
-     * @return void
+     * @param  Prestamo  $prestamo  El préstamo cabecera
+     * @param  mixed  $detalle  El detalle creado (modelo PrestamoDetalle)
+     * @param  bool  $increase  true=ingreso, false=salida
      */
     private function registrarMovimientoDetalle(Prestamo $prestamo, $detalle, bool $increase): void
     {
         $params = [
-            'tipo'              => $increase
+            'tipo' => $increase
                                     ? MovimientoService::TIPO_PRESTAMO_INGRESO
                                     : MovimientoService::TIPO_PRESTAMO_SALIDA,
-            'fecha'             => $prestamo->fecha_prestamo,
-            'transaccion_tipo'  => 'prestamos',
-            'transaccion_id'    => $prestamo->id,
-            'detalle_id'        => $detalle->id,
-            'producto_id'       => $detalle->producto_id,
-            'producto_nombre'   => $detalle->producto_nombre,
-            'empaque'           => $detalle->producto_empaque,
-            'unidad_codigo'     => $detalle->unidad_codigo,
-            'cantidad'          => $detalle->cantidad,
-            'cantidad_kg'       => $detalle->cantidad_kgm,
-            'costo_unitario'    => $detalle->valor_unitario,
+            'fecha' => $prestamo->fecha_prestamo,
+            'transaccion_tipo' => 'prestamos',
+            'transaccion_id' => $prestamo->id,
+            'detalle_id' => $detalle->id,
+            'producto_id' => $detalle->producto_id,
+            'producto_nombre' => $detalle->producto_nombre,
+            'empaque' => $detalle->producto_empaque,
+            'unidad_codigo' => $detalle->unidad_codigo,
+            'cantidad' => $detalle->cantidad,
+            'cantidad_kg' => $detalle->cantidad_kgm,
+            'costo_unitario' => $detalle->valor_unitario,
         ];
 
         // Si es una devolución, forzamos que use el costo histórico original
@@ -472,8 +472,8 @@ class PrestamoService
      * DD (Devolución De) y PD (Préstamo De) → AUMENTAN stock
      * PA (Préstamo A) y DA (Devolución A)   → DISMINUYEN stock
      *
-     * @param  string $movimientoTipo Tipo de movimiento (PA, PD, DD, DA)
-     * @return bool   true si el stock aumenta, false si disminuye
+     * @param  string  $movimientoTipo  Tipo de movimiento (PA, PD, DD, DA)
+     * @return bool true si el stock aumenta, false si disminuye
      */
     private function isIncreaseStock(string $movimientoTipo): bool
     {
@@ -488,9 +488,9 @@ class PrestamoService
      * Determina cliente origen/destino según el tipo de movimiento.
      * Ahora acepta unidad_codigo y empaque desde el frontend (selector de fracción).
      *
-     * @param  array $data  Datos validados del request
-     * @param  bool  $isNew Define si se agregan campos de auditoría (user_id, user_nombre)
-     * @param  string|null $estado Estado explícito (ej: 'registrada')
+     * @param  array  $data  Datos validados del request
+     * @param  bool  $isNew  Define si se agregan campos de auditoría (user_id, user_nombre)
+     * @param  string|null  $estado  Estado explícito (ej: 'registrada')
      * @return array [ 'prestamo' => array, 'detalles' => array ]
      */
     private function processPrestamoData(array $data, bool $isNew = false, ?string $estado = null): array
@@ -513,15 +513,15 @@ class PrestamoService
             $precioUnitario = $detalle['precio_unitario'];
 
             // Si es una devolución, forzamos el precio original del préstamo referenciado ajustado al empaque usado
-            if (!empty($data['prestamo_referencia_id'])) {
+            if (! empty($data['prestamo_referencia_id'])) {
                 $originalDetalle = \App\Models\PrestamoDetalle::where('prestamo_id', $data['prestamo_referencia_id'])
-                                        ->where('producto_id', $detalle['producto_id'])
-                                        ->first();
+                    ->where('producto_id', $detalle['producto_id'])
+                    ->first();
                 if ($originalDetalle) {
                     $precioOriginal = (float) $originalDetalle->valor_unitario;
                     $empaqueOriginal = (float) ($originalDetalle->producto_empaque > 0 ? $originalDetalle->producto_empaque : 1);
                     $precioPorKg = $precioOriginal / $empaqueOriginal;
-                    
+
                     $empaqueDevolucion = (float) ($detalle['empaque'] ?? $empaqueOriginal);
                     $precioUnitario = $precioPorKg * $empaqueDevolucion;
                 }
@@ -530,14 +530,14 @@ class PrestamoService
                 if ($data['movimiento_tipo'] === 'PA') {
                     $productoEnBD = $productos[$detalle['producto_id']];
                     // Si el empaque es diferente a 1, el precio_unitario (por unidad enviada)
-                    // debe ser ajustado en caso de que se preste por empaque. 
+                    // debe ser ajustado en caso de que se preste por empaque.
                     // El costo_unitario en BD corresponde al empaque base del producto.
                     $empaqueBase = (float) ($productoEnBD->empaque > 0 ? $productoEnBD->empaque : 1);
                     $empaqueFrontend = (float) ($detalle['empaque'] ?? $empaqueBase);
-                    
+
                     // Obtenemos el precio por Kg actual
                     $costoPorKg = (float) $productoEnBD->costo_unitario / $empaqueBase;
-                    
+
                     // Calculamos el precio unitario final para la unidad seleccionada
                     $precioUnitario = $costoPorKg * $empaqueFrontend;
                 }
@@ -562,41 +562,41 @@ class PrestamoService
 
         // Construir array de la cabecera
         $prestamoData = [
-            'movimiento_tipo'         => $data['movimiento_tipo'],
-            'cliente_origen_id'       => $clienteOrigenId,
-            'cliente_destino_id'      => $clienteDestinoId,
-            'prestamo_referencia_id'  => $data['prestamo_referencia_id'] ?? null,
+            'movimiento_tipo' => $data['movimiento_tipo'],
+            'cliente_origen_id' => $clienteOrigenId,
+            'cliente_destino_id' => $clienteDestinoId,
+            'prestamo_referencia_id' => $data['prestamo_referencia_id'] ?? null,
             'comprobante_tipo_codigo' => $data['comprobante_tipo_codigo'],
             'comprobante_tipo_nombre' => $comprobanteTipo->codigo ?? '',
-            'serie'                   => $data['serie'],
-            'correlativo'             => $data['correlativo'],
-            'fecha_prestamo'          => $data['fecha_prestamo'] ?? now(),
-            'total'                   => round($totales['total'], 2)
+            'serie' => $data['serie'],
+            'correlativo' => $data['correlativo'],
+            'fecha_prestamo' => $data['fecha_prestamo'] ?? now(),
+            'total' => round($totales['total'], 2),
         ];
 
         // Campos exclusivos de creación
         if ($isNew) {
             $prestamoData['estado'] = $estado ?? 'registrada';
-            $prestamoData['user_id']     = auth()->id();
+            $prestamoData['user_id'] = auth()->id();
             $prestamoData['user_nombre'] = auth()->user()->name;
         }
 
         return [
             'prestamo' => $prestamoData,
-            'detalles' => $detallesCalculados
+            'detalles' => $detallesCalculados,
         ];
     }
 
     /**
      * Obtiene las cantidades devueltas y pendientes para un préstamo original.
-     * 
-     * @param int $id ID del préstamo original
+     *
+     * @param  int  $id  ID del préstamo original
      * @return array [producto_id => ['devuelto' => float, 'pendiente' => float]]
      */
     public function obtenerSaldosPendientes(int $id): array
     {
         $prestamoOriginal = Prestamo::with('detalles')->findOrFail($id);
-        
+
         // Obtenemos todas las devoluciones activas associadas a este préstamo
         $devoluciones = Prestamo::with('detalles')
             ->where('prestamo_referencia_id', $id)
@@ -614,10 +614,10 @@ class PrestamoService
         foreach ($prestamoOriginal->detalles as $det) {
             $devuelto = $cantidadesDevueltasKgm[$det->producto_id] ?? 0;
             $pendiente = max(0, $det->cantidad_kgm - $devuelto);
-            
+
             $saldos[$det->producto_id] = [
                 'devuelto' => round($devuelto, 4),
-                'pendiente' => round($pendiente, 4)
+                'pendiente' => round($pendiente, 4),
             ];
         }
 
@@ -627,14 +627,11 @@ class PrestamoService
     /**
      * Actualiza el estado del préstamo original (PA/PD) evaluando si lo devuelto
      * alcanza o no a lo prestado inicialmente.
-     *
-     * @param int $referenciaId
-     * @return void
      */
     private function actualizarEstadoPrestamoReferencia(int $referenciaId): void
     {
         $prestamoOriginal = Prestamo::with('detalles')->findOrFail($referenciaId);
-        
+
         // Obtenemos todas las devoluciones activas (no anuladas) asociadas a este préstamo
         $devoluciones = Prestamo::with('detalles')
             ->where('prestamo_referencia_id', $referenciaId)
@@ -653,7 +650,7 @@ class PrestamoService
 
         foreach ($prestamoOriginal->detalles as $detOriginal) {
             $devuelto = $cantidadesDevueltas[$detOriginal->producto_id] ?? 0;
-            
+
             // Usamos round a 4 decimales para evitar problemas de precisión flotante
             if (round($devuelto, 4) < round($detOriginal->cantidad_kgm, 4)) {
                 $esCompleta = false;
@@ -678,9 +675,10 @@ class PrestamoService
 
     /**
      * Valida que las cantidades a devolver no superen el saldo pendiente del préstamo original.
-     * 
-     * @param int $referenciaId ID del préstamo original
-     * @param array $detallesNuevos Detalles calculados de la devolución
+     *
+     * @param  int  $referenciaId  ID del préstamo original
+     * @param  array  $detallesNuevos  Detalles calculados de la devolución
+     *
      * @throws \Exception Si alguna cantidad excede el saldo pendiente
      */
     private function validarCantidadesDevolucion(int $referenciaId, array $detallesNuevos): void
@@ -692,7 +690,7 @@ class PrestamoService
             $nombre = $det['producto_nombre'];
             $cantidadKgm = $det['cantidad_kgm'];
 
-            if (!isset($saldos[$productoId])) {
+            if (! isset($saldos[$productoId])) {
                 throw new \Exception("El producto '{$nombre}' no forma parte del préstamo original.");
             }
 
@@ -712,13 +710,13 @@ class PrestamoService
      * Si se reciben unidad_codigo y empaque del frontend (selector de fracción),
      * esos valores se usan. Si no, se usan los del producto base.
      *
-     * @param  Producto    $producto         Producto con su unidad cargada
-     * @param  float       $cantidad         Cantidad prestada
-     * @param  float       $precio_unitario  Precio unitario del producto
-     * @param  string|null $unidadCodigo     Código de unidad del frontend (nullable)
-     * @param  float|null  $empaque          Empaque del frontend (nullable)
-     * @param  array       &$totales         Array de totales acumulados (referencia)
-     * @return array       Detalle listo para createMany()
+     * @param  Producto  $producto  Producto con su unidad cargada
+     * @param  float  $cantidad  Cantidad prestada
+     * @param  float  $precio_unitario  Precio unitario del producto
+     * @param  string|null  $unidadCodigo  Código de unidad del frontend (nullable)
+     * @param  float|null  $empaque  Empaque del frontend (nullable)
+     * @param  array  &$totales  Array de totales acumulados (referencia)
+     * @return array Detalle listo para createMany()
      */
     private function calculateDetail(
         $producto,
@@ -740,15 +738,15 @@ class PrestamoService
         $totales['total'] += $detalleTotal;
 
         return [
-            'producto_id'      => $producto->id,
-            'producto_nombre'  => $producto->nombre,
-            'unidad_codigo'    => $unidadCodigoFinal,
-            'unidad_nombre'    => $unidadNombre,
+            'producto_id' => $producto->id,
+            'producto_nombre' => $producto->nombre,
+            'unidad_codigo' => $unidadCodigoFinal,
+            'unidad_nombre' => $unidadNombre,
             'producto_empaque' => $empaqueFinal,
-            'cantidad'         => $cantidad,
-            'cantidad_kgm'     => $cantidad * $empaqueFinal,
-            'valor_unitario'   => round($precioCalculado, 4),
-            'total'            => round($detalleTotal, 2)
+            'cantidad' => $cantidad,
+            'cantidad_kgm' => $cantidad * $empaqueFinal,
+            'valor_unitario' => round($precioCalculado, 4),
+            'total' => round($detalleTotal, 2),
         ];
     }
 }

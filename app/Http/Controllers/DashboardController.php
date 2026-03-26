@@ -22,7 +22,9 @@ class DashboardController extends Controller
         $totalComprasHoy = Compra::whereDate('fecha_compra', $hoy)->sum('total');
         $alertasProductos = Producto::with('linea')
             ->where('activo', true)
-            ->where('linea_id', 2) 
+            ->where('stock_almacen', '>=', 0)
+            ->where('activo', 1)
+            // ->where('linea_id', 2) 
             ->where('stock_minimo', '>', 0)
             ->whereColumn('stock_almacen', '<=', 'stock_minimo')
             ->orderBy('stock_almacen')

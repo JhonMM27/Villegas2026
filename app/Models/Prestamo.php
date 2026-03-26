@@ -22,10 +22,11 @@ class Prestamo extends Model
         'fecha_prestamo',
         'total',
         'estado',
+        'rectificacion_count',
     ];
 
     protected $casts = [
-        'total'        => 'decimal:2',
+        'total' => 'decimal:2',
     ];
 
     /*

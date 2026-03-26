@@ -25,10 +25,11 @@ class NucleoPreparada extends Model
         'items',
         'estado',
         'nota',
+        'rectificacion_count',
     ];
 
     protected $casts = [
-        //'fecha' => 'datetime',
+        // 'fecha' => 'datetime',
         'cantidad_porcentaje' => 'decimal:2',
         'costo_unitario' => 'decimal:4',
         'ingreso_kg' => 'decimal:4',

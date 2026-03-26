@@ -171,33 +171,62 @@
                     @endcan
                     @can('dashboard_productos')
                     <div class="row">
-                        <div class="col-lg-6">
+                        <div class="col-lg-12">
                             <div class="card card-info card-outline mb-4">
                                 <!--begin::Header-->
                                 <div class="card-header"><div class="card-title" style="font-size:14px;">Productos con bajo Stock</div></div>
                                 <!--end::Header-->
                                 <!--begin::Body-->
-                                <div class="card-body">
-                                    @foreach($alertasProductos as $producto)
-                                        <div class="progress-group">
-                                            {{ $producto->nombre }}
-                                            <small class="text-muted">
-                                                ({{ $producto->empaque }} {{ $producto->unidad_codigo }}
-                                                | {{ $producto->linea->nombre ?? '-' }})
-                                            </small>
+                                <div class="card-body p-0">
+                                    <div class="row">
+                                        @php
+                                            $mitad = ceil($alertasProductos->count() / 2);
+                                            $col1 = $alertasProductos->take($mitad);
+                                            $col2 = $alertasProductos->skip($mitad);
+                                        @endphp
+                                        <div class="col-lg-6 border-end">
+                                            @foreach($col1 as $producto)
+                                                <div class="progress-group px-3 py-2 border-bottom">
+                                                    {{ $producto->nombre }}
+                                                    <small class="text-muted">
+                                                        ({{ $producto->empaque }} {{ $producto->unidad_codigo }}
+                                                        | {{ $producto->linea->nombre ?? '-' }})
+                                                    </small>
 
-                                            <span class="float-end">
-                                                <b>{{ $producto->stock_almacen }}</b> / {{ $producto->stock_minimo }}
-                                            </span>
+                                                    <span class="float-end">
+                                                        <b>{{ $producto->stock_almacen }}</b> / {{ $producto->stock_minimo }}
+                                                    </span>
 
-                                            <div class="progress progress-sm">
-                                                <div class="progress-bar {{ $producto->color_stock }}"
-                                                    style="width: {{ $producto->porcentaje_stock }}%">
+                                                    <div class="progress progress-sm">
+                                                        <div class="progress-bar {{ $producto->color_stock }}"
+                                                            style="width: {{ $producto->porcentaje_stock }}%">
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            @endforeach
                                         </div>
-                                    @endforeach
+                                        <div class="col-lg-6">
+                                            @foreach($col2 as $producto)
+                                                <div class="progress-group px-3 py-2 border-bottom">
+                                                    {{ $producto->nombre }}
+                                                    <small class="text-muted">
+                                                        ({{ $producto->empaque }} {{ $producto->unidad_codigo }}
+                                                        | {{ $producto->linea->nombre ?? '-' }})
+                                                    </small>
 
+                                                    <span class="float-end">
+                                                        <b>{{ $producto->stock_almacen }}</b> / {{ $producto->stock_minimo }}
+                                                    </span>
+
+                                                    <div class="progress progress-sm">
+                                                        <div class="progress-bar {{ $producto->color_stock }}"
+                                                            style="width: {{ $producto->porcentaje_stock }}%">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
                                 </div>
                                 <!--end::Body-->
                             </div>
