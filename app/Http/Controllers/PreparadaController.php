@@ -81,14 +81,14 @@ class PreparadaController extends Controller
                     */
 
                     // Botón Anular (solo si está registrada)
-                    if ($row->estado === 'registrada' && auth()->user()->can('preparadas_delete')) {
+                    if ($row->estado === 'registrada' && auth()->user()->can('preparadas_delete') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
                         $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-preparada" data-id="' . $row->id . '" title="Anular Preparada">
                             <i class="bi bi-x-circle"></i>
                          </button>';
                     }
 
                     // Botón Rectificar (solo si está anulada)
-                    if ($row->estado === 'anulada' && auth()->user()->can('preparadas_edit')) {
+                    if ($row->estado === 'anulada' && auth()->user()->can('preparadas_edit') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
                         $buttons[] = '<button class="btn btn-sm btn-warning btn-rectificar-preparada" data-id="' . $row->id . '" title="Rectificar Preparada">
                             <i class="bi bi-arrow-repeat"></i>
                          </button>';

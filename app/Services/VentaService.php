@@ -188,8 +188,9 @@ class VentaService
             $ventaDataRaw = $this->processVentaData($data, false);
             $ventaData = $ventaDataRaw['venta'];
             
-            // Forzamos serie de rectificación, estado y trazabilidad
-            $ventaData['serie']  = '01';
+            // Forzar serie y correlativo originales de la venta (se preservan en rectificación)
+            $ventaData['serie']       = $venta->serie;
+            $ventaData['correlativo'] = $venta->correlativo;
             $ventaData['estado'] = 'rectificada';
             $ventaData['nota']   = trim(($data['nota'] ?? $venta->nota) . " | Rectificada el " . now()->format('d/m/Y H:i'));
 

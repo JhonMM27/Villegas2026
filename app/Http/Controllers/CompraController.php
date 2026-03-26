@@ -97,11 +97,11 @@ class CompraController extends Controller
                     $anularButton = '';
                     $rectificarButton = '';
 
-                    if ($row->estado === 'registrada' && auth()->user()->can('compras_delete')) {
+                    if ($row->estado === 'registrada' && auth()->user()->can('compras_delete') && \Carbon\Carbon::parse($row->fecha_compra)->format('Y-m-d') >= '2026-03-24') {
                         $anularButton = '<button class="btn btn-sm btn-danger btn-anular-compra" data-id="'.$row->id.'" title="Anular Compra">
                             <i class="bi bi-x-circle"></i>
                         </button>';
-                    } else if ($row->estado === 'anulada' && auth()->user()->can('compras_create')) {
+                    } else if ($row->estado === 'anulada' && auth()->user()->can('compras_create') && \Carbon\Carbon::parse($row->fecha_compra)->format('Y-m-d') >= '2026-03-24') {
                         // Botón Rectificar: solo si ESTÁ anulada
                         $rectificarButton = '<button class="btn btn-sm btn-warning btn-rectificar-compra" data-id="'.$row->id.'" title="Rectificar Compra">
                             <i class="bi bi-arrow-repeat"></i>

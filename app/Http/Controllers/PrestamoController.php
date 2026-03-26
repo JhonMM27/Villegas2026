@@ -123,14 +123,14 @@ class PrestamoController extends Controller
                     */
 
                     // Botón Anular (solo si está registrada)
-                    if ($row->estado === 'registrada' && auth()->user()->can('prestamos_delete')) {
+                    if ($row->estado === 'registrada' && auth()->user()->can('prestamos_delete') && \Carbon\Carbon::parse($row->fecha_prestamo)->format('Y-m-d') >= '2026-03-24') {
                         $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-prestamo" data-id="' . $row->id . '" title="Anular Préstamo">
                             <i class="bi bi-x-circle"></i>
                          </button>';
                     }
 
                     // Botón Rectificar (solo si está anulada)
-                    if ($row->estado === 'anulada' && auth()->user()->can('prestamos_edit')) {
+                    if ($row->estado === 'anulada' && auth()->user()->can('prestamos_edit') && \Carbon\Carbon::parse($row->fecha_prestamo)->format('Y-m-d') >= '2026-03-24') {
                         $buttons[] = '<button class="btn btn-sm btn-warning btn-rectificar-prestamo" data-id="' . $row->id . '" title="Rectificar Préstamo">
                             <i class="bi bi-arrow-repeat"></i>
                          </button>';

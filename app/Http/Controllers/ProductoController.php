@@ -248,9 +248,12 @@ class ProductoController extends Controller
     {
         $q = $request->input('q');
         return Producto::with('afectacionTipo:codigo,porcentaje','unidad:codigo,descripcion', 'fracciones:id,producto_id,unidad_codigo,empaque,precio_lista')
-                    ->where('id', '=', $q)
-                    ->orWhere('nombre', 'like', "%{$q}%")
-                    ->orWhere('codigo', 'like', "%{$q}%")
+                    ->where('activo', true)
+                    ->where(function($query) use ($q) {
+                        $query->where('id', '=', $q)
+                            ->orWhere('nombre', 'like', "%{$q}%")
+                            ->orWhere('codigo', 'like', "%{$q}%");
+                    })
                     ->select('id','codigo', 'nombre', 'costo_unitario','stock_almacen', 'afectacion_tipo_codigo', 'unidad_codigo','empaque')
                     ->limit(10)
                     ->get();

@@ -86,14 +86,14 @@ class VentaController extends Controller
                     */
 
                     // Botón Anular (solo si está registrada)
-                    if ($row->estado === 'registrada' && auth()->user()->can('ventas_delete')) {
+                    if ($row->estado === 'registrada' && auth()->user()->can('ventas_delete') && \Carbon\Carbon::parse($row->fecha_venta)->format('Y-m-d') >= '2026-03-24') {
                         $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-venta" data-id="' . $row->id . '" title="Anular Venta">
                             <i class="bi bi-x-circle"></i>
                          </button>';
                     }
 
                     // Botón Rectificar (solo si está anulada)
-                    if ($row->estado === 'anulada' && auth()->user()->can('ventas_edit')) {
+                    if ($row->estado === 'anulada' && auth()->user()->can('ventas_edit') && \Carbon\Carbon::parse($row->fecha_venta)->format('Y-m-d') >= '2026-03-24') {
                         $buttons[] = '<button class="btn btn-sm btn-warning btn-rectificar-venta" data-id="' . $row->id . '" title="Rectificar Venta">
                             <i class="bi bi-arrow-repeat"></i>
                          </button>';

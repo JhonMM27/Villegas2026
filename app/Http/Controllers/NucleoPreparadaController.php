@@ -71,14 +71,14 @@ class NucleoPreparadaController extends Controller
                     $buttons = [];
 
                     // Botón Anular (solo si está registrada)
-                    if ($row->estado === 'registrada' && auth()->user()->can('nucleo_preparadas_delete')) {
+                    if ($row->estado === 'registrada' && auth()->user()->can('nucleo_preparadas_delete') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
                         $buttons[] = '<button class="btn btn-sm btn-danger btn-anular-nucleo-preparada" data-id="' . $row->id . '" title="Anular">
                             <i class="bi bi-x-circle"></i>
                          </button>';
                     }
 
                     // Botón Rectificar (solo si está anulada)
-                    if ($row->estado === 'anulada' && auth()->user()->can('nucleo_preparadas_edit')) {
+                    if ($row->estado === 'anulada' && auth()->user()->can('nucleo_preparadas_edit') && \Carbon\Carbon::parse($row->fecha)->format('Y-m-d') >= '2026-03-24') {
                         $buttons[] = '<button class="btn btn-sm btn-warning btn-rectificar-nucleo-preparada" data-id="' . $row->id . '" title="Rectificar">
                             <i class="bi bi-arrow-repeat"></i>
                          </button>';
