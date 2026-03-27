@@ -309,6 +309,25 @@ class CuentaCorrienteClienteController extends Controller
         $cliente = Cliente::find($clienteId);
         $clienteNombre = $cliente ? ($cliente->id.' - '.$cliente->razon_social) : null;
 
+        // Abonos sueltos (adelantos sin venta asociada)
+        $abonosSueltos = DB::table('venta_provisionales as v')
+            ->selectRaw("
+                v.id,
+                v.fecha_provisional,
+                v.numero_recibo,
+                v.monto
+            ")
+            ->where('v.cliente_id', $clienteId)
+            ->where('v.tipo', 'ADELANTO')
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('venta_provisional_detalles as vpd')
+                    ->whereColumn('vpd.venta_provisional_id', 'v.id')
+                    ->whereNotNull('vpd.venta_id');
+            })
+            ->orderBy('v.fecha_provisional')
+            ->get();
+
         $reportes = Venta::query()
             ->leftJoin('venta_detalles as vd', 'vd.venta_id', '=', 'ventas.id')
             ->selectRaw('
@@ -362,7 +381,8 @@ class CuentaCorrienteClienteController extends Controller
             'totAcuenta',
             'totAbonos',
             'totSaldo',
-            'totItems'
+            'totItems',
+            'abonosSueltos'
         ))->setPaper('a4', 'portrait');
 
         return $pdf->stream('creditos_por_cobrar_cliente_todos.pdf');

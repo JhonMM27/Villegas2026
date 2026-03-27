@@ -86,5 +86,33 @@
         </tbody>
     </table>
 
+    {{-- CUADRO DE ABONOS SUELTOS --}}
+    <div class="section-title">Saldo a favor (abonos sin venta asociada)</div>
+
+    <table class="reporte">
+        <thead>
+        <tr>
+            <th class="nowrap">Fecha</th>
+            <th>Documento</th>
+            <th>Detalle</th>
+            <th class="text-right">Pago</th>
+        </tr>
+        </thead>
+        <tbody>
+        @forelse($abonosSueltos ?? [] as $p)
+            <tr class="row-abono">
+                <td class="nowrap">{{ \Carbon\Carbon::parse($p->fecha_provisional)->format('d/m/Y') }}</td>
+                <td>{{ 'REC ' . ($p->numero_recibo ?? '') }}</td>
+                <td>ABONO</td>
+                <td class="text-right">{{ number_format((float)($p->monto ?? 0), 2) }}</td>
+            </tr>
+        @empty
+            <tr>
+                <td colspan="4" class="text-center">Sin abonos sueltos en el rango.</td>
+            </tr>
+        @endforelse
+        </tbody>
+    </table>
+
 </body>
 </html>

@@ -123,6 +123,12 @@
             font-weight: 400;
         }
 
+        .row-abono td{
+            background:#fffdf5;
+        }
+
+        .section-title{ font-weight: 700; margin: 10px 0 6px 0; }
+
         .page-number:before {
             content: counter(page);
         }
@@ -366,6 +372,45 @@
                 <td colspan="3"></td>
             </tr>
 
+        </tbody>
+    </table>
+
+    {{-- CUADRO DE ABONOS SUELTOS --}}
+    <div class="section-title">Saldo a favor (abonos sin venta asociada)</div>
+
+    <table class="report">
+        <thead>
+        <tr>
+            <th class="nowrap">Fecha</th>
+            <th>Documento</th>
+            <th>Detalle</th>
+            <th class="num">Pago</th>
+        </tr>
+        </thead>
+        <tbody>
+        @forelse($abonosSueltos ?? [] as $p)
+            @php
+                $docPago = (!empty($p->serie) && !empty($p->correlativo))
+                    ? trim(($p->comprobante_tipo_codigo ? $p->comprobante_tipo_codigo.' ' : '').$p->serie.'-'.$p->correlativo)
+                    : ('REC '.($p->numero_recibo ?? ''));
+            @endphp
+
+            <tr class="row-abono">
+                <td class="nowrap">{{ \Carbon\Carbon::parse($p->fecha_provisional)->format('d/m/Y') }}</td>
+                <td>{{ $docPago }}</td>
+                <td>
+                    ABONO
+                    @if(!empty($p->comentario))
+                        <div class="muted">{{ $p->comentario }}</div>
+                    @endif
+                </td>
+                <td class="num">{{ number_format((float)($p->monto ?? 0), 2) }}</td>
+            </tr>
+        @empty
+            <tr>
+                <td colspan="4" class="text-center muted">Sin abonos sueltos en el rango.</td>
+            </tr>
+        @endforelse
         </tbody>
     </table>
 

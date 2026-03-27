@@ -96,6 +96,7 @@
                                     <div class="d-flex flex-wrap gap-2">
                                         {{-- Cada botón llama a una ruta (HTML parcial) --}}
                                         
+                                        {{--
                                         <button type="button" class="btn btn-secondary btn-sm btn-report"
                                                 data-tab="1"
                                                 data-target="#reporteTab1"
@@ -103,13 +104,14 @@
                                                 data-url="{{ route('cuenta.corriente.cliente.estado_cuenta_pdf') }}">
                                             Estado de cuenta
                                         </button>
+                                        --}}
 
                                         <button type="button" class="btn btn-info btn-sm btn-report"
                                                 data-tab="1"
                                                 data-target="#reporteTab1"
                                                 data-cliente="si" data-fecha="range" data-dia="no"
                                                 data-url="{{ route('cuenta.corriente.cliente.estado_cuenta_simplificado_pdf') }}">
-                                            Estado de cuenta Simplificado
+                                            Estado de cuenta
                                         </button>
                                         
 
