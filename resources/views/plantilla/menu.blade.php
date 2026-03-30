@@ -387,6 +387,54 @@
                     </ul>
                 </li>
                 @endcanany
+                @canany(['empleados_list', 'planilla_adelantos_list', 'planilla_prestamos_list', 'planilla_pagos_list', 'planilla_report'])
+                <li class="nav-item" id="mnuPlanilla">
+                    <a href="#" class="nav-link">
+                        <i class="bi bi-people"></i>
+                        <p>
+                            <strong>Planilla</strong>
+                            <i class="nav-arrow bi bi-chevron-right"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        @can('empleados_list')
+                        <li class="nav-item">
+                            <a href="{{route('empleados.index')}}" class="nav-link" id="itemEmpleados">
+                                <p>Empleados</p>
+                            </a>
+                        </li>
+                        @endcan
+                        @can('planilla_adelantos_list')
+                        <li class="nav-item">
+                            <a href="{{route('planilla-adelantos.index')}}" class="nav-link" id="itemAdelantos">
+                                <p>Adelantos</p>
+                            </a>
+                        </li>
+                        @endcan
+                        @can('planilla_prestamos_list')
+                        <li class="nav-item">
+                            <a href="{{route('planilla-prestamos.index')}}" class="nav-link" id="itemPrestamosPlanilla">
+                                <p>Préstamos</p>
+                            </a>
+                        </li>
+                        @endcan
+                        @can('planilla_pagos_list')
+                        <li class="nav-item">
+                            <a href="{{route('planilla-pagos.index')}}" class="nav-link" id="itemPagos">
+                                <p>Pagos</p>
+                            </a>
+                        </li>
+                        @endcan
+                        @can('planilla_report')
+                        <li class="nav-item">
+                            <a href="{{route('reportes.planilla')}}" class="nav-link" id="itemReportes">
+                                <p>Reportes</p>
+                            </a>
+                        </li>
+                        @endcan
+                    </ul>
+                </li>
+                @endcanany
                 @canany(['kardex_report'])
                 <li class="nav-item" id="mnuKardex">
                     <a href="#" class="nav-link">                        

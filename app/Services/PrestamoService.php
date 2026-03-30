@@ -203,40 +203,40 @@ class PrestamoService
      *
      * @throws \Exception Si ocurre cualquier error
      */
-    public function deletePrestamo(int $id): void
-    {
-        DB::transaction(function () use ($id) {
-            $registro = Prestamo::with('detalles')->findOrFail($id);
+    // public function deletePrestamo(int $id): void
+    // {
+    //     DB::transaction(function () use ($id) {
+    //         $registro = Prestamo::with('detalles')->findOrFail($id);
 
-            // 1) Recoger movimientos asociados
-            $movimientos = Movimiento::where('transaccion_tipo', 'prestamos')
-                ->where('transaccion_id', $registro->id)
-                ->get();
+    //         // 1) Recoger movimientos asociados
+    //         $movimientos = Movimiento::where('transaccion_tipo', 'prestamos')
+    //             ->where('transaccion_id', $registro->id)
+    //             ->get();
 
-            $productosAfectados = $movimientos->pluck('producto_id')->unique()->toArray();
+    //         $productosAfectados = $movimientos->pluck('producto_id')->unique()->toArray();
 
-            // 2) Neutralizar movimientos y recalcular kardex por producto
-            foreach ($productosAfectados as $productoId) {
-                $idsProducto = $movimientos
-                    ->where('producto_id', $productoId)
-                    ->pluck('id')
-                    ->toArray();
+    //         // 2) Neutralizar movimientos y recalcular kardex por producto
+    //         foreach ($productosAfectados as $productoId) {
+    //             $idsProducto = $movimientos
+    //                 ->where('producto_id', $productoId)
+    //                 ->pluck('id')
+    //                 ->toArray();
 
-                $this->movimientoService->recalcularKardexExcluyendo(
-                    $productoId,
-                    $idsProducto
-                );
-            }
+    //             $this->movimientoService->recalcularKardexExcluyendo(
+    //                 $productoId,
+    //                 $idsProducto
+    //             );
+    //         }
 
-            // 3) Eliminar préstamo (cascade elimina detalles)
-            $registro->delete();
+    //         // 3) Eliminar préstamo (cascade elimina detalles)
+    //         $registro->delete();
 
-            // Actualizar estado del préstamo original si este registro era una devolución
-            if ($registro->prestamo_referencia_id) {
-                $this->actualizarEstadoPrestamoReferencia($registro->prestamo_referencia_id);
-            }
-        });
-    }
+    //         // Actualizar estado del préstamo original si este registro era una devolución
+    //         if ($registro->prestamo_referencia_id) {
+    //             $this->actualizarEstadoPrestamoReferencia($registro->prestamo_referencia_id);
+    //         }
+    //     });
+    // }
 
     /**
      * Anula un préstamo existente dentro de una transacción.
@@ -263,7 +263,12 @@ class PrestamoService
 
             $prestamo->update(['estado' => 'anulada']);
 
-            $productosAfectados = $prestamo->detalles->pluck('producto_id')->unique()->toArray();
+            $productosAfectados = [];
+            foreach ($prestamo->detalles as $detalle) {
+                if (! in_array($detalle->producto_id, $productosAfectados)) {
+                    $productosAfectados[] = $detalle->producto_id;
+                }
+            }
 
             foreach ($productosAfectados as $productoId) {
                 $movIds = Movimiento::where('transaccion_tipo', 'prestamos')
@@ -392,6 +397,8 @@ class PrestamoService
 
                     $movNeutralizado->update($updateParams);
                     $productosAfectados[] = $detalle->producto_id;
+
+                    continue;
                 } else {
                     $this->registrarMovimientoDetalle($prestamo, $detalle, $newIncrease);
                     $productosAfectados[] = $detalle->producto_id;
@@ -661,9 +668,9 @@ class PrestamoService
         }
 
         if ($esCompleta) {
-            $nuevoEstado = 'devuelto';
+            $nuevoEstado = 'registrada';
         } elseif ($esParcial) {
-            $nuevoEstado = 'parcial';
+            $nuevoEstado = 'registrada';
         } else {
             $nuevoEstado = 'registrada';
         }

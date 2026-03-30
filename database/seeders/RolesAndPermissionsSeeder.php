@@ -46,7 +46,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'venta_provisionales',
             'compra_provisionales',
             'venta_entregas',
-            'gastos'
+            'gastos',
+            'empleados',
+            'planilla_adelantos',
+            'planilla_prestamos',
+            'planilla_pagos'
         ];
         $actions = ['list', 'create', 'edit', 'delete'];
         $permissions = [];
@@ -74,7 +78,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'cuenta_corriente_report',
             'caja_report',
             'rentabilidad_report',
-            'super_admin'
+            'super_admin',
+            'planilla_report'
         ];
 
         foreach ($permissionsReport as $permission) {

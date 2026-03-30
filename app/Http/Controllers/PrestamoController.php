@@ -81,8 +81,7 @@ class PrestamoController extends Controller
                         // PRÉSTAMO DE → Me prestaron / me deben
                     case 'PD':
                         $data->where('movimiento_tipo', 'PD')
-                            ->where('cliente_destino_id', $this->empresa_cliente_id)
-                            ->whereIn('estado', ['registrada']);
+                            ->where('cliente_destino_id', $this->empresa_cliente_id);
                         break;
 
                         // DEVOLUCIÓN DE → Me devuelven
@@ -332,22 +331,22 @@ class PrestamoController extends Controller
      * @param  int  $id  ID del préstamo a eliminar
      * @return JsonResponse Respuesta con el resultado de la operación
      */
-    public function destroy($id): JsonResponse
-    {
-        try {
-            $this->prestamoService->deletePrestamo($id);
+    // public function destroy($id): JsonResponse
+    // {
+    //     try {
+    //         $this->prestamoService->deletePrestamo($id);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Prestamo eliminado satisfactoriamente.',
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al eliminar el registro: '.$e->getMessage(),
-            ], 500);
-        }
-    }
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Prestamo eliminado satisfactoriamente.',
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Error al eliminar el registro: '.$e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
 
     /**
      * Anula un préstamo registrando movimientos de reversión

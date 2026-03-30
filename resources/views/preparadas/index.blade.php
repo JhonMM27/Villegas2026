@@ -195,9 +195,9 @@ class PreparadaManager extends CrudManager {
             return;
         }
 
-        const costoServicio = parseFloat(
-            document.getElementById('costo_servicio')?.value || 0
-        );
+        // const costoServicio = parseFloat(
+        //     document.getElementById('costo_servicio')?.value || 0
+        // );
 
         
         tbodyDestino.innerHTML = '';
@@ -273,6 +273,14 @@ class PreparadaManager extends CrudManager {
         // =========================================
         // SERVICIO MEZCLADO
         // =========================================
+        const costoServicioCalculado = Number((totalSalidaKg * 0.07).toFixed(2));
+        const inputServicio = document.getElementById('costo_servicio');
+        if (inputServicio) {
+            inputServicio.value = costoServicioCalculado;
+        }
+
+        const costoServicio = costoServicioCalculado;
+
         if (costoServicio > 0) {
             const idx = tbodyDestino.rows.length;
 
@@ -523,6 +531,10 @@ class PreparadaManager extends CrudManager {
             info.classList.remove('d-none');
 
             document.getElementById('formulacion_nombre').value = response.producto_nombre || '';
+            const inputServicio = document.getElementById('costo_servicio');
+            if (inputServicio) {
+                inputServicio.value = Number((parseFloat(response.ingreso_kg || 0) * 0.07).toFixed(2));
+            }
             document.getElementById('producto_empaque_text').textContent = response.producto_empaque || '';
             //document.getElementById('unidad_text').textContent = response.costo_unitario;
             document.getElementById('cliente_nombre').textContent = response.cliente_nombre|| '';
@@ -584,6 +596,10 @@ class PreparadaManager extends CrudManager {
             info.classList.remove('d-none');
 
             document.getElementById('formulacion_nombre').value = response.producto_nombre || '';
+            const inputServicio = document.getElementById('costo_servicio');
+            if (inputServicio) {
+                inputServicio.value = Number((parseFloat(response.ingreso_kg || 0) * 0.07).toFixed(2));
+            }
             document.getElementById('producto_empaque_text').textContent = response.producto_empaque || '';
             document.getElementById('cliente_nombre').textContent = response.cliente_nombre|| '';
             document.getElementById('numero_interno').value = response.numero_interno || '';

@@ -61,6 +61,33 @@
         $gastoD = (float)($gastos->importe_d ?? 0);
         $gastoC = (float)($gastos->importe_c ?? 0);
 
+        // Planilla - GASTOS EMPLEADOS
+        $adelantoTotal = (float)($adelantos->total ?? 0);
+        $adelantoP = (float)($adelantos->importe_p ?? 0);
+        $adelantoD = (float)($adelantos->importe_d ?? 0);
+        $adelantoC = (float)($adelantos->importe_c ?? 0);
+
+        $prestamoTotal = (float)($prestamos->total ?? 0);
+        $prestamoP = (float)($prestamos->importe_p ?? 0);
+        $prestamoD = (float)($prestamos->importe_d ?? 0);
+        $prestamoC = (float)($prestamos->importe_c ?? 0);
+
+        $pagoPrestamoTotal = (float)($pagosPrestamos->total ?? 0);
+        $pagoPrestamoP = (float)($pagosPrestamos->importe_p ?? 0);
+        $pagoPrestamoD = (float)($pagosPrestamos->importe_d ?? 0);
+        $pagoPrestamoC = (float)($pagosPrestamos->importe_c ?? 0);
+
+        $pagoPlanillaTotal = (float)($pagosPlanilla->total ?? 0);
+        $pagoPlanillaP = (float)($pagosPlanilla->importe_p ?? 0);
+        $pagoPlanillaD = (float)($pagosPlanilla->importe_d ?? 0);
+        $pagoPlanillaC = (float)($pagosPlanilla->importe_c ?? 0);
+
+        // GASTOS EMPLEADOS = adelantos + prestamos + pagoPrestamos + pagoPlanilla
+        $gastosEmpleadosTotal = $adelantoTotal + $prestamoTotal + $pagoPrestamoTotal + $pagoPlanillaTotal;
+        $gastosEmpleadosP = $adelantoP + $prestamoP + $pagoPrestamoP + $pagoPlanillaP;
+        $gastosEmpleadosD = $adelantoD + $prestamoD + $pagoPrestamoD + $pagoPlanillaD;
+        $gastosEmpleadosC = $adelantoC + $prestamoC + $pagoPrestamoC + $pagoPlanillaC;
+
         // Usar el resumen calculado en controlador (evita descalces)
         $ingP = (float)($resumen['ing_p'] ?? 0);
         $ingD = (float)($resumen['ing_d'] ?? 0);
@@ -137,6 +164,15 @@
                 <td class="text-right">{{ number_format($gastoC, 2, '.', '') }}</td>
             </tr>
 
+            <tr>
+                <td><strong>GASTOS - EMPLEADOS</strong></td>
+                <td class="text-right">{{ number_format($gastosEmpleadosTotal, 2, '.', '') }}</td>
+                <td class="text-right">—</td>
+                <td class="text-right">{{ number_format($gastosEmpleadosP, 2, '.', '') }}</td>
+                <td class="text-right">{{ number_format($gastosEmpleadosD, 2, '.', '') }}</td>
+                <td class="text-right">{{ number_format($gastosEmpleadosC, 2, '.', '') }}</td>
+            </tr>
+
             <tr class="total-row">
                 <td>Ingresos (Ventas + Provisionales)</td>
                 <td class="text-right" colspan="2"></td>
@@ -146,7 +182,7 @@
             </tr>
 
             <tr class="total-row">
-                <td>Egresos (Compras + Provisionales + Gastos)</td>
+                <td>Egresos (Compras + Provisionales + Gastos + Planilla)</td>
                 <td class="text-right" colspan="2"></td>
                 <td class="text-right">{{ number_format($egrP, 2, '.', '') }}</td>
                 <td class="text-right">{{ number_format($egrD, 2, '.', '') }}</td>

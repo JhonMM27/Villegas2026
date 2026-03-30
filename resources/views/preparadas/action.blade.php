@@ -53,7 +53,7 @@
                             </div>
                             <div class="col-lg-3">
                               <label for="costo_servicio" class="form-label">Servicio<span class="text-danger">*</span></label>
-                              <input type="number" id="costo_servicio" value="70" name="costo_servicio" class="form-control form-control-sm">
+                              <input type="number" id="costo_servicio" value="0.00" name="costo_servicio" class="form-control form-control-sm" readonly>
                               <div class="invalid-feedback"></div>
                             </div>
                             <div class="col-lg-3">
