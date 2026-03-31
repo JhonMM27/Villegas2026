@@ -142,6 +142,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/venta-entregas/{id}/ver', [VentaEntregaController::class, 'view'])->name('venta-entregas.ver');
     Route::get('/venta-entregas/ventas-por-entregar', [VentaEntregaController::class, 'ventasPorEntregar'])->name('venta-entregas.ventas-por-entregar');
     Route::get('/venta-entregas/ventas-por-entregar-detalle/{ventaId}', [VentaEntregaController::class, 'ventasPorEntregarDetalle'])->name('venta-entregas.ventas-por-entregar-detalle');
+    Route::put('/venta-entregas/{id}/anular', [VentaEntregaController::class, 'anular'])->name('venta-entregas.anular');
+    Route::put('/venta-entregas/{id}/rectificar', [VentaEntregaController::class, 'rectificar'])->name('venta-entregas.rectificar');
     Route::resource('venta-entregas', VentaEntregaController::class)->except(['create', 'edit']);
 
     Route::get('/compra-provisionales/{id}/imprimir', [CompraProvisionalController::class, 'printTicket'])->name('compra-provisionales.imprimir');
@@ -237,6 +239,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/reportes/ventas/por_entregar', [ReporteVentaController::class, 'ventasPorEntregar'])->name('reportes.ventas_por_entregar');
     Route::get('/reportes/ventas/por_entregar/imprimir', [ReporteVentaController::class, 'imprimirVentasPorEntregar'])->name('reportes.ventas_por_entregar.imprimir');
+
+    Route::get('/reportes/ventas/por_entregar_clientes', [ReporteVentaController::class, 'ventasPorEntregarClientes'])->name('reportes.ventas_por_entregar_clientes');
+    Route::get('/reportes/ventas/por_entregar_clientes/imprimir', [ReporteVentaController::class, 'imprimirVentasPorEntregarClientes'])->name('reportes.ventas_por_entregar_clientes.imprimir');
 
     Route::get('/reportes/ventas/top-productos-mes', [ReporteVentaController::class, 'topProductosMes'])
         ->name('reportes.ventas-top-productos-mes');

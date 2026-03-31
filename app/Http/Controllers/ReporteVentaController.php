@@ -2,43 +2,43 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\User;
-use App\Models\CompraDetalle;
-use App\Models\Venta;
-use App\Models\VentaDetalle;
-use Carbon\Carbon;
-
+use App\Exports\VentasAcumuladasProductoExport;
 use App\Exports\VentasDocumentosExport;
 use App\Exports\VentasDocumentosTipoExport;
-use App\Exports\VentasAcumuladasProductoExport;
-use Maatwebsite\Excel\Facades\Excel;
+use App\Models\User;
+use App\Models\Venta;
+use App\Models\VentaDetalle;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReporteVentaController extends Controller
 {
-    public function __construct(){
-        $this->middleware('can:ventas_report')->only(['index','ventasEmitidas','exportarVentasEmitidas','ventasTipoDocumentos','exportarVentasTipoDocumentos', 'ventasAcumuladasProducto','exportarVentasAcumuladasProducto','ventasagrupadasProducto','imprimirVentasEmitidas','imprimirVentasTipoDocumentos','imprimirVentasAcumuladasProducto','imprimirVentasAgrupadasProducto','ventasPor']);
+    public function __construct()
+    {
+        $this->middleware('can:ventas_report')->only(['index', 'ventasEmitidas', 'exportarVentasEmitidas', 'ventasTipoDocumentos', 'exportarVentasTipoDocumentos', 'ventasAcumuladasProducto', 'exportarVentasAcumuladasProducto', 'ventasagrupadasProducto', 'imprimirVentasEmitidas', 'imprimirVentasTipoDocumentos', 'imprimirVentasAcumuladasProducto', 'imprimirVentasAgrupadasProducto', 'ventasPor']);
 
-        $this->middleware('can:dashboard_estadisticas')->only(['topProductosMes','ventasUltimos15','ventasUltimos15Continuo']);
+        $this->middleware('can:dashboard_estadisticas')->only(['topProductosMes', 'ventasUltimos15', 'ventasUltimos15Continuo']);
     }
 
     public function index(Request $request)
     {
         // Lógica para generar el reporte de compras
-        $vendedores=User::select('id','name')->where('activo',1)->get();
+        $vendedores = User::select('id', 'name')->where('activo', 1)->get();
+
         return view('reportes.ventas', compact('vendedores'));
     }
 
     public function ventasEmitidas(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
-        $vendedorId  = $request->input('vendedor_id');
+        $vendedorId = $request->input('vendedor_id');
 
         $query = Venta::query()
             ->selectRaw('
@@ -59,15 +59,15 @@ class ReporteVentaController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('ventas.fecha_venta', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
-        if (!empty($vendedorId)) { // ✅ si no viene, es "Todos"
-            $query->where('ventas.user_id', (int)$vendedorId); // usa tu campo real
+        if (! empty($vendedorId)) { // ✅ si no viene, es "Todos"
+            $query->where('ventas.user_id', (int) $vendedorId); // usa tu campo real
         }
 
-        $reportes = $query            
+        $reportes = $query
             ->orderBy('ventas.correlativo', 'asc')    // luego correlativo
             ->orderBy('ventas.fecha_venta', 'asc')   // primero por fecha
             ->get();
@@ -79,9 +79,9 @@ class ReporteVentaController extends Controller
     {
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
-         $vendedorId  = $request->input('vendedor_id');
+        $vendedorId = $request->input('vendedor_id');
 
-        $fileName = 'ventas_documentos_fecha_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'ventas_documentos_fecha_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new VentasDocumentosExport($fechaInicio, $fechaFin, $vendedorId),
@@ -93,7 +93,7 @@ class ReporteVentaController extends Controller
     {
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
-        $vendedorId  = $request->input('vendedor_id');
+        $vendedorId = $request->input('vendedor_id');
 
         $query = Venta::query()
             ->selectRaw('
@@ -114,14 +114,14 @@ class ReporteVentaController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('ventas.fecha_venta', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
-        if (!empty($vendedorId)) { // ✅ si no viene, es "Todos"
-            $query->where('ventas.user_id', (int)$vendedorId); // usa tu campo real
+        if (! empty($vendedorId)) { // ✅ si no viene, es "Todos"
+            $query->where('ventas.user_id', (int) $vendedorId); // usa tu campo real
         }
 
-        $reportes = $query            
+        $reportes = $query
             ->orderBy('ventas.correlativo', 'asc')    // luego correlativo
             ->orderBy('ventas.fecha_venta', 'asc')   // primero por fecha
             ->get();
@@ -130,21 +130,21 @@ class ReporteVentaController extends Controller
             'reportes.ventas.ventas_emitidas_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('ventas_emitidas.pdf');
     }
 
     public function ventasTipoDocumentos(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
-        $tipoDoc     = $request->input('tipo_documento');
+        $tipoDoc = $request->input('tipo_documento');
 
         $query = Venta::query()
             ->selectRaw('
@@ -165,15 +165,15 @@ class ReporteVentaController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('ventas.fecha_venta', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
-        if (!empty($tipoDoc)) {
+        if (! empty($tipoDoc)) {
             $query->where('ventas.comprobante_tipo_codigo', $tipoDoc);
         }
 
-        $reportes = $query            
+        $reportes = $query
             ->orderBy('ventas.correlativo', 'asc')    // luego correlativo
             ->orderBy('ventas.fecha_venta', 'asc')   // primero por fecha
             ->get();
@@ -185,9 +185,9 @@ class ReporteVentaController extends Controller
     {
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
-        $tipoDoc     = $request->input('tipo_documento');
+        $tipoDoc = $request->input('tipo_documento');
 
-        $fileName = 'ventas_tipos_documentos_fecha_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'ventas_tipos_documentos_fecha_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new VentasDocumentosTipoExport($fechaInicio, $fechaFin, $tipoDoc),
@@ -199,7 +199,7 @@ class ReporteVentaController extends Controller
     {
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
-        $tipoDoc     = $request->input('tipo_documento');
+        $tipoDoc = $request->input('tipo_documento');
 
         switch ($tipoDoc) {
             case '01':
@@ -234,15 +234,15 @@ class ReporteVentaController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('ventas.fecha_venta', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
-        if (!empty($tipoDoc)) {
+        if (! empty($tipoDoc)) {
             $query->where('ventas.comprobante_tipo_codigo', $tipoDoc);
         }
 
-        $reportes = $query            
+        $reportes = $query
             ->orderBy('ventas.correlativo', 'asc')    // luego correlativo
             ->orderBy('ventas.fecha_venta', 'asc')   // primero por fecha
             ->get();
@@ -251,16 +251,16 @@ class ReporteVentaController extends Controller
             'reportes.ventas.documentos_emitidos_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin', 'nomDoc')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('documentos_emitidos.pdf');
     }
 
     public function ventasAcumuladasProducto(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
@@ -312,7 +312,7 @@ class ReporteVentaController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-        $fileName = 'ventas_acumuladas_producto_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'ventas_acumuladas_producto_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new VentasAcumuladasProductoExport($fechaInicio, $fechaFin),
@@ -322,9 +322,9 @@ class ReporteVentaController extends Controller
 
     public function imprimirVentasAcumuladasProducto(Request $request)
     {
-       $data = $request->validate([
+        $data = $request->validate([
             'fecha_inicio' => ['required', 'date'],
-            'fecha_fin'    => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
         ]);
 
         $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
@@ -347,7 +347,7 @@ class ReporteVentaController extends Controller
                 DB::raw('IFNULL(p.empaque,0) as empaque_producto'),
             ])
             // Cantidad convertida acumulada
-            ->selectRaw("
+            ->selectRaw('
                 SUM(
                     CASE
                         WHEN IFNULL(p.empaque,0) > 0 AND IFNULL(venta_detalles.producto_empaque,0) > 0
@@ -355,9 +355,9 @@ class ReporteVentaController extends Controller
                         ELSE venta_detalles.cantidad
                     END
                 ) as cantidad_total
-            ")
+            ')
             // Kg acumulado
-            ->selectRaw("
+            ->selectRaw('
                 SUM(
                     (venta_detalles.cantidad *
                         CASE
@@ -366,11 +366,11 @@ class ReporteVentaController extends Controller
                         END
                     )
                 ) as kg_total
-            ")
+            ')
             // Importe acumulado
-            ->selectRaw("SUM(venta_detalles.total) as importe_total")
+            ->selectRaw('SUM(venta_detalles.total) as importe_total')
             // (opcional) precio promedio ponderado: importe / cantidad_total
-            ->selectRaw("
+            ->selectRaw('
                 (
                     SUM(venta_detalles.total) /
                     NULLIF(
@@ -383,7 +383,7 @@ class ReporteVentaController extends Controller
                         ),
                     0)
                 ) as precio_promedio
-            ")
+            ')
             ->where('estado', '!=', 'anulada')
             ->whereBetween('v.fecha_venta', [$ini, $fin]) // puedes dejarlo
             ->groupBy('venta_detalles.producto_id', 'venta_detalles.producto_nombre', 'p.empaque')
@@ -392,8 +392,8 @@ class ReporteVentaController extends Controller
 
         // Totales generales (si quieres al final del PDF)
         $totCantidad = (float) $reportes->sum('cantidad_total');
-        $totKg       = (float) $reportes->sum('kg_total');
-        $totImporte  = (float) $reportes->sum('importe_total');
+        $totKg = (float) $reportes->sum('kg_total');
+        $totImporte = (float) $reportes->sum('importe_total');
 
         $pdf = Pdf::loadView(
             'reportes.ventas.ventas_acumuladas_producto_pdf',
@@ -405,7 +405,7 @@ class ReporteVentaController extends Controller
 
     public function ventasagrupadasProducto(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
@@ -450,22 +450,22 @@ class ReporteVentaController extends Controller
                 DB::raw('IFNULL(p.empaque,0) as empaque_producto'),
                 DB::raw("CONCAT(v.comprobante_tipo_codigo,' ',v.serie,'-',v.correlativo) as documento"),
 
-                DB::raw("
+                DB::raw('
                     (venta_detalles.cantidad *
                         CASE
                             WHEN IFNULL(venta_detalles.producto_empaque,0) > 0 THEN venta_detalles.producto_empaque
                             ELSE IFNULL(p.empaque,0)
                         END
                     ) as kg_detalle
-                "),
+                '),
 
-                DB::raw("
+                DB::raw('
                     CASE
                         WHEN IFNULL(p.empaque,0) > 0 AND IFNULL(venta_detalles.producto_empaque,0) > 0
                             THEN (venta_detalles.cantidad * (venta_detalles.producto_empaque / p.empaque))
                         ELSE venta_detalles.cantidad
                     END as cantidad_convertida
-                "),
+                '),
             ])
             ->where('estado', '!=', 'anulada')
             // OJO: ya filtramos ventas con joinSub, esto puede omitirse o dejarse por seguridad
@@ -486,7 +486,7 @@ class ReporteVentaController extends Controller
     {
         $data = $request->validate([
             'fecha_inicio' => ['required', 'date'],
-            'fecha_fin'    => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
         ]);
 
         $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
@@ -527,22 +527,22 @@ class ReporteVentaController extends Controller
                 DB::raw('IFNULL(p.empaque,0) as empaque_producto'),
                 DB::raw("CONCAT(v.comprobante_tipo_codigo,' ',v.serie,'-',v.correlativo) as documento"),
 
-                DB::raw("
+                DB::raw('
                     (venta_detalles.cantidad *
                         CASE
                             WHEN IFNULL(venta_detalles.producto_empaque,0) > 0 THEN venta_detalles.producto_empaque
                             ELSE IFNULL(p.empaque,0)
                         END
                     ) as kg_detalle
-                "),
+                '),
 
-                DB::raw("
+                DB::raw('
                     CASE
                         WHEN IFNULL(p.empaque,0) > 0 AND IFNULL(venta_detalles.producto_empaque,0) > 0
                             THEN (venta_detalles.cantidad * (venta_detalles.producto_empaque / p.empaque))
                         ELSE venta_detalles.cantidad
                     END as cantidad_convertida
-                "),
+                '),
             ])
             ->where('estado', '!=', 'anulada')
             // OJO: ya filtramos ventas con joinSub, esto puede omitirse o dejarse por seguridad
@@ -563,13 +563,13 @@ class ReporteVentaController extends Controller
 
     public function ventasPorEntregar(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
-       $fechaInicio = Carbon::parse($request->input('fecha_inicio'))->startOfDay();
-        $fechaFin    = Carbon::parse($request->input('fecha_fin'))->endOfDay();
-        $vendedorId  = $request->input('vendedor_id');
+        $fechaInicio = Carbon::parse($request->input('fecha_inicio'))->startOfDay();
+        $fechaFin = Carbon::parse($request->input('fecha_fin'))->endOfDay();
+        $vendedorId = $request->input('vendedor_id');
 
         $query = DB::table('ventas as v')
             ->join('venta_detalles as d', 'd.venta_id', '=', 'v.id')
@@ -577,8 +577,8 @@ class ReporteVentaController extends Controller
             // ✅ Solo las líneas con faltante
             ->whereRaw('COALESCE(d.entregado,0) < COALESCE(d.cantidad,0)')
             // ✅ Filtro por vendedor (si viene)
-            ->when(!empty($vendedorId), function ($q) use ($vendedorId) {
-                $q->where('v.user_id', (int)$vendedorId);
+            ->when(! empty($vendedorId), function ($q) use ($vendedorId) {
+                $q->where('v.user_id', (int) $vendedorId);
             })
             ->selectRaw("
                 v.id,
@@ -623,8 +623,8 @@ class ReporteVentaController extends Controller
     public function imprimirVentasPorEntregar(Request $request)
     {
         $fechaInicio = Carbon::parse($request->input('fecha_inicio'))->startOfDay();
-        $fechaFin    = Carbon::parse($request->input('fecha_fin'))->endOfDay();
-        $vendedorId  = $request->input('vendedor_id');
+        $fechaFin = Carbon::parse($request->input('fecha_fin'))->endOfDay();
+        $vendedorId = $request->input('vendedor_id');
 
         $query = DB::table('ventas as v')
             ->join('venta_detalles as d', 'd.venta_id', '=', 'v.id')
@@ -632,8 +632,8 @@ class ReporteVentaController extends Controller
             // ✅ Solo las líneas con faltante
             ->whereRaw('COALESCE(d.entregado,0) < COALESCE(d.cantidad,0)')
             // ✅ Filtro por vendedor (si viene)
-            ->when(!empty($vendedorId), function ($q) use ($vendedorId) {
-                $q->where('v.user_id', (int)$vendedorId);
+            ->when(! empty($vendedorId), function ($q) use ($vendedorId) {
+                $q->where('v.user_id', (int) $vendedorId);
             })
             ->selectRaw("
                 v.id,
@@ -675,19 +675,196 @@ class ReporteVentaController extends Controller
         return $pdf->stream('reporte_ventas_por_entregar.pdf');
     }
 
+    public function ventasPorEntregarClientes(Request $request)
+    {
+        if (! $request->ajax()) {
+            abort(403, 'Acceso no autorizado');
+        }
+
+        $fechaInicio = Carbon::parse($request->input('fecha_inicio'))->startOfDay();
+        $fechaFin = Carbon::parse($request->input('fecha_fin'))->endOfDay();
+        $clienteId = $request->input('cliente_id');
+        $tipo = $request->input('tipo', 'todos');
+
+        $query = DB::table('ventas as v')
+            ->join('venta_detalles as d', 'd.venta_id', '=', 'v.id')
+            ->whereBetween('v.fecha_venta', [$fechaInicio, $fechaFin])
+            ->when(! empty($clienteId), function ($q) use ($clienteId) {
+                $q->where('v.cliente_id', (int) $clienteId);
+            })
+            ->selectRaw("
+                v.id,
+                v.fecha_venta,
+                v.cliente_id,
+                v.cliente_nombre,
+                TRIM(CONCAT(COALESCE(v.comprobante_tipo_codigo,''), ' ', COALESCE(v.serie,''), '-', COALESCE(v.correlativo,''))) AS documento,
+                v.total AS monto,
+                SUM(d.cantidad) AS cantidad_total,
+                SUM(d.entregado) AS entregado_total,
+                SUM(d.saldo) AS pendiente_total
+            ")
+            ->groupBy(
+                'v.id',
+                'v.fecha_venta',
+                'v.cliente_id',
+                'v.cliente_nombre',
+                'v.comprobante_tipo_codigo',
+                'v.serie',
+                'v.correlativo',
+                'v.total'
+            )
+            ->where('v.estado', '!=', 'anulada')
+            ->orderByDesc('v.fecha_venta')
+            ->orderByDesc('v.id');
+
+        if ($tipo === 'pendiente') {
+            $query->havingRaw('SUM(d.saldo) > 0');
+        } elseif ($tipo === 'entregado') {
+            $query->havingRaw('SUM(d.saldo) = 0');
+        }
+
+        $ventas = $query->get();
+
+        $entregasMap = [];
+        if ($ventas->isNotEmpty()) {
+            $ventaIds = $ventas->pluck('id')->toArray();
+
+            $entregas = DB::table('venta_entregas as ve')
+                ->join('venta_entrega_detalles as ved', 'ved.venta_entrega_id', '=', 've.id')
+                ->join('venta_detalles as vd', 'vd.id', '=', 'ved.venta_detalle_id')
+                ->whereIn('ve.venta_id', $ventaIds)
+                ->where('ve.estado', '!=', 'ANULADO')
+                ->selectRaw('
+                    ve.venta_id,
+                    ve.fecha_entrega,
+                    ve.numero_recibo,
+                    ved.producto_nombre,
+                    ved.cantidad,
+                    vd.producto_empaque
+                ')
+                ->orderBy('ve.fecha_entrega')
+                ->get();
+
+            foreach ($entregas as $e) {
+                $key = $e->venta_id;
+                if (! isset($entregasMap[$key])) {
+                    $entregasMap[$key] = [];
+                }
+                $entregasMap[$key][] = $e;
+            }
+        }
+
+        $clientes = DB::table('clientes')
+            ->select('id', 'razon_social')
+            ->orderBy('razon_social')
+            ->get();
+
+        return view('reportes.ventas.ventas_por_entregar_clientes', compact(
+            'ventas',
+            'entregasMap',
+            'fechaInicio',
+            'fechaFin',
+            'clienteId',
+            'tipo'
+        ));
+    }
+
+    public function imprimirVentasPorEntregarClientes(Request $request)
+    {
+        $fechaInicio = Carbon::parse($request->input('fecha_inicio'))->startOfDay();
+        $fechaFin = Carbon::parse($request->input('fecha_fin'))->endOfDay();
+        $clienteId = $request->input('cliente_id');
+        $tipo = $request->input('tipo', 'todos');
+
+        $query = DB::table('ventas as v')
+            ->join('venta_detalles as d', 'd.venta_id', '=', 'v.id')
+            ->whereBetween('v.fecha_venta', [$fechaInicio, $fechaFin])
+            ->when(! empty($clienteId), function ($q) use ($clienteId) {
+                $q->where('v.cliente_id', (int) $clienteId);
+            })
+            ->selectRaw("
+                v.id,
+                v.fecha_venta,
+                v.cliente_id,
+                v.cliente_nombre,
+                TRIM(CONCAT(COALESCE(v.comprobante_tipo_codigo,''), ' ', COALESCE(v.serie,''), '-', COALESCE(v.correlativo,''))) AS documento,
+                v.total AS monto,
+                SUM(d.cantidad) AS cantidad_total,
+                SUM(d.entregado) AS entregado_total,
+                SUM(d.saldo) AS pendiente_total
+            ")
+            ->groupBy(
+                'v.id',
+                'v.fecha_venta',
+                'v.cliente_id',
+                'v.cliente_nombre',
+                'v.comprobante_tipo_codigo',
+                'v.serie',
+                'v.correlativo',
+                'v.total'
+            )
+            ->where('v.estado', '!=', 'anulada')
+            ->orderByDesc('v.fecha_venta')
+            ->orderByDesc('v.id');
+
+        if ($tipo === 'pendiente') {
+            $query->havingRaw('SUM(d.saldo) > 0');
+        } elseif ($tipo === 'entregado') {
+            $query->havingRaw('SUM(d.saldo) = 0');
+        }
+
+        $ventas = $query->get();
+
+        $entregasMap = [];
+        if ($ventas->isNotEmpty()) {
+            $ventaIds = $ventas->pluck('id')->toArray();
+
+            $entregas = DB::table('venta_entregas as ve')
+                ->join('venta_entrega_detalles as ved', 'ved.venta_entrega_id', '=', 've.id')
+                ->join('venta_detalles as vd', 'vd.id', '=', 'ved.venta_detalle_id')
+                ->whereIn('ve.venta_id', $ventaIds)
+                ->where('ve.estado', '!=', 'ANULADO')
+                ->selectRaw('
+                    ve.venta_id,
+                    ve.fecha_entrega,
+                    ve.numero_recibo,
+                    ved.producto_nombre,
+                    ved.cantidad,
+                    vd.producto_empaque
+                ')
+                ->orderBy('ve.fecha_entrega')
+                ->get();
+
+            foreach ($entregas as $e) {
+                $key = $e->venta_id;
+                if (! isset($entregasMap[$key])) {
+                    $entregasMap[$key] = [];
+                }
+                $entregasMap[$key][] = $e;
+            }
+        }
+
+        $pdf = Pdf::loadView(
+            'reportes.ventas.ventas_por_entregar_clientes_pdf',
+            compact('ventas', 'entregasMap', 'fechaInicio', 'fechaFin', 'tipo')
+        )->setPaper('a4', 'landscape');
+
+        return $pdf->stream('reporte_ventas_por_entregar_clientes.pdf');
+    }
+
     public function topProductosMes(Request $request)
-    {        
-        if (!$request->ajax()) {
+    {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
         $inicioMes = now()->startOfMonth();
         $finMes = now()->endOfMonth();
 
-        $top = VentaDetalle::selectRaw("
+        $top = VentaDetalle::selectRaw('
                 producto_nombre,
                 SUM(cantidad) as total_cantidad,
                 SUM(cantidad * producto_empaque) as total_kg
-            ")
+            ')
             ->join('ventas', 'venta_detalles.venta_id', '=', 'ventas.id')
             ->whereBetween('ventas.fecha_venta', [$inicioMes, $finMes])
             ->where('estado', '!=', 'anulada')
@@ -698,10 +875,10 @@ class ReporteVentaController extends Controller
 
         return response()->json($top);
     }
-    
+
     public function ventasUltimos15(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
         // Buscar en los últimos 30 días, no 15
@@ -709,10 +886,10 @@ class ReporteVentaController extends Controller
         $finFiltro = now()->toDateString();
 
         // Obtener ventas agrupadas por día
-        $totales = Venta::selectRaw("
+        $totales = Venta::selectRaw('
                 DATE(fecha_venta) as fecha,
                 SUM(total) as total_dia
-            ")
+            ')
             ->where('estado', '!=', 'anulada')
             ->whereDate('fecha_venta', '>=', $inicioFiltro)
             ->whereDate('fecha_venta', '<=', $finFiltro)
@@ -723,27 +900,27 @@ class ReporteVentaController extends Controller
             ->sortBy('fecha')         // luego los ordenamos ascendente para el gráfico
             ->values();
 
-        //return response()->json($totales);
-        $totalesFormateados = $totales->map(function($item) {
+        // return response()->json($totales);
+        $totalesFormateados = $totales->map(function ($item) {
             return [
                 'fecha' => \Carbon\Carbon::parse($item->fecha)->format('d-m'),
-                'total_dia' => $item->total_dia
+                'total_dia' => $item->total_dia,
             ];
         });
 
         return response()->json($totalesFormateados);
     }
-    
+
     public function ventasUltimos15Continuo(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
         $hoy = now()->toDateString();
         $inicio = now()->subDays(15)->toDateString();
 
         // Obtener totales por día
-        $totales = Venta::selectRaw("DATE(fecha_venta) as fecha, SUM(total) as total_dia")
+        $totales = Venta::selectRaw('DATE(fecha_venta) as fecha, SUM(total) as total_dia')
             ->where('estado', '!=', 'anulada')
             ->whereDate('fecha_venta', '>=', $inicio)
             ->whereDate('fecha_venta', '<=', $hoy)
@@ -764,11 +941,10 @@ class ReporteVentaController extends Controller
         foreach ($fechas as $fecha) {
             $data[] = [
                 'fecha' => $fecha,
-                'total_dia' => $totales->get($fecha, 0) // si no existe, 0
+                'total_dia' => $totales->get($fecha, 0), // si no existe, 0
             ];
         }
 
         return response()->json($data);
     }
-    
 }

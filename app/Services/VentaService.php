@@ -72,8 +72,14 @@ class VentaService
             $venta = Venta::create($ventaData['venta']);
             $detallesCreados = $venta->detalles()->createMany($ventaData['detalles']);
 
-            // 5) Registrar movimientos de SALIDA en el kardex por cada detalle
+            // 5) Registrar movimientos de SALIDA en el kardex SOLO por la cantidad entregada
+            //    Si entregado < cantidad, queda saldo pendiente que se gestiona en VentaEntrega
             foreach ($detallesCreados as $detalle) {
+                $entregado = (float) $detalle->entregado;
+                if ($entregado <= 0) {
+                    continue;
+                }
+                $cantidadKg = $entregado * (float) $detalle->producto_empaque;
                 $this->movimientoService->registrarSalida([
                     'tipo' => MovimientoService::TIPO_VENTA,
                     'fecha' => $venta->fecha_venta,
@@ -84,10 +90,30 @@ class VentaService
                     'producto_nombre' => $detalle->producto_nombre,
                     'empaque' => $detalle->producto_empaque,
                     'unidad_codigo' => $detalle->unidad_codigo,
-                    'cantidad' => $detalle->cantidad,
-                    'cantidad_kg' => $detalle->salida_kg,
+                    'cantidad' => $entregado,
+                    'cantidad_kg' => $cantidadKg,
                 ]);
             }
+
+            // ============================================================
+            // CÓDIGO ANTERIOR (descontaba toda la cantidad, no solo entregado)
+            // ============================================================
+            // foreach ($detallesCreados as $detalle) {
+            //     $this->movimientoService->registrarSalida([
+            //         'tipo' => MovimientoService::TIPO_VENTA,
+            //         'fecha' => $venta->fecha_venta,
+            //         'transaccion_tipo' => 'ventas',
+            //         'transaccion_id' => $venta->id,
+            //         'detalle_id' => $detalle->id,
+            //         'producto_id' => $detalle->producto_id,
+            //         'producto_nombre' => $detalle->producto_nombre,
+            //         'empaque' => $detalle->producto_empaque,
+            //         'unidad_codigo' => $detalle->unidad_codigo,
+            //         'cantidad' => $detalle->cantidad,
+            //         'cantidad_kg' => $detalle->salida_kg,
+            //     ]);
+            // }
+            // ============================================================
 
             // 6) Incrementar correlativo en comprobante_series
             $serieConfig->update([
