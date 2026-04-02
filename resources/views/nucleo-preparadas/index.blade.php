@@ -294,10 +294,10 @@ class NucleoPreparadaManager extends CrudManager {
         // =========================================
         
         const kilosPorSaco = parseFloat(document.getElementById('nucleo_empaque_text')?.textContent || 1);
-        const totalKg = proporcion; // kg finales que el usuario quiere preparar
+        const totalKg = proporcion;
 
         const sacos = (kilosPorSaco > 0) ? (totalKg / kilosPorSaco) : 0;
-        const costoPorSaco = preparadaTotal/factor;
+        const costoPorSaco = sacos > 0 ? preparadaTotal / sacos : 0;
 
         document.querySelector('#tablaDetalles #kilos_sacof').value = kilosPorSaco.toFixed(4);
         document.querySelector('#tablaDetalles #total_sacof').value = sacos.toFixed(4);
@@ -665,8 +665,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.nucleoPreparadaManager = new NucleoPreparadaManager();
     document.body.addEventListener('click', function(e) {
         // ─── Botón Ver Nucleo Preparada ─────────────────────────────
-        if (e.target && (e.target.matches('.btn-view-preparada') || e.target.closest('.btn-view-preparada'))) {
-            const button = e.target.closest('.btn-view-preparada');
+        if (e.target && (e.target.matches('.btn-view-nucleo-preparada') || e.target.closest('.btn-view-nucleo-preparada'))) {
+            const button = e.target.closest('.btn-view-nucleo-preparada');
             const preparadaId = button.getAttribute('data-id');
             if (!preparadaId) return;
             

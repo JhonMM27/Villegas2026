@@ -290,7 +290,7 @@ class NucleoPreparadaController extends Controller
             'celular' => '967984895 - 978431737 - 915177079',
         ];
 
-        $pdf = Pdf::loadView('nucleo-preparadas.ticket', compact('preparada', 'empresa'))
+        $pdf = Pdf::loadView('nucleo-preparadas.ticket', ['nucleoPreparada' => $preparada, 'empresa' => $empresa])
             ->setPaper([0, 0, 226.77, 600], 'portrait')
             ->setOption('isRemoteEnabled', true)
             ->setOption('defaultFont', 'DejaVu Sans');
@@ -314,7 +314,7 @@ class NucleoPreparadaController extends Controller
                 },
             ])->findOrFail($id);
 
-            return view('nucleo-preparadas.view', compact('preparada'));
+            return view('nucleo-preparadas.view', ['nucleoPreparada' => $preparada]);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
         }

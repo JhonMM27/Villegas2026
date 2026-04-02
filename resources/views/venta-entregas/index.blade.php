@@ -57,6 +57,7 @@
 class VentaEntregaManager extends CrudManager {
     constructor() {
         super("{{ url('venta-entregas') }}");
+        this.afterSuccess = this.handleEntregaSuccess.bind(this);
         this.initializeDataTable();
 
         this.setupLiveSearchSelect({
@@ -465,5 +466,35 @@ document.addEventListener('DOMContentLoaded', () => {
 // Menú activo (ajusta IDs según tu sidebar)
 document.getElementById('mnuSalida')?.classList.add('menu-open');
 document.getElementById('itemVentaEntregas')?.classList.add('active');
+
+// ================================================
+// Métodos para opción de imprimir ticket
+// ================================================
+VentaEntregaManager.prototype.handleEntregaSuccess = async function(response, isEditing) {
+    if (!isEditing && response.venta_entrega_id) {
+        setTimeout(() => {
+            this.showTicketOption(response);
+        }, 1000);
+    }
+};
+
+VentaEntregaManager.prototype.showTicketOption = async function(response) {
+    const result = await Swal.fire({
+        title: 'Entrega registrada!',
+        text: '¿Deseas imprimir el ticket?',
+        icon: 'success',
+        showCancelButton: true,
+        confirmButtonText: 'Imprimir Ticket',
+        cancelButtonText: 'Continuar',
+        reverseButtons: true,
+        timer: 8000,
+        timerProgressBar: true
+    });
+
+    if (result.isConfirmed) {
+        const imprimirRuta = "{{ route('venta-entregas.imprimir', ':id') }}";
+        window.open(imprimirRuta.replace(':id', response.venta_entrega_id), '_blank');
+    }
+};
 </script>
 @endpush

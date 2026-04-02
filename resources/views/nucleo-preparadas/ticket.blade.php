@@ -62,7 +62,7 @@
     <table class="totales">
         <tr class="bold">
             <td>Kilos por saco:</td>
-            <td style="text-align:right;">{{ number_format($nucleoPreparada->empaque,2) }}</td>
+            <td style="text-align:right;">{{ number_format($nucleoPreparada->producto_empaque,2) }}</td>
         </tr>
         <tr class="bold">
             <td>Costo por saco:</td>

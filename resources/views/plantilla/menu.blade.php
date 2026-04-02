@@ -106,6 +106,13 @@
                             </a>
                         </li>
                         @endcan
+                        @can('configuraciones_list')
+                        <li class="nav-item">
+                            <a href="{{route('configuraciones.index')}}" class="nav-link" id="itemCostoServicioPreparada">
+                                <p>Costo servicio preparada</p>
+                            </a>
+                        </li>
+                        @endcan
                     </ul>
                 </li>
                 @endcanany

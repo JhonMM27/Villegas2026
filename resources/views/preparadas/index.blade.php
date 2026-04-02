@@ -64,7 +64,9 @@ class PreparadaManager extends CrudManager {
     constructor() {
         super("{{ url('preparadas') }}");
         this.afterSuccess = this.handlePreparadaSuccess.bind(this);
+        this.config = {};
         this.initializeDataTable();
+        this.fetchConfiguraciones();
 
         document.addEventListener('click', (e) => {
             if (e.target && e.target.id === 'btnProcesar') {
@@ -86,6 +88,16 @@ class PreparadaManager extends CrudManager {
             delay : 300,
             onSelect: (item) => this.addFormulacion(item)
         });
+    }
+
+    async fetchConfiguraciones() {
+        try {
+            const res = await fetch('/configuraciones/json');
+            this.config = await res.json();
+        } catch (e) {
+            console.warn('No se pudo cargar configuraciones, usando valores por defecto');
+            this.config = {};
+        }
     }
 
     async handlePreparadaSuccess(response, isEditing) {
@@ -273,7 +285,7 @@ class PreparadaManager extends CrudManager {
         // =========================================
         // SERVICIO MEZCLADO
         // =========================================
-        const costoServicioCalculado = Number((totalSalidaKg * 0.07).toFixed(2));
+        const costoServicioCalculado = Number((totalSalidaKg * (parseFloat(this.config.costo_servicio_mezclado_preparadas) || 0.07)).toFixed(2));
         const inputServicio = document.getElementById('costo_servicio');
         if (inputServicio) {
             inputServicio.value = costoServicioCalculado;
@@ -533,7 +545,7 @@ class PreparadaManager extends CrudManager {
             document.getElementById('formulacion_nombre').value = response.producto_nombre || '';
             const inputServicio = document.getElementById('costo_servicio');
             if (inputServicio) {
-                inputServicio.value = Number((parseFloat(response.ingreso_kg || 0) * 0.07).toFixed(2));
+                inputServicio.value = Number((parseFloat(response.ingreso_kg || 0) * (parseFloat(this.config.costo_servicio_mezclado_preparadas) || 0.07)).toFixed(2));
             }
             document.getElementById('producto_empaque_text').textContent = response.producto_empaque || '';
             //document.getElementById('unidad_text').textContent = response.costo_unitario;
@@ -598,7 +610,7 @@ class PreparadaManager extends CrudManager {
             document.getElementById('formulacion_nombre').value = response.producto_nombre || '';
             const inputServicio = document.getElementById('costo_servicio');
             if (inputServicio) {
-                inputServicio.value = Number((parseFloat(response.ingreso_kg || 0) * 0.07).toFixed(2));
+                inputServicio.value = Number((parseFloat(response.ingreso_kg || 0) * (parseFloat(this.config.costo_servicio_mezclado_preparadas) || 0.07)).toFixed(2));
             }
             document.getElementById('producto_empaque_text').textContent = response.producto_empaque || '';
             document.getElementById('cliente_nombre').textContent = response.cliente_nombre|| '';

@@ -94,7 +94,14 @@
                     getId: item => item.id,
                     minLength: 1,
                     delay: 300,
-                    onSelect: (item) => this.addProductoToTable(item)
+                    onSelect: (item) => {
+                        this.addProductoToTable(item);
+                        setTimeout(() => {
+                            if (window.focusFirstCantidadInTable) {
+                                window.focusFirstCantidadInTable();
+                            }
+                        }, 50);
+                    }
                 });
 
                 this.setupLiveSearchSelect({
@@ -289,6 +296,7 @@
                 <input type="hidden" name="detalles[${rowCount}][producto_id]" value="${item.id}">
                 <input type="hidden" name="detalles[${rowCount}][unidad_codigo]" value="${item.unidad_codigo}">
                 <input type="hidden" name="detalles[${rowCount}][empaque]" value="${empaqueInicial}">
+                </tr>
             `;
 
                     //Select fracciones
@@ -1040,12 +1048,10 @@
             }
 
             focusFirstField() {
-                document.getElementById('producto_nombre').focus();
-
                 const modalEl = this.modal._element;
 
                 modalEl.addEventListener('shown.bs.modal', () => {
-                    const input = document.getElementById('producto_nombre');
+                    const input = document.getElementById('cliente_razon_social');
                     if (input) input.focus();
                 }, {
                     once: true

@@ -13,12 +13,15 @@
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-lg-7">
-                          @include('ventas.partials.comprobante-form')
+                            @include('ventas.partials.cliente-form')
                         </div>
                         <div class="col-lg-5">
                           @include('ventas.partials.cobranza')
                         </div>
                         <div class="col-lg-7 mt-3">
+                          @include('ventas.partials.comprobante-form')
+                        </div>
+                        <div class="col-lg-5 mt-3">
                           <div class="border border-primary rounded p-3">
                             <div class="row g-2">
                                 <!-- Nombre -->
@@ -33,9 +36,6 @@
                                 </div>
                             </div>
                           </div>
-                        </div>
-                        <div class="col-lg-5 mt-3">
-                            @include('ventas.partials.cliente-form')
                         </div>
                     </div>
                     <div class="row mt-4">

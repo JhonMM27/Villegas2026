@@ -114,6 +114,7 @@ class CompraProvisionalService
                     }
 
                     $compra = Compra::where('id', $detalle->compra_id)
+                        ->where('estado', '!=', 'anulada')
                         ->lockForUpdate()
                         ->first();
 
@@ -157,6 +158,7 @@ class CompraProvisionalService
 
         // Cargar compras involucradas
         $compras = Compra::whereIn('id', collect($comprasInput)->pluck('compra_id')->filter())
+            ->where('estado', '!=', 'anulada')
             ->get()
             ->keyBy('id');
 
@@ -227,7 +229,10 @@ class CompraProvisionalService
             ->get();
 
         foreach ($sumas as $s) {
-            $compra = Compra::where('id', $s->compra_id)->lockForUpdate()->firstOrFail();
+            $compra = Compra::where('id', $s->compra_id)
+                ->where('estado', '!=', 'anulada')
+                ->lockForUpdate()
+                ->firstOrFail();
 
             $m = (float)$s->total;
 
@@ -257,7 +262,10 @@ class CompraProvisionalService
             ->get();
 
         foreach ($sumas as $s) {
-            $compra = Compra::where('id', $s->compra_id)->lockForUpdate()->first();
+            $compra = Compra::where('id', $s->compra_id)
+                ->where('estado', '!=', 'anulada')
+                ->lockForUpdate()
+                ->first();
             if (!$compra) continue;
 
             $m = (float)$s->total;

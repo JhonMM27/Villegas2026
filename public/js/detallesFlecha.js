@@ -1,6 +1,35 @@
 (function enableArrowNavigationForDetalles() {
-    const TABLE_ID = 'tablaDetalles'; // tu tabla de detalles
-    const ENABLE_CTRL_TO_MOVE = false; // true => usar Ctrl+Flecha para no interferir al editar
+    const TABLE_ID = 'tablaDetalles';
+    const ENABLE_CTRL_TO_MOVE = false;
+
+    const COBRANZA_FIELDS = ['principal', 'deposito', 'consorcio'];
+    const TABLE_ENTER_SEQUENCE = {
+        'inputCantidad': 'inputPrecioUnitario',
+        'inputPrecioUnitario': 'producto_nombre'
+    };
+    const ENTER_SEQUENCE = {
+        'cliente_razon_social': 'comprobante_tipo_codigo',
+        'comprobante_tipo_codigo': 'serie',
+        'serie': 'correlativo',
+        'correlativo': 'docpagoi',
+        'docpagoi': 'cobranza_tipo_id',
+        'cobranza_tipo_id': 'pago_forma_codigo',
+        'pago_forma_codigo': 'fecha_venta',
+        'fecha_venta': 'fecha_vencimiento',
+        'fecha_vencimiento': 'principal',
+        'principal': 'producto_nombre',
+        'deposito': 'producto_nombre',
+        'consorcio': 'producto_nombre',
+        'producto_nombre': 'cantidad'
+    };
+
+    function getTableFieldClass(el) {
+        if (!el) return null;
+        const classes = el.className?.split(' ') || [];
+        if (classes.includes('inputCantidad')) return 'inputCantidad';
+        if (classes.includes('inputPrecioUnitario')) return 'inputPrecioUnitario';
+        return null;
+    }
 
     function isEditableField(el) {
         if (!el) return false;
@@ -29,7 +58,6 @@
     }
 
     function getColIndex(cell) {
-        // index real en la fila (incluye columnas sin input)
         const row = cell.parentElement;
         const cells = [...row.children].filter(c => c.tagName === 'TD' || c.tagName === 'TH');
         return cells.indexOf(cell);
@@ -40,7 +68,6 @@
         const field = cell.querySelector('input:not([type="hidden"]), select, textarea');
         if (field && isEditableField(field)) {
             field.focus({ preventScroll: true });
-            // opcional: seleccionar todo si es input
             if (field.tagName.toLowerCase() === 'input') field.select?.();
             field.scrollIntoView({ block: 'nearest', inline: 'nearest' });
             return true;
@@ -71,7 +98,6 @@
 
         const colIndex = getColIndex(cell);
 
-        // Helper: obtener celda por (r,c)
         const getCellAt = (r, c) => {
             const targetRow = rows[r];
             if (!targetRow) return null;
@@ -79,16 +105,11 @@
             return cells[c] || null;
         };
 
-        // UP / DOWN: misma columna, distinta fila
         if (dir === 'up' || dir === 'down') {
             const step = (dir === 'up') ? -1 : 1;
             for (let r = rowIndex + step; r >= 0 && r < rows.length; r += step) {
                 const targetCell = getCellAt(r, colIndex);
-
-                // Si esa celda no tiene input, intentamos buscar en esa fila la más cercana:
                 if (focusFirstFieldInCell(targetCell)) return true;
-
-                // Buscar hacia la derecha y luego izquierda en esa fila
                 const targetRow = rows[r];
                 if (findNextFocusableInRow(targetRow, colIndex + 1, +1)) return true;
                 if (findNextFocusableInRow(targetRow, colIndex - 1, -1)) return true;
@@ -96,7 +117,6 @@
             return false;
         }
 
-        // LEFT / RIGHT: misma fila, distinta columna
         if (dir === 'left' || dir === 'right') {
             const step = (dir === 'left') ? -1 : 1;
             const cells = [...row.children].filter(c => c.tagName === 'TD' || c.tagName === 'TH');
@@ -108,50 +128,128 @@
     }
 
     function shouldHijackArrow(e, el) {
-        // si quieres que SIEMPRE navegue con flechas, pon ENABLE_CTRL_TO_MOVE = false
         if (!ENABLE_CTRL_TO_MOVE) return true;
-
-        // con Ctrl sí navegamos
         if (e.ctrlKey) return true;
-
-        // sin Ctrl, dejamos el comportamiento normal de edición
-        // (mover cursor en input number/text)
         const tag = el?.tagName?.toLowerCase();
         if (tag === 'input' || tag === 'textarea') return false;
-
-        // en select sí podemos navegar
         if (tag === 'select') return true;
-
         return false;
     }
 
-    document.addEventListener('keydown', function(e) {
+    function moveToCobranza(currentField, direction) {
+        const currentIndex = COBRANZA_FIELDS.indexOf(currentField);
+        if (currentIndex === -1) {
+            focusField('principal');
+            return;
+        }
+        let nextIndex;
+        if (direction === 'down') {
+            nextIndex = (currentIndex + 1) % COBRANZA_FIELDS.length;
+        } else {
+            nextIndex = (currentIndex - 1 + COBRANZA_FIELDS.length) % COBRANZA_FIELDS.length;
+        }
+        focusField(COBRANZA_FIELDS[nextIndex]);
+    }
+
+    function focusField(id) {
+        const field = document.getElementById(id);
+        if (field) {
+            field.focus({ preventScroll: true });
+            if (field.tagName.toLowerCase() === 'input') {
+                field.select?.();
+            }
+            field.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+    }
+
+    function focusFieldInLastRow(className) {
         const table = getTable();
         if (!table) return;
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        const rows = [...tbody.querySelectorAll('tr')].filter(r => !r.classList.contains('d-none'));
+        if (rows.length === 0) return;
+        const lastRow = rows[rows.length - 1];
+        const input = lastRow.querySelector('.' + className);
+        if (input) {
+            input.focus({ preventScroll: true });
+            input.select?.();
+            input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+    }
 
+    function focusFirstCantidadInTable() {
+        focusFieldInLastRow('inputCantidad');
+    }
+
+    document.addEventListener('keydown', function(e) {
         const active = document.activeElement;
         if (!active) return;
 
-        // solo dentro de la tabla de detalles
-        if (!table.contains(active)) return;
-
-        // solo si es un campo editable
-        if (!isEditableField(active)) return;
-
-        // flechas
+        const fieldId = active.id;
         const key = e.key;
+
         const map = {
             ArrowUp: 'up',
             ArrowDown: 'down',
             ArrowLeft: 'left',
             ArrowRight: 'right'
         };
+
+        if (key === 'Enter') {
+            const table = getTable();
+            if (table && table.contains(active)) {
+                const fieldClass = getTableFieldClass(active);
+                if (fieldClass) {
+                    e.preventDefault();
+                    const nextClass = TABLE_ENTER_SEQUENCE[fieldClass];
+                    if (nextClass === 'inputPrecioUnitario') {
+                        focusFieldInLastRow('inputPrecioUnitario');
+                    } else if (nextClass === 'producto_nombre') {
+                        focusField('producto_nombre');
+                    } else if (nextClass === 'inputCantidad') {
+                        focusFirstCantidadInTable();
+                    }
+                    return;
+                }
+            }
+            if (fieldId === 'producto_nombre') {
+                e.preventDefault();
+                focusFirstCantidadInTable();
+                return;
+            }
+            const nextField = ENTER_SEQUENCE[fieldId];
+            if (nextField) {
+                e.preventDefault();
+                if (nextField === 'cantidad') {
+                    focusFirstCantidadInTable();
+                } else {
+                    focusField(nextField);
+                }
+                return;
+            }
+        }
+
+        if (key === 'ArrowDown' || key === 'ArrowUp') {
+            if (COBRANZA_FIELDS.includes(fieldId)) {
+                e.preventDefault();
+                moveToCobranza(fieldId, key);
+                return;
+            }
+        }
+
+        const table = getTable();
+        if (!table) return;
+        if (!table.contains(active)) return;
+        if (!isEditableField(active)) return;
+
         const dir = map[key];
         if (!dir) return;
-
         if (!shouldHijackArrow(e, active)) return;
 
         e.preventDefault();
         moveFocus(active, dir);
     }, true);
+
+    window.focusFirstCantidadInTable = focusFirstCantidadInTable;
 })();

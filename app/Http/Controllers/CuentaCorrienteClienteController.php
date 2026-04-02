@@ -348,6 +348,7 @@ class CuentaCorrienteClienteController extends Controller
                 ventas.user_nombre
             ')
             ->where('ventas.cliente_id', $clienteId)
+            ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0)
             ->groupBy(
                 'ventas.id',
@@ -434,6 +435,7 @@ class CuentaCorrienteClienteController extends Controller
             ')
             ->whereBetween('ventas.fecha_venta', [$ini, $fin])
             ->when(!empty($clienteIds), fn($q) => $q->whereIn('ventas.cliente_id', $clienteIds))
+            ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0) // créditos por cobrar
             ->groupBy(
                 'ventas.id',
@@ -521,6 +523,7 @@ class CuentaCorrienteClienteController extends Controller
             ')
             ->whereBetween('ventas.fecha_venta', [$ini, $fin])
             ->when(!empty($clienteIds), fn($q) => $q->whereIn('ventas.cliente_id', $clienteIds))
+            ->where('ventas.estado', '!=', 'anulada')
             //->where('ventas.saldo', '>', 0) // créditos por cobrar
             ->groupBy(
                 'ventas.id',
@@ -601,6 +604,7 @@ class CuentaCorrienteClienteController extends Controller
                 ventas.user_nombre
             ')
             ->where('ventas.cliente_id', $clienteId)
+            ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0)
             ->groupBy(
                 'ventas.id',
@@ -670,6 +674,7 @@ class CuentaCorrienteClienteController extends Controller
                 ventas.cliente_nombre,
                 ventas.user_nombre
             ')
+            ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0)
             ->groupBy(
                 'ventas.id',
@@ -736,6 +741,7 @@ class CuentaCorrienteClienteController extends Controller
                 ventas.cliente_nombre,
                 ventas.user_nombre
             ')
+            ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0)
             ->whereBetween('ventas.fecha_venta', [$ini, $fin])
             ->groupBy(
@@ -804,6 +810,7 @@ class CuentaCorrienteClienteController extends Controller
                 ventas.cliente_nombre,
                 ventas.user_nombre
             ')
+            ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0)
             ->whereNotNull('ventas.fecha_vencimiento')
             ->whereRaw('DATEDIFF(CURDATE(), ventas.fecha_venta) >= ?', [$dias])
@@ -875,6 +882,7 @@ class CuentaCorrienteClienteController extends Controller
                 ventas.user_nombre
             ')
             ->withCount(['detalles as items'])
+            ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0)
             ->whereNotNull('ventas.fecha_vencimiento')
             // equivalente a >= días, pero sin funciones sobre la columna
@@ -935,6 +943,7 @@ class CuentaCorrienteClienteController extends Controller
                 clientes.telefono as telefono
             ')
             // si quieres SOLO créditos por cobrar:
+            ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0)
             // >= 30 días de antigüedad desde la fecha_venta:
             ->whereDate('ventas.fecha_venta', '<=', DB::raw('DATE_SUB(CURDATE(), INTERVAL ? DAY)'))
@@ -961,7 +970,6 @@ class CuentaCorrienteClienteController extends Controller
 
     public function saldosAcumuladosClienteFechasPdf(Request $request)
     {
-        
 
         $data = $request->validate([
             'fecha_inicio'  => ['required', 'date'],
@@ -982,6 +990,7 @@ class CuentaCorrienteClienteController extends Controller
                 clientes.telefono as telefono
             ')
             // si quieres SOLO créditos por cobrar:
+            ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0)
             // >= 30 días de antigüedad desde la fecha_venta:
             ->whereBetween('ventas.fecha_venta', [$ini, $fin])
@@ -1037,6 +1046,7 @@ class CuentaCorrienteClienteController extends Controller
             ')
             ->withCount(['detalles as items'])
             ->whereDate('ventas.fecha_venta', '<=', $fecha)
+            ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0)
             ->orderBy('ventas.cliente_nombre', 'asc')
             ->orderBy('ventas.fecha_venta','asc')
@@ -1265,6 +1275,7 @@ class CuentaCorrienteClienteController extends Controller
                 saldo
             ")
             ->where('cliente_id', $clienteId)
+            ->where('estado', '!=', 'anulada')
             ->where(function ($q) use ($ini, $fin, $ventaIdsPagadasEnRango) {
                 $q->where(function ($q2) use ($ini, $fin) {
                     $q2->whereBetween('fecha_venta', [$ini, $fin])

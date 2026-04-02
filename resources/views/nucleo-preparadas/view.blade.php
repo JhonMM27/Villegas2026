@@ -1,6 +1,6 @@
 <!-- Modal de visualización -->
 <div class="modal fade" id="modalViewnucleoPreparada" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
-     aria-labelledby="modalViewnucleoPreparadaLabel" aria-hidden="true">
+     aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content fs-7">
             <div class="modal-header">

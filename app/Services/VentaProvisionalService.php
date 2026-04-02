@@ -113,6 +113,7 @@ class VentaProvisionalService
                     }
 
                     $venta = Venta::where('id', $detalle->venta_id)
+                        ->where('estado', '!=', 'anulada')
                         ->lockForUpdate()
                         ->first();
 
@@ -156,7 +157,7 @@ class VentaProvisionalService
 
         // Cargar ventas involucradas
         $ventas = Venta::whereIn('id', collect($ventasInput)->pluck('venta_id')->filter())
-            // ->where('estado', '!=', 'anulada')
+            ->where('estado', '!=', 'anulada')
             ->get()
             ->keyBy('id');
 
@@ -227,7 +228,10 @@ class VentaProvisionalService
             ->get();
 
         foreach ($sumas as $s) {
-            $venta = Venta::where('id', $s->venta_id)->lockForUpdate()->firstOrFail();
+            $venta = Venta::where('id', $s->venta_id)
+                ->where('estado', '!=', 'anulada')
+                ->lockForUpdate()
+                ->firstOrFail();
 
             $m = (float)$s->total;
 
@@ -257,7 +261,10 @@ class VentaProvisionalService
             ->get();
 
         foreach ($sumas as $s) {
-            $venta = Venta::where('id', $s->venta_id)->lockForUpdate()->first();
+            $venta = Venta::where('id', $s->venta_id)
+                ->where('estado', '!=', 'anulada')
+                ->lockForUpdate()
+                ->first();
             if (!$venta) continue;
 
             $m = (float)$s->total;

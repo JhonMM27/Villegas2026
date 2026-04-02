@@ -310,6 +310,7 @@ class CompraProvisionalController extends Controller
         // Total deuda = suma de saldos de todas las compras del proveedor (solo saldos > 0)
         $totalDeuda = Compra::query()
             ->where('proveedor_id', $provisional->proveedor_id)
+            ->where('estado', '!=', 'anulada')
             ->where('saldo', '>', 0)
             ->sum('saldo');
         

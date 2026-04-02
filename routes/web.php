@@ -9,6 +9,7 @@ use App\Http\Controllers\CompraController;
 use App\Http\Controllers\CompraProvisionalController;
 use App\Http\Controllers\ComprobanteSerieController;
 use App\Http\Controllers\ComprobanteTipoController;
+use App\Http\Controllers\ConfiguracionController;
 use App\Http\Controllers\CotizacionController;
 use App\Http\Controllers\CuentaCorrienteClienteController;
 use App\Http\Controllers\CuentaCorrienteProveedorController;
@@ -83,6 +84,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/sunat-certificados/select', [SunatCertificadoController::class, 'select'])->name('sunat-certificados.select');
     Route::resource('sunat-certificados', SunatCertificadoController::class)->except(['create', 'edit']);
     Route::resource('comprobante-series', ComprobanteSerieController::class)->except(['create', 'edit']);
+    Route::get('/configuraciones/json', [ConfiguracionController::class, 'json'])->name('configuraciones.json');
+    Route::resource('configuraciones', ConfiguracionController::class)->except(['create', 'edit']);
     Route::get('/productos/buscar', [ProductoController::class, 'buscar'])->name('productos.buscar');
     Route::get('/productos/buscar-formulacion', [ProductoController::class, 'buscarFormulacion'])->name('productos.buscar-formulacion');
     Route::get('/productos/buscar-formulacion-preparada', [ProductoController::class, 'buscarFormulacionPreparada'])->name('productos.buscar-formulacion-preparada');

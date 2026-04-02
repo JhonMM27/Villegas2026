@@ -416,7 +416,7 @@ class NucleoPreparadaService
         $cantidad_porcentaje = $cantidad_porcentaje ?? 0;
         $costo_unitario = $costo_unitario ?? 0;
 
-        $totales['total'] += $costo_unitario * $cantidad_porcentaje;
+        $totales['total'] += $costo_unitario * $salida_kg;
 
         return [
             'producto_id' => $producto->id,
