@@ -37,6 +37,7 @@
         <thead>
             <tr>
                 <th class="text-center">#</th>
+                <th>N° Int.</th>
                 <th>Empleado</th>
                 <th>DNI</th>
                 <th>Fecha</th>
@@ -50,6 +51,7 @@
             @php $totalMonto += (float)$a->monto; @endphp
             <tr>
                 <td class="text-center">{{ $index + 1 }}</td>
+                <td>{{ $a->numero_interno }}</td>
                 <td>{{ $a->empleado->nombre ?? 'N/A' }}</td>
                 <td>{{ $a->empleado->dni ?? 'N/A' }}</td>
                 <td>{{ \Carbon\Carbon::parse($a->fecha)->format('d/m/Y') }}</td>
@@ -60,7 +62,7 @@
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="4" class="text-right"><strong>TOTAL:</strong></td>
+                <td colspan="5" class="text-right"><strong>TOTAL:</strong></td>
                 <td class="text-right"><strong>S/ {{ number_format($totalMonto, 2) }}</strong></td>
                 <td></td>
             </tr>

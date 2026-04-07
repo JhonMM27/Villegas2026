@@ -46,7 +46,7 @@ class PlanillaPago extends Model
         return $this->hasMany(PlanillaPagoDetalle::class);
     }
 
-    public function adelantos(): HasMany
+    public function adelantosRecords(): HasMany
     {
         return $this->hasMany(PlanillaAdelanto::class);
     }

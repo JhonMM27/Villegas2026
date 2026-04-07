@@ -25,6 +25,15 @@
                                 <div class="row">
                                     <div class="col-4">
                                         <div class="mb-3">
+                                            <label for="numero_interno" class="form-label">Número Interno <span
+                                                    class="text-danger">*</span></label>
+                                            <input type="number" id="numero_interno" name="numero_interno"
+                                                class="form-control form-control-sm" required>
+                                            <div class="invalid-feedback"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="mb-3">
                                             <label for="fecha_prestamo" class="form-label">Fecha <span
                                                     class="text-danger">*</span></label>
                                             <input type="date" id="fecha_prestamo" name="fecha_prestamo"
@@ -45,6 +54,8 @@
                                             <div class="invalid-feedback"></div>
                                         </div>
                                     </div>
+                                </div>
+                                <div class="row">
                                     <div class="col-4">
                                         <div class="mb-3">
                                             <label for="estado" class="form-label">Estado</label>

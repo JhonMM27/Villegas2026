@@ -173,6 +173,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('nucleo-preparadas', NucleoPreparadaController::class)->except(['create', 'edit', 'destroy']);
 
     Route::get('/gastos/{id}/ver', [GastoController::class, 'view'])->name('gastos.ver');
+    Route::get('/gastos/{id}/imprimir', [GastoController::class, 'printTicket'])->name('gastos.imprimir');
     Route::resource('gastos', GastoController::class)->except(['create', 'edit']);
 
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -391,16 +392,30 @@ Route::middleware(['auth'])->group(function () {
 
     // Planilla - Empleados
     Route::get('/empleados/buscar', [EmpleadoController::class, 'buscar'])->name('empleados.buscar');
+    Route::get('/empleados/{id}/edit', [EmpleadoController::class, 'edit'])->name('empleados.edit');
     Route::resource('empleados', EmpleadoController::class)->except(['create', 'edit']);
 
     // Planilla - Adelantos
     Route::get('/planilla-adelantos/disponible', [PlanillaAdelantoController::class, 'getDisponible'])->name('planilla-adelantos.disponible');
+    Route::get('/planilla-adelantos/{id}/imprimir', [PlanillaAdelantoController::class, 'printTicket'])->name('planilla-adelantos.imprimir');
     Route::resource('planilla-adelantos', PlanillaAdelantoController::class)->except(['create']);
 
     // Planilla - Prestamos
     Route::get('/planilla-prestamos/{id}/ver', [PlanillaPrestamoController::class, 'view'])->name('planilla-prestamos.ver');
     Route::get('/planilla-prestamos/{id}/cuotas', [PlanillaPrestamoController::class, 'getCuotas'])->name('planilla-prestamos.cuotas');
+    Route::get('/planilla-prestamos/{id}/imprimir', [PlanillaPrestamoController::class, 'printTicket'])->name('planilla-prestamos.imprimir');
+    Route::get('/planilla-prestamos/{id}/montos', [PlanillaPrestamoController::class, 'getMontos'])->name('planilla-prestamos.montos');
     Route::post('/planilla-prestamos/{id}/pagar', [PlanillaPrestamoController::class, 'registrarPago'])->name('planilla-prestamos.pagar');
+    
+    // Pagos de Prestamos
+    Route::get('/planilla-prestamos/{prestamoId}/pagos', [PlanillaPrestamoController::class, 'pagosIndex'])->name('planilla-prestamos.pagos-index');
+    Route::get('/planilla-prestamos/{prestamoId}/pagos/data', [PlanillaPrestamoController::class, 'pagosData'])->name('planilla-prestamos.pagos-data');
+    Route::get('/planilla-prestamos/pagos/{id}', [PlanillaPrestamoController::class, 'showPago'])->name('planilla-prestamos.pagos-show');
+    Route::get('/planilla-prestamos/pagos/{id}/editar', [PlanillaPrestamoController::class, 'editPago'])->name('planilla-prestamos.pagos-edit');
+    Route::put('/planilla-prestamos/pagos/{id}', [PlanillaPrestamoController::class, 'updatePago'])->name('planilla-prestamos.pagos-update');
+    Route::delete('/planilla-prestamos/pagos/{id}', [PlanillaPrestamoController::class, 'destroyPago'])->name('planilla-prestamos.pagos-destroy');
+    Route::get('/planilla-prestamos/pagos/{id}/imprimir', [PlanillaPrestamoController::class, 'printPagoTicket'])->name('planilla-prestamos.pagos-imprimir');
+    
     Route::resource('planilla-prestamos', PlanillaPrestamoController::class)->except(['create']);
 
     // Planilla - Pagos

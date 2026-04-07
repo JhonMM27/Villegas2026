@@ -12,6 +12,7 @@ class PlanillaPrestamoPago extends Model
     protected $table = 'planilla_prestamo_pagos';
 
     protected $fillable = [
+        'numero_interno',
         'planilla_prestamo_id',
         'monto_pagado',
         'fecha_pago',
@@ -22,6 +23,7 @@ class PlanillaPrestamoPago extends Model
     ];
 
     protected $casts = [
+        'numero_interno' => 'int',
         'monto_pagado' => 'decimal:2',
         'fecha_pago' => 'date',
     ];

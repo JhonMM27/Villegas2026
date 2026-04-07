@@ -6,11 +6,13 @@ use App\Models\Gasto;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Yajra\DataTables\DataTables;
+use Barryvdh\DomPDF\Facade\Pdf;
+use App\Helpers\NumeroALetras;
 
 class GastoController extends Controller
 {
     public function __construct(){
-        $this->middleware('can:gastos_list')->only(['index','view']);
+        $this->middleware('can:gastos_list')->only(['index','view','printTicket']);
         $this->middleware('can:gastos_create')->only(['store']);
         $this->middleware('can:gastos_edit')->only(['show', 'update']);
         $this->middleware('can:gastos_delete')->only(['destroy']);
@@ -36,10 +38,15 @@ class GastoController extends Controller
                     }
 
                     $ver='<button class="btn btn-sm btn-info btn-view-gasto" data-id="'.$row->id.'" title="Ver Gasto">
-                        <i class="bi bi-eye"></i>
-                     </button>';
-                    // Combinar ambos botones en una cadena y devolverla
-                    return '<div class="btn-group">' . $editButton . $deleteButton . $ver . '</div>';
+                         <i class="bi bi-eye"></i>
+                      </button>';
+                    $ticketButton='<a href="' . route('gastos.imprimir', $row->id) . '" 
+                         target="_blank" 
+                         class="btn btn-sm btn-secondary" 
+                         title="Ver Comprobante">
+                         <i class="bi bi-printer"></i>
+                      </a>';
+                    return '<div class="btn-group">' . $editButton . $deleteButton . $ver . $ticketButton . '</div>';
                 })
                 ->make(true);
         }
@@ -173,10 +180,31 @@ class GastoController extends Controller
         try {
             $gasto = Gasto::findOrFail($id);
 
-            // Devolver vista parcial
             return view('gastos.view', compact('gasto'));
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
         }
+    }
+
+    public function printTicket($id)
+    {
+        $gasto = Gasto::findOrFail($id);
+
+        $empresa = (object)[
+            'razon_social' => 'CONSORCIOS VILLEGAS E.I.R.L.',
+            'direccion' => 'Carretera Pomalca KM 3' . "\n" . 'A espaldas de Ferretería Herrera',
+            'ruc' => '20538937321',
+            'celular'=>'967984895 - 978431737 - 915177079',
+        ];
+
+        $formatter = new NumeroALetras();
+        $total_letras = $formatter->convertir($gasto->monto);
+
+        $pdf = Pdf::loadView('gastos.ticket', compact('gasto', 'empresa', 'total_letras'))
+            ->setPaper([0, 0, 226.77, 600], 'portrait')
+            ->setOption('isRemoteEnabled', true)
+            ->setOption('defaultFont', 'DejaVu Sans');
+
+        return $pdf->stream("gasto_{$gasto->id}.pdf");
     }
 }

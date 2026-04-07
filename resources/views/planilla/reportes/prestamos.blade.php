@@ -41,6 +41,7 @@
         <thead>
             <tr>
                 <th class="text-center">#</th>
+                <th>N° Int.</th>
                 <th>Empleado</th>
                 <th>DNI</th>
                 <th>Fecha Préstamo</th>
@@ -58,6 +59,7 @@
             @endphp
             <tr>
                 <td class="text-center">{{ $index + 1 }}</td>
+                <td>{{ $p->numero_interno }}</td>
                 <td>{{ $p->empleado->nombre ?? 'N/A' }}</td>
                 <td>{{ $p->empleado->dni ?? 'N/A' }}</td>
                 <td>{{ \Carbon\Carbon::parse($p->fecha_prestamo)->format('d/m/Y') }}</td>
@@ -77,7 +79,7 @@
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="4" class="text-right"><strong>TOTALES:</strong></td>
+                <td colspan="5" class="text-right"><strong>TOTALES:</strong></td>
                 <td class="text-right"><strong>S/ {{ number_format($totalOriginal, 2) }}</strong></td>
                 <td class="text-right"><strong>S/ {{ number_format($totalSaldo, 2) }}</strong></td>
                 <td></td>

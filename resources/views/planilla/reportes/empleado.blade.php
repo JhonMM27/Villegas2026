@@ -72,14 +72,16 @@
                                                 <table class="table table-sm table-striped mb-0">
                                                     <thead class="table-light">
                                                         <tr>
-                                                            <th>Fecha</th>
-                                                            <th class="text-end">Monto</th>
+                                                            <th style="width: 60px;">N° Int.</th>
+                                                            <th style="width: 90px;">Fecha</th>
+                                                            <th style="width: 100px;" class="text-end">Monto</th>
                                                             <th>Observaciones</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         @foreach ($adelantos as $a)
                                                             <tr>
+                                                                <td>{{ $a->numero_interno }}</td>
                                                                 <td>{{ \Carbon\Carbon::parse($a->fecha)->format('d/m/Y') }}
                                                                 </td>
                                                                 <td class="text-end">S/
@@ -90,7 +92,7 @@
                                                     </tbody>
                                                     <tfoot class="table-light">
                                                         <tr>
-                                                            <th>TOTAL</th>
+                                                            <th colspan="2">TOTAL</th>
                                                             <th class="text-end">S/
                                                                 {{ number_format($adelantos->sum('monto'), 2) }}</th>
                                                             <th></th>

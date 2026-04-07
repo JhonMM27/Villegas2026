@@ -79,7 +79,6 @@ class EmpleadoManager extends CrudManager {
             document.getElementById('sueldo_planilla').value = data.empleado.sueldo_planilla;
             document.getElementById('sueldo_real').value = data.empleado.sueldo_real;
             document.getElementById('estado').value = data.empleado.estado;
-            document.getElementById('observaciones').value = data.empleado.observaciones || '';
         });
         this.isEditing = true;
         this.elements.methodField.value = 'PUT';

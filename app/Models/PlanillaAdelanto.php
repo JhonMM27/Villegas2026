@@ -13,6 +13,7 @@ class PlanillaAdelanto extends Model
 
     protected $fillable = [
         'empleado_id',
+        'numero_interno',
         'monto',
         'fecha',
         'planilla_pago_id',
@@ -25,6 +26,7 @@ class PlanillaAdelanto extends Model
     protected $casts = [
         'monto' => 'decimal:2',
         'fecha' => 'date',
+        'numero_interno' => 'int',
     ];
 
     public function empleado(): BelongsTo

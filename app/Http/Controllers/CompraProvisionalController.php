@@ -305,7 +305,7 @@ class CompraProvisionalController extends Controller
      * @return \Illuminate\Http\Response PDF streamed
      */
     public function printTicket($id){
-        $provisional = CompraProvisional::with(['proveedor'])->findOrFail($id);
+        $provisional = CompraProvisional::with(['proveedor.documentoTipo'])->findOrFail($id);
 
         // Total deuda = suma de saldos de todas las compras del proveedor (solo saldos > 0)
         $totalDeuda = Compra::query()
@@ -327,7 +327,7 @@ class CompraProvisionalController extends Controller
         $formatter = new NumeroALetras();
         $total_letras = $formatter->convertir($provisional->monto);
 
-        $pdf = Pdf::loadView('venta-provisionales.ticket', compact('provisional','totalDeuda','empresa','total_letras'))
+        $pdf = Pdf::loadView('compra-provisionales.ticket', compact('provisional','totalDeuda','empresa','total_letras'))
             ->setPaper([0, 0, 226.77, 600], 'portrait')
             ->setOption('isRemoteEnabled', true)
             ->setOption('defaultFont', 'DejaVu Sans');

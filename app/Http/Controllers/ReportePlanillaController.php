@@ -64,8 +64,8 @@ class ReportePlanillaController extends Controller
             ->get();
 
         $resumen = [
-            'total_sueldo_planilla' => $pagos->count() * (float) $empleado->sueldo_planilla,
-            'total_sueldo_real' => $pagos->count() * (float) $empleado->sueldo_real,
+            'total_sueldo_planilla' => (float) $empleado->sueldo_planilla,
+            'total_sueldo_real' => (float) $empleado->sueldo_real,
             'total_sueldo_base' => $pagos->sum('sueldo_base'),
             'total_horas_extras' => $pagos->sum('horas_extras'),
             'total_adelantos' => $adelantos->sum('monto'),
@@ -120,13 +120,21 @@ class ReportePlanillaController extends Controller
     {
         $empresa = $this->getEmpresa();
 
-        $pagos = PlanillaPago::with('empleado')
+        $pagos = PlanillaPago::with(['empleado'])
             ->where('estado', 'pendiente')
             ->orderByDesc('anio')
             ->orderByDesc('mes')
             ->get();
 
         $totalRegistros = $pagos->count();
+
+        $pagos->each(function ($pago) {
+            $adelantos = PlanillaAdelanto::where('empleado_id', $pago->empleado_id)
+                ->whereMonth('fecha', $pago->mes)
+                ->whereYear('fecha', $pago->anio)
+                ->sum('monto');
+            $pago->adelantos_calculado = $adelantos;
+        });
 
         $pdf = PDF::loadView('planilla.reportes.pagos_pendientes', compact('pagos', 'empresa', 'totalRegistros'));
 
@@ -188,8 +196,8 @@ class ReportePlanillaController extends Controller
                 return redirect()->back()->with('error', 'Empleado no encontrado');
             }
             $resumen = [
-                'total_sueldo_planilla' => $pagos->count() * (float) $empleado->sueldo_planilla,
-                'total_sueldo_real' => $pagos->count() * (float) $empleado->sueldo_real,
+                'total_sueldo_planilla' => (float) $empleado->sueldo_planilla,
+                'total_sueldo_real' => (float) $empleado->sueldo_real,
                 'total_sueldo_base' => $pagos->sum('sueldo_base'),
                 'total_horas_extras' => $pagos->sum('horas_extras'),
                 'total_adelantos' => $adelantos->sum('monto'),

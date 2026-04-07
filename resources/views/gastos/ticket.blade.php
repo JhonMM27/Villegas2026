@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Provisional Compra {{ $provisional->numero_recibo }}</title>
+    <title>Gasto {{ $gasto->numero_recibo }}</title>
     <style>
         @page {
             margin: 2mm 0mm 2mm 0mm;
@@ -44,16 +44,15 @@
     <div class="spacer"></div>
 
     <div class="center">
-        <h3 class="bold">RECIBO {{ $provisional->numero_recibo }}</h3>
+        <h3 class="bold">RECIBO {{ $gasto->numero_recibo }}</h3>
     </div>
 
     <div class="line"></div>
 
-    {{-- DATOS PROVEEDOR --}}
-    <p><strong>Proveedor:</strong> {{ $provisional->proveedor_nombre }}</p>
-    <p><strong>Documento:</strong> {{ $provisional->proveedor->documentoTipo->descripcion ?? '-' }} {{ $provisional->proveedor_documento }}</p>
-    <p><strong>Dirección:</strong> {{ $provisional->proveedor_direccion ?? '-' }}</p>
-    <p><strong>Fecha:</strong> {{ \Carbon\Carbon::parse($provisional->fecha_provisional)->format('d/m/Y H:i') }}</p>
+    {{-- DATOS GASTO --}}
+    <p><strong>Responsable:</strong> {{ $gasto->responsable }}</p>
+    <p><strong>Descripción:</strong> {{ $gasto->descripcion }}</p>
+    <p><strong>Fecha:</strong> {{ \Carbon\Carbon::parse($gasto->fecha_gasto)->format('d/m/Y H:i') }}</p>
 
     <div class="line"></div>
     <div class="spacer"></div>
@@ -61,38 +60,31 @@
     {{-- TOTALES --}}
     <table class="totales">
         <tr class="bold">
-            <td style="text-align: left; width: 70%;">PAGO REALIZADO:</td>
-            <td style="text-align: right; width: 30%;">S/ {{ number_format($provisional->monto, 2) }}</td>
+            <td style="text-align: right; width: 70%;">TOTAL GASTO:</td>
+            <td style="text-align: right; width: 30%;">S/ {{ number_format($gasto->monto, 2) }}</td>
         </tr>
     </table>
 
     <p style="font-size: 8px; text-align: center;">{{ $total_letras }}</p>
 
-    <table class="totales">
-        <tr class="bold">
-            <td style="text-align: left; width: 70%;">TOTAL DEUDA:</td>
-            <td style="text-align: right; width: 30%;">S/ {{ number_format($totalDeuda, 2) }}</td>
-        </tr>
-    </table>
-
     <div class="line"></div>
     <div class="spacer"></div>
 
-    <p><strong>Vendedor:</strong> {{ $provisional->user_nombre }}</p>
+    <p><strong>Usuario:</strong> {{ $gasto->user_nombre }}</p>
     <p class="bold">COBRANZA</p>
 
     <table>
         <tr>
             <td class="bold">Principal:</td>
-            <td class="right">S/ {{ number_format($provisional->importe_p, 2) }}</td>
+            <td class="right">S/ {{ number_format($gasto->importe_p, 2) }}</td>
         </tr>
         <tr>
             <td class="bold">Depósito:</td>
-            <td class="right">S/ {{ number_format($provisional->importe_d, 2) }}</td>
+            <td class="right">S/ {{ number_format($gasto->importe_d, 2) }}</td>
         </tr>
         <tr>
             <td class="bold">Consorcio:</td>
-            <td class="right">S/ {{ number_format($provisional->importe_c, 2) }}</td>
+            <td class="right">S/ {{ number_format($gasto->importe_c, 2) }}</td>
         </tr>
     </table>
 

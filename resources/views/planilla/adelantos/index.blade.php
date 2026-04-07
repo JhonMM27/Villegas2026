@@ -18,7 +18,7 @@
                             <thead>
                                 <tr>
                                     <th>Opciones</th>
-                                    <th>ID</th>
+                                    <th>N° Interno</th>
                                     <th>Empleado</th>
                                     <th>Monto</th>
                                     <th>Fecha</th>
@@ -56,7 +56,7 @@ class AdelantoManager {
             ajax: { url: this.baseUrl, type: 'GET' },
             columns: [
                 { data: 'action', name: 'action', orderable: false, searchable: false },
-                { data: 'id', name: 'id' },
+                { data: 'numero_interno', name: 'numero_interno' },
                 { data: 'empleado_id', name: 'empleado_id' },
                 { data: 'monto', name: 'monto' },
                 { data: 'fecha', name: 'fecha' },
@@ -240,6 +240,7 @@ class AdelantoManager {
         document.getElementById('method_field').value = '';
         this.form.action = this.baseUrl;
         this.form.reset();
+        document.getElementById('numero_interno').value = '';
         document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
         document.getElementById('empleado_id').value = '';
         document.getElementById('empleado_nombre').value = '';
@@ -260,6 +261,7 @@ class AdelantoManager {
             document.getElementById('modalTitle').textContent = 'Editar Adelanto';
             document.getElementById('method_field').value = 'PUT';
             this.form.action = `${this.baseUrl}/${id}`;
+            document.getElementById('numero_interno').value = response.adelanto.numero_interno;
             document.getElementById('empleado_id').value = response.adelanto.empleado_id;
             document.getElementById('empleado_nombre').value = response.adelanto.empleado?.nombre || '';
             document.getElementById('fecha').value = response.adelanto.fecha;

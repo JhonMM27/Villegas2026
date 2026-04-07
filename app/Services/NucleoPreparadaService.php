@@ -63,6 +63,8 @@ class NucleoPreparadaService
                     continue;
                 }
 
+                $cantidadUnidades = (float) $detalle->salida_kg / (float) ($detalle->producto_empaque ?: 1);
+
                 $this->movimientoService->registrarSalida([
                     'tipo' => MovimientoService::TIPO_PREPARADA_SALIDA,
                     'fecha' => $preparada->fecha,
@@ -73,7 +75,7 @@ class NucleoPreparadaService
                     'producto_nombre' => $detalle->producto_nombre,
                     'empaque' => $detalle->producto_empaque,
                     'unidad_codigo' => $detalle->unidad_codigo,
-                    'cantidad' => $detalle->cantidad_porcentaje,
+                    'cantidad' => round($cantidadUnidades, 4),
                     'cantidad_kg' => $detalle->salida_kg,
                 ]);
             }
@@ -205,125 +207,57 @@ class NucleoPreparadaService
             $detallesNuevos = $preparada->detalles()->createMany($preparadaDataRaw['detalles']);
             $preparada->load('detalles');
 
-            // 4) Reemplazar movimientos de SALIDA de insumos en el kardex (reutilizando neutralizados)
+            // 4) ELIMINAR movimientos existentes de esta nucleo_preparada
+            // (se reemplazarán por movimientos nuevos con datos correctos)
+            Movimiento::where('transaccion_tipo', 'nucleo_preparadas')
+                ->where('transaccion_id', $preparada->id)
+                ->delete();
+
+            // 5) Registrar SALIDA de insumos en el kardex (siempre movimientos nuevos)
             $productosAfectados = [];
             foreach ($detallesNuevos as $detalle) {
-                // Excluir producto ID 77 (servicio mezclado)
                 if ((float) $detalle->salida_kg <= 0 || (int) $detalle->producto_id === 77) {
                     continue;
                 }
 
-                // Buscar movimiento neutralizado existente
-                $movNeutralizado = Movimiento::where('transaccion_tipo', 'nucleo_preparadas')
-                    ->where('transaccion_id', $preparadaId)
-                    ->where('producto_id', $detalle->producto_id)
-                    ->where('entrada', 0)
-                    ->where('salida', 0)
-                    ->where('cantidad_kg', 0)
-                    ->first();
+                $cantidadUnidades = (float) $detalle->salida_kg / (float) ($detalle->producto_empaque ?: 1);
 
-                if ($movNeutralizado) {
-                    // Reutilizar movimiento neutralizado
-                    $producto = Producto::find($detalle->producto_id);
-                    $empaqueBase = (float) ($producto->empaque ?? 1);
-                    $empaqueFinal = (float) ($detalle->producto_empaque ?? 1);
-                    $cantidad = (float) $detalle->cantidad_porcentaje;
-
-                    $cantidadStock = ($empaqueFinal == $empaqueBase)
-                        ? $cantidad
-                        : round($cantidad * ($empaqueFinal / $empaqueBase), 4);
-
-                    $movNeutralizado->update([
-                        'detalle_id' => $detalle->id,
-                        'fecha' => $preparada->fecha,
-                        'producto_nombre' => $detalle->producto_nombre,
-                        'empaque' => $empaqueFinal,
-                        'unidad_codigo' => $detalle->unidad_codigo,
-                        'cantidad' => $cantidad,
-                        'cantidad_kg' => $detalle->salida_kg,
-                        'entrada' => 0,
-                        'salida' => $cantidadStock,
-                        'comentario' => 'Rectificación de nucleo_preparada (Actualizado)',
-                    ]);
-                    $productosAfectados[] = $detalle->producto_id;
-                } else {
-                    // Crear nuevo movimiento si no existe neutralizado
-                    $this->movimientoService->registrarSalida([
-                        'tipo' => MovimientoService::TIPO_PREPARADA_SALIDA,
-                        'fecha' => $preparada->fecha,
-                        'transaccion_tipo' => 'nucleo_preparadas',
-                        'transaccion_id' => $preparada->id,
-                        'detalle_id' => $detalle->id,
-                        'producto_id' => $detalle->producto_id,
-                        'producto_nombre' => $detalle->producto_nombre,
-                        'empaque' => $detalle->producto_empaque,
-                        'unidad_codigo' => $detalle->unidad_codigo,
-                        'cantidad' => $detalle->cantidad_porcentaje,
-                        'cantidad_kg' => $detalle->salida_kg,
-                        'comentario' => 'Rectificación de nucleo_preparada',
-                    ]);
-                    $productosAfectados[] = $detalle->producto_id;
-                }
-            }
-
-            // 5) Reemplazar movimiento INGRESO del producto final en el kardex
-            $movNeutralizadoProd = Movimiento::where('transaccion_tipo', 'nucleo_preparadas')
-                ->where('transaccion_id', $preparadaId)
-                ->where('producto_id', $preparada->nucleo_id)
-                ->where('entrada', 0)
-                ->where('salida', 0)
-                ->where('cantidad_kg', 0)
-                ->first();
-
-            if ($movNeutralizadoProd) {
-                // Reutilizar movimiento neutralizado del producto final
-                $productoFinal = Producto::find($preparada->nucleo_id);
-                $empaqueBase = (float) ($productoFinal->empaque ?? 1);
-                $empaqueFinal = (float) ($preparada->producto_empaque ?? 1);
-                $cantidad = (float) $preparada->ingreso_saco;
-
-                $cantidadStock = ($empaqueFinal == $empaqueBase)
-                    ? $cantidad
-                    : round($cantidad * ($empaqueFinal / $empaqueBase), 4);
-
-                $costoTotalPrep = (float) ($cantidad * $preparada->costo_unitario);
-                $costoUnitarioBase = $cantidadStock > 0 ? $costoTotalPrep / $cantidadStock : (float) $preparada->costo_unitario;
-
-                $movNeutralizadoProd->update([
-                    'fecha' => $preparada->fecha,
-                    'producto_nombre' => $preparada->nucleo_nombre,
-                    'empaque' => $empaqueFinal,
-                    'unidad_codigo' => null,
-                    'cantidad' => $cantidad,
-                    'cantidad_kg' => $preparada->ingreso_kg,
-                    'entrada' => $cantidadStock,
-                    'salida' => 0,
-                    'costo_unitario' => round($costoUnitarioBase, 4),
-                    'costo_total' => round($costoTotalPrep, 4),
-                    'comentario' => 'Rectificación de nucleo_preparada (Actualizado)',
-                ]);
-                $productosAfectados[] = $preparada->nucleo_id;
-            } else {
-                // Crear nuevo movimiento de ingreso
-                $this->movimientoService->registrarIngreso([
-                    'tipo' => MovimientoService::TIPO_PREPARADA_INGRESO,
+                $this->movimientoService->registrarSalida([
+                    'tipo' => MovimientoService::TIPO_PREPARADA_SALIDA,
                     'fecha' => $preparada->fecha,
                     'transaccion_tipo' => 'nucleo_preparadas',
                     'transaccion_id' => $preparada->id,
-                    'detalle_id' => null,
-                    'producto_id' => $preparada->nucleo_id,
-                    'producto_nombre' => $preparada->nucleo_nombre,
-                    'empaque' => $preparada->producto_empaque,
-                    'unidad_codigo' => null,
-                    'cantidad' => $preparada->ingreso_saco,
-                    'cantidad_kg' => $preparada->ingreso_kg,
-                    'costo_unitario' => $preparada->costo_unitario,
+                    'detalle_id' => $detalle->id,
+                    'producto_id' => $detalle->producto_id,
+                    'producto_nombre' => $detalle->producto_nombre,
+                    'empaque' => $detalle->producto_empaque,
+                    'unidad_codigo' => $detalle->unidad_codigo,
+                    'cantidad' => round($cantidadUnidades, 4),
+                    'cantidad_kg' => $detalle->salida_kg,
                     'comentario' => 'Rectificación de nucleo_preparada',
                 ]);
-                $productosAfectados[] = $preparada->nucleo_id;
+                $productosAfectados[] = $detalle->producto_id;
             }
 
-            // 6) Recalcular Kardex para productos afectados
+            // 6) Registrar INGRESO del producto final en el kardex (siempre movimiento nuevo)
+            $this->movimientoService->registrarIngreso([
+                'tipo' => MovimientoService::TIPO_PREPARADA_INGRESO,
+                'fecha' => $preparada->fecha,
+                'transaccion_tipo' => 'nucleo_preparadas',
+                'transaccion_id' => $preparada->id,
+                'detalle_id' => null,
+                'producto_id' => $preparada->nucleo_id,
+                'producto_nombre' => $preparada->nucleo_nombre,
+                'empaque' => $preparada->producto_empaque,
+                'unidad_codigo' => null,
+                'cantidad' => $preparada->ingreso_saco,
+                'cantidad_kg' => $preparada->ingreso_kg,
+                'costo_unitario' => $preparada->costo_unitario,
+                'comentario' => 'Rectificación de nucleo_preparada',
+            ]);
+            $productosAfectados[] = $preparada->nucleo_id;
+
+            // 7) Recalcular Kardex para productos afectados
             foreach (array_unique($productosAfectados) as $pId) {
                 $primerMov = Movimiento::where('transaccion_id', $preparada->id)
                     ->where('producto_id', $pId)

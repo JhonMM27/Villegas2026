@@ -14,7 +14,8 @@ class EmpleadoController extends Controller
     public function __construct(
         protected EmpleadoService $empleadoService
     ) {
-        $this->middleware('can:empleados_list')->only(['index', 'edit']);
+        $this->middleware('can:empleados_list')->only(['index']);
+        $this->middleware('can:empleados_edit')->only(['edit']);
         $this->middleware('can:empleados_create')->only(['store']);
         $this->middleware('can:empleados_edit')->only(['update']);
         $this->middleware('can:empleados_delete')->only(['destroy']);
@@ -29,23 +30,23 @@ class EmpleadoController extends Controller
                 ->addColumn('action', function ($row) {
                     $buttons = '';
 
-                    $buttons .= '<button class="btn btn-sm btn-info me-1" onclick="empleadoManager.verDetalle(' . $row->id . ')">
+                    $buttons .= '<button class="btn btn-sm btn-info me-1" onclick="empleadoManager.verDetalle('.$row->id.')">
                         <i class="bi bi-eye"></i>
                     </button>';
 
                     if (auth()->user()->can('empleados_edit')) {
-                        $buttons .= '<button class="btn btn-sm btn-warning me-1" onclick="empleadoManager.showEditModal(' . $row->id . ')"><i class="bi bi-pencil"></i></button>';
+                        $buttons .= '<button class="btn btn-sm btn-warning me-1" onclick="empleadoManager.showEditModal('.$row->id.')"><i class="bi bi-pencil"></i></button>';
                     }
 
                     if (auth()->user()->can('empleados_delete')) {
-                        $buttons .= '<button class="btn btn-sm btn-danger me-1" onclick="empleadoManager.confirmDelete(' . $row->id . ')"><i class="bi bi-trash"></i></button>';
+                        $buttons .= '<button class="btn btn-sm btn-danger me-1" onclick="empleadoManager.confirmDelete('.$row->id.')"><i class="bi bi-trash"></i></button>';
                     }
 
-                    return '<div class="btn-group">' . $buttons . '</div>';
+                    return '<div class="btn-group">'.$buttons.'</div>';
                 })
-                ->editColumn('sueldo_planilla', fn($row) => 'S/' . number_format((float) $row->sueldo_planilla, 2))
-                ->editColumn('sueldo_real', fn($row) => 'S/' . number_format((float) $row->sueldo_real, 2))
-                ->editColumn('estado', fn($row) => $row->estado === 'activo'
+                ->editColumn('sueldo_planilla', fn ($row) => 'S/'.number_format((float) $row->sueldo_planilla, 2))
+                ->editColumn('sueldo_real', fn ($row) => 'S/'.number_format((float) $row->sueldo_real, 2))
+                ->editColumn('estado', fn ($row) => $row->estado === 'activo'
                     ? '<span class="badge bg-success">Activo</span>'
                     : '<span class="badge bg-secondary">Inactivo</span>')
                 ->rawColumns(['action', 'estado'])
@@ -62,14 +63,14 @@ class EmpleadoController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Empleado registrado correctamente'
+            'message' => 'Empleado registrado correctamente',
         ]);
     }
 
     public function update(Request $request, $id)
     {
-        $empleado = $this->empleadoService->findById($id);
-        if (!$empleado) {
+        $empleado = $this->empleadoService->findById((int) $id);
+        if (! $empleado) {
             return response()->json(['success' => false, 'message' => 'Empleado no encontrado'], 404);
         }
 
@@ -78,14 +79,14 @@ class EmpleadoController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Empleado actualizado correctamente'
+            'message' => 'Empleado actualizado correctamente',
         ]);
     }
 
     public function edit($id)
     {
-        $empleado = $this->empleadoService->findById($id);
-        if (!$empleado) {
+        $empleado = $this->empleadoService->findById((int) $id);
+        if (! $empleado) {
             return response()->json(['success' => false, 'message' => 'Empleado no encontrado'], 404);
         }
 
@@ -95,7 +96,7 @@ class EmpleadoController extends Controller
     public function show($id)
     {
         $empleado = $this->empleadoService->findById((int) $id);
-        if (!$empleado) {
+        if (! $empleado) {
             return response()->json(['success' => false, 'message' => 'Empleado no encontrado'], 404);
         }
 
@@ -104,8 +105,8 @@ class EmpleadoController extends Controller
 
     public function destroy($id)
     {
-        $empleado = $this->empleadoService->findById($id);
-        if (!$empleado) {
+        $empleado = $this->empleadoService->findById((int) $id);
+        if (! $empleado) {
             return response()->json(['success' => false, 'message' => 'Empleado no encontrado'], 404);
         }
 
@@ -113,7 +114,7 @@ class EmpleadoController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Empleado eliminado correctamente'
+            'message' => 'Empleado eliminado correctamente',
         ]);
     }
 
@@ -129,7 +130,7 @@ class EmpleadoController extends Controller
     {
         $rules = [
             'nombre' => 'required|string|max:255',
-            'dni' => 'required|string|max:8|unique:empleados,dni,' . $id,
+            'dni' => 'required|string|max:8|unique:empleados,dni,'.$id,
             'telefono' => 'nullable|string|max:20',
             'correo' => 'nullable|email|max:255',
             'sueldo_planilla' => 'required|numeric|min:0',

@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Producto;
-use Carbon\Carbon;
-use Maatwebsite\Excel\Facades\Excel;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\DB;
-use App\Exports\StockAlCorteExport;
 use App\Exports\KardexFechasProductosExport;
 use App\Exports\MovimientosExport;
+use App\Exports\StockAlCorteExport;
 use App\Models\Movimiento;
+use App\Models\Producto;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 class KardexController extends Controller
 {
@@ -34,12 +34,13 @@ class KardexController extends Controller
     public function index(Request $request)
     {
         $productos = Producto::select('id', 'nombre')->get();
+
         return view('kardex.index', compact('productos'));
     }
 
     public function stockGeneral(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
@@ -64,7 +65,7 @@ class KardexController extends Controller
 
         $reportes = $this->getStockAlCorteReportes($fecha, true, false);
 
-        $fileName = 'stock_alcorte_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'stock_alcorte_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new StockAlCorteExport($reportes),
@@ -84,28 +85,28 @@ class KardexController extends Controller
 
         $pdf = Pdf::loadView('kardex.reportes.stock_general_pdf', [
             'reportes' => $reportes,
-            'fecha'    => $fecha,
+            'fecha' => $fecha,
         ])->setPaper('letter', 'portrait')
-          ->setOptions([
-              'defaultFont' => 'Courier',
-          ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('stock_general.pdf');
     }
 
     public function kardexFechasProductos(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
         $request->validate([
-            'fecha_inicio'   => ['required', 'date'],
-            'fecha_fin'      => ['required', 'date', 'after_or_equal:fecha_inicio'],
-            'producto_ids'   => ['array'],
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'producto_ids' => ['array'],
             'producto_ids.*' => ['integer'],
-            'operaciones'    => ['array'],
-            'operaciones.*'  => ['string'],
+            'operaciones' => ['array'],
+            'operaciones.*' => ['string'],
         ]);
 
         $data = $this->getKardexFechasProductosReportes(
@@ -123,12 +124,12 @@ class KardexController extends Controller
     public function kardexFechasProductosPdf(Request $request)
     {
         $request->validate([
-            'fecha_inicio'   => ['required', 'date'],
-            'fecha_fin'      => ['required', 'date', 'after_or_equal:fecha_inicio'],
-            'producto_ids'   => ['array'],
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'producto_ids' => ['array'],
             'producto_ids.*' => ['integer'],
-            'operaciones'    => ['array'],
-            'operaciones.*'  => ['string'],
+            'operaciones' => ['array'],
+            'operaciones.*' => ['string'],
         ]);
 
         $data = $this->getKardexFechasProductosReportes(
@@ -139,9 +140,9 @@ class KardexController extends Controller
         );
 
         $pdf = Pdf::loadView('kardex.reportes.fechas_productos_pdf', [
-            'reportes'    => $data['reportes'],
+            'reportes' => $data['reportes'],
             'fechaInicio' => $data['ini'],
-            'fechaFin'    => $data['fin'],
+            'fechaFin' => $data['fin'],
             'operaciones' => $data['operaciones'],
         ])->setPaper('a4', 'landscape');
 
@@ -151,12 +152,12 @@ class KardexController extends Controller
     public function kardexFechasProductosExcel(Request $request)
     {
         $request->validate([
-            'fecha_inicio'   => ['required', 'date'],
-            'fecha_fin'      => ['required', 'date', 'after_or_equal:fecha_inicio'],
-            'producto_ids'   => ['array'],
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'producto_ids' => ['array'],
             'producto_ids.*' => ['integer'],
-            'operaciones'    => ['array'],
-            'operaciones.*'  => ['string'],
+            'operaciones' => ['array'],
+            'operaciones.*' => ['string'],
         ]);
 
         $data = $this->getKardexFechasProductosReportes(
@@ -173,17 +174,17 @@ class KardexController extends Controller
 
     public function reporteMovimientos(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
         $request->validate([
-            'fecha_inicio'   => ['required', 'date'],
-            'fecha_fin'      => ['required', 'date', 'after_or_equal:fecha_inicio'],
-            'producto_ids'   => ['array'],
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'producto_ids' => ['array'],
             'producto_ids.*' => ['integer'],
-            'tipos'          => ['array'],
-            'tipos.*'        => ['string'],
+            'tipos' => ['array'],
+            'tipos.*' => ['string'],
         ]);
 
         $reportes = $this->getMovimientosData(
@@ -199,12 +200,12 @@ class KardexController extends Controller
     public function exportarMovimientosExcel(Request $request)
     {
         $request->validate([
-            'fecha_inicio'   => ['required', 'date'],
-            'fecha_fin'      => ['required', 'date', 'after_or_equal:fecha_inicio'],
-            'producto_ids'   => ['array'],
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'producto_ids' => ['array'],
             'producto_ids.*' => ['integer'],
-            'tipos'          => ['array'],
-            'tipos.*'        => ['string'],
+            'tipos' => ['array'],
+            'tipos.*' => ['string'],
         ]);
 
         $reportes = $this->getMovimientosData(
@@ -214,7 +215,7 @@ class KardexController extends Controller
             (array) $request->input('tipos', [])
         );
 
-        $fileName = 'movimientos_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'movimientos_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(new MovimientosExport($reportes), $fileName);
     }
@@ -222,12 +223,12 @@ class KardexController extends Controller
     public function imprimirMovimientosPdf(Request $request)
     {
         $request->validate([
-            'fecha_inicio'   => ['required', 'date'],
-            'fecha_fin'      => ['required', 'date', 'after_or_equal:fecha_inicio'],
-            'producto_ids'   => ['array'],
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'producto_ids' => ['array'],
             'producto_ids.*' => ['integer'],
-            'tipos'          => ['array'],
-            'tipos.*'        => ['string'],
+            'tipos' => ['array'],
+            'tipos.*' => ['string'],
         ]);
 
         $reportes = $this->getMovimientosData(
@@ -238,9 +239,9 @@ class KardexController extends Controller
         );
 
         $pdf = Pdf::loadView('kardex.reportes.movimientos_pdf', [
-            'reportes'    => $reportes,
+            'reportes' => $reportes,
             'fechaInicio' => Carbon::parse($request->fecha_inicio),
-            'fechaFin'    => Carbon::parse($request->fecha_fin),
+            'fechaFin' => Carbon::parse($request->fecha_fin),
         ])->setPaper('a4', 'landscape');
 
         return $pdf->stream('reporte_movimientos.pdf');
@@ -253,8 +254,8 @@ class KardexController extends Controller
 
         return Movimiento::with('producto')
             ->whereBetween('fecha', [$ini, $fin])
-            ->when(!empty($productoIds), fn($q) => $q->whereIn('producto_id', $productoIds))
-            ->when(!empty($tipos), fn($q) => $q->whereIn('tipo', $tipos))
+            ->when(! empty($productoIds), fn ($q) => $q->whereIn('producto_id', $productoIds))
+            ->when(! empty($tipos), fn ($q) => $q->whereIn('tipo', $tipos))
             ->orderBy('fecha', 'desc')
             ->orderBy('id', 'desc')
             ->get();
@@ -266,7 +267,7 @@ class KardexController extends Controller
      */
     private function movimientosKardexUnion(array $productoIds = [], ?Carbon $ini = null, ?Carbon $hasta = null)
     {
-        $ini   = $ini ?: Carbon::now()->subYears(5)->startOfDay();
+        $ini = $ini ?: Carbon::now()->subYears(5)->startOfDay();
         $hasta = $hasta ?: Carbon::now()->endOfDay();
 
         $compra = DB::table('compra_detalles as cd')
@@ -275,7 +276,7 @@ class KardexController extends Controller
             ->leftJoin('lineas as l', 'l.id', '=', 'p.linea_id')
             ->whereBetween('c.fecha_compra', [$ini, $hasta])
             ->where('cd.cantidad', '>', 0)
-            ->when(!empty($productoIds), fn($q) => $q->whereIn('p.id', $productoIds))
+            ->when(! empty($productoIds), fn ($q) => $q->whereIn('p.id', $productoIds))
             ->selectRaw("
                 c.fecha_compra as fecha,
                 'COMPRA' as operacion,
@@ -303,9 +304,9 @@ class KardexController extends Controller
             ->where('v.estado', '!=', 'anulada')
             ->where(function ($q) {
                 $q->where('vd.salida_kg', '>', 0)
-                  ->orWhere('vd.cantidad', '>', 0);
+                    ->orWhere('vd.cantidad', '>', 0);
             })
-            ->when(!empty($productoIds), fn($q) => $q->whereIn('p.id', $productoIds))
+            ->when(! empty($productoIds), fn ($q) => $q->whereIn('p.id', $productoIds))
             ->selectRaw("
                 v.fecha_venta as fecha,
                 'VENTA' as operacion,
@@ -334,7 +335,7 @@ class KardexController extends Controller
             ->whereBetween('pr.fecha', [$ini, $hasta])
             ->where('pr.ingreso_saco', '>', 0)
             ->where('pr.estado', '!=', 'anulada')
-            ->when(!empty($productoIds), fn($q) => $q->whereIn('p.id', $productoIds))
+            ->when(! empty($productoIds), fn ($q) => $q->whereIn('p.id', $productoIds))
             ->selectRaw("
                 pr.fecha as fecha,
                 'PREPARADA' as operacion,
@@ -360,7 +361,7 @@ class KardexController extends Controller
             ->whereBetween('pr.fecha', [$ini, $hasta])
             ->where('pd.salida_kg', '>', 0)
             ->where('pr.estado', '!=', 'anulada')
-            ->when(!empty($productoIds), fn($q) => $q->whereIn('p.id', $productoIds))
+            ->when(! empty($productoIds), fn ($q) => $q->whereIn('p.id', $productoIds))
             ->selectRaw("
                 pr.fecha as fecha,
                 'PREPARADA' as operacion,
@@ -385,7 +386,7 @@ class KardexController extends Controller
             ->whereBetween('np.fecha', [$ini, $hasta])
             ->where('np.ingreso_saco', '>', 0)
             // ->where('np.estado', '!=', 'anulada')
-            ->when(!empty($productoIds), fn($q) => $q->whereIn('p.id', $productoIds))
+            ->when(! empty($productoIds), fn ($q) => $q->whereIn('p.id', $productoIds))
             ->selectRaw("
                 np.fecha as fecha,
                 'PREPARADA_NUCLEO' as operacion,
@@ -411,7 +412,7 @@ class KardexController extends Controller
             ->whereBetween('np.fecha', [$ini, $hasta])
             ->where('nd.salida_kg', '>', 0)
             // ->where('estado', '!=', 'anulada')
-            ->when(!empty($productoIds), fn($q) => $q->whereIn('p.id', $productoIds))
+            ->when(! empty($productoIds), fn ($q) => $q->whereIn('p.id', $productoIds))
             ->selectRaw("
                 np.fecha as fecha,
                 'PREPARADA_NUCLEO' as operacion,
@@ -437,7 +438,7 @@ class KardexController extends Controller
             ->whereBetween('pr.fecha_prestamo', [$ini, $hasta])
             ->where('ptd.cantidad_kgm', '>', 0)
             ->where('pr.estado', '!=', 'anulada')
-            ->when(!empty($productoIds), fn($q) => $q->whereIn('p.id', $productoIds))
+            ->when(! empty($productoIds), fn ($q) => $q->whereIn('p.id', $productoIds))
             ->selectRaw("
                 pr.fecha_prestamo as fecha,
                 'PRESTAMO' as operacion,
@@ -488,21 +489,21 @@ class KardexController extends Controller
             ->join('productos as p', 'p.id', '=', 'cd.producto_id')
             ->where('cd.cantidad', '>', 0)
             ->where('c.estado', '!=', 'anulada')
-            ->selectRaw("
+            ->selectRaw('
                 cd.producto_id,
                 c.fecha_compra as fecha,
                 (COALESCE(cd.cantidad,0) * (COALESCE(NULLIF(cd.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0))) as delta
-            ");
+            ');
 
         $venta = DB::table('venta_detalles as vd')
             ->join('ventas as v', 'v.id', '=', 'vd.venta_id')
             ->join('productos as p', 'p.id', '=', 'vd.producto_id')
             ->where(function ($q) {
                 $q->where('vd.salida_kg', '>', 0)
-                  ->orWhere('vd.cantidad', '>', 0);
+                    ->orWhere('vd.cantidad', '>', 0);
             })
             ->where('v.estado', '!=', 'anulada')
-            ->selectRaw("
+            ->selectRaw('
                 vd.producto_id,
                 v.fecha_venta as fecha,
                 -(
@@ -512,49 +513,49 @@ class KardexController extends Controller
                         ELSE (COALESCE(vd.cantidad,0) * (COALESCE(NULLIF(vd.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0)))
                     END
                 ) as delta
-            ");
+            ');
 
         $prepIn = DB::table('preparadas as pr')
             ->join('productos as p', 'p.id', '=', 'pr.producto_id')
             ->where('pr.ingreso_saco', '>', 0)
             ->where('pr.estado', '!=', 'anulada')
-            ->selectRaw("
+            ->selectRaw('
                 pr.producto_id,
                 pr.fecha as fecha,
                 (COALESCE(pr.ingreso_saco,0) * (COALESCE(NULLIF(pr.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0))) as delta
-            ");
+            ');
 
         $prepOut = DB::table('preparada_detalles as pd')
             ->join('preparadas as pr', 'pr.id', '=', 'pd.preparada_id')
             ->join('productos as p', 'p.id', '=', 'pd.producto_id')
             ->where('pd.salida_kg', '>', 0)
             ->where('pr.estado', '!=', 'anulada')
-            ->selectRaw("
+            ->selectRaw('
                 pd.producto_id,
                 pr.fecha as fecha,
                 -(COALESCE(pd.salida_kg,0) / NULLIF(p.empaque,0)) as delta
-            ");
+            ');
 
         $npIn = DB::table('nucleo_preparadas as np')
             ->join('productos as p', 'p.id', '=', 'np.nucleo_id')
             ->where('np.ingreso_saco', '>', 0)
-            // ->where('np.estado', '!=', 'anulada')
-            ->selectRaw("
+            ->where('np.estado', '!=', 'anulada')
+            ->selectRaw('
                 np.nucleo_id as producto_id,
                 np.fecha as fecha,
                 (COALESCE(np.ingreso_saco,0) * (COALESCE(NULLIF(np.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0))) as delta
-            ");
+            ');
 
         $npOut = DB::table('nucleo_preparada_detalles as nd')
             ->join('nucleo_preparadas as np', 'np.id', '=', 'nd.nucleo_preparada_id')
             ->join('productos as p', 'p.id', '=', 'nd.producto_id')
             ->where('nd.salida_kg', '>', 0)
-            // ->where('estado', '!=', 'anulada')
-            ->selectRaw("
+            ->where('np.estado', '!=', 'anulada')
+            ->selectRaw('
                 nd.producto_id,
                 np.fecha as fecha,
                 -(COALESCE(nd.salida_kg,0) / NULLIF(p.empaque,0)) as delta
-            ");
+            ');
 
         $prestamo = DB::table('prestamo_detalles as ptd')
             ->join('prestamos as pr', 'pr.id', '=', 'ptd.prestamo_id')
@@ -585,11 +586,9 @@ class KardexController extends Controller
     /**
      * Stock al corte.
      *
-     * LÓGICA CORREGIDA:
-     * - El stock actual real es productos.stock_almacen (hoy).
-     * - Para obtener el stock en una fecha pasada (fechaCorte), restamos
-     *   todos los movimientos que ocurrieron DESPUÉS de fechaCorte.
-     *   stock_corte = stock_almacen - SUM(delta donde fecha > fechaCorte)
+     * LÓGICA:
+     * - El stock se calcula deshaciendo movimientos futuros: stock_almacen - delta_post
+     * - El CPP (costo_unitario) se obtiene de la tabla movimientos a la fecha del corte
      */
     private function getStockAlCorteReportes(Carbon $fechaCorte, bool $soloActivos = true, bool $soloConStock = true)
     {
@@ -600,24 +599,36 @@ class KardexController extends Controller
             ->fromSub($this->movimientosStockUnion(), 'm')
             ->where('m.fecha', '>', $fechaCorte)
             ->groupBy('m.producto_id')
-            ->selectRaw("
+            ->selectRaw('
                 m.producto_id,
                 SUM(COALESCE(m.delta, 0)) as delta_post
-            ");
+            ');
+
+        // Subconsulta para CPP: último costo_nuevo por producto a la fecha del corte
+        $cppSubquery = DB::query()
+            ->fromRaw("(
+                SELECT producto_id, costo_nuevo,
+                    ROW_NUMBER() OVER (PARTITION BY producto_id ORDER BY fecha DESC, id DESC) as rn
+                FROM movimientos
+                WHERE fecha <= '{$fechaCorte->toDateTimeString()}'
+                    AND costo_nuevo IS NOT NULL
+            ) as ranked")
+            ->where('rn', 1)
+            ->selectRaw('producto_id, costo_nuevo');
 
         $q = DB::table('productos as p')
             ->leftJoin('lineas as l', 'l.id', '=', 'p.linea_id')
-            ->leftJoinSub($movPostCorte, 's', fn($j) => $j->on('s.producto_id', '=', 'p.id'))
-            ->selectRaw("
+            ->leftJoinSub($movPostCorte, 's', fn ($j) => $j->on('s.producto_id', '=', 'p.id'))
+            ->leftJoinSub($cppSubquery, 'cpp', fn ($j) => $j->on('cpp.producto_id', '=', 'p.id'))
+            ->selectRaw('
                 p.id as producto_id,
                 p.nombre as producto,
                 p.empaque,
                 l.nombre as linea,
-                -- Stock en el corte = stock actual - lo que entró/salió después del corte
                 (COALESCE(p.stock_almacen, 0) - COALESCE(s.delta_post, 0)) as stock,
-                COALESCE(p.costo_unitario, 0) as costo_unitario,
-                ((COALESCE(p.stock_almacen, 0) - COALESCE(s.delta_post, 0)) * COALESCE(p.costo_unitario, 0)) as valor_total
-            ");
+                COALESCE(cpp.costo_nuevo, p.costo_unitario, 0) as costo_unitario,
+                ((COALESCE(p.stock_almacen, 0) - COALESCE(s.delta_post, 0)) * COALESCE(cpp.costo_nuevo, p.costo_unitario, 0)) as valor_total
+            ');
 
         if ($soloActivos) {
             $q->where('p.activo', 1);
@@ -672,30 +683,30 @@ class KardexController extends Controller
         //    Así obtenemos cuánto había justo ANTES del inicio del rango.
         $movDesdeIni = DB::query()
             ->fromSub($this->movimientosStockUnion(), 's')
-            ->when(!empty($productoIds), fn($q) => $q->whereIn('s.producto_id', $productoIds))
+            ->when(! empty($productoIds), fn ($q) => $q->whereIn('s.producto_id', $productoIds))
             ->where('s.fecha', '>=', $ini)  // Todo lo que ocurrió desde el inicio del rango en adelante
             ->groupBy('s.producto_id')
-            ->selectRaw("
+            ->selectRaw('
                 s.producto_id,
                 SUM(COALESCE(s.delta, 0)) as delta_desde_ini
-            ");
+            ');
 
         // Unimos con productos para obtener el stock_almacen base
         $stockInicialRango = DB::table('productos as p')
-            ->leftJoinSub($movDesdeIni, 'd', fn($j) => $j->on('d.producto_id', '=', 'p.id'))
-            ->when(!empty($productoIds), fn($q) => $q->whereIn('p.id', $productoIds))
-            ->selectRaw("
+            ->leftJoinSub($movDesdeIni, 'd', fn ($j) => $j->on('d.producto_id', '=', 'p.id'))
+            ->when(! empty($productoIds), fn ($q) => $q->whereIn('p.id', $productoIds))
+            ->selectRaw('
                 p.id as producto_id,
                 -- Stock justo antes del inicio del rango
                 (COALESCE(p.stock_almacen, 0) - COALESCE(d.delta_desde_ini, 0)) as base_stock
-            ");
+            ');
 
         // 3) Movimientos del rango con stock acumulado usando el stock inicial real
         $calc = DB::query()
             ->fromSub($movUnion, 'k')
-            ->leftJoinSub($stockInicialRango, 'b', fn($j) => $j->on('b.producto_id', '=', 'k.producto_id'))
+            ->leftJoinSub($stockInicialRango, 'b', fn ($j) => $j->on('b.producto_id', '=', 'k.producto_id'))
             ->whereIn('k.operacion', $operaciones)
-            ->selectRaw("
+            ->selectRaw('
                 k.fecha,
                 k.operacion,
                 k.op_id as id,
@@ -719,7 +730,7 @@ class KardexController extends Controller
                         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
                     )
                 ) AS stock_und
-            ")
+            ')
             ->orderBy('k.producto_id')
             ->orderBy('k.fecha')
             ->orderBy('k.sort')
@@ -728,11 +739,11 @@ class KardexController extends Controller
             ->orderBy('k.det_id');
 
         return [
-            'ini'         => $ini,
-            'fin'         => $fin,
+            'ini' => $ini,
+            'fin' => $fin,
             'operaciones' => $operaciones,
             'productoIds' => $productoIds,
-            'reportes'    => $calc->get(),
+            'reportes' => $calc->get(),
         ];
     }
 }

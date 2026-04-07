@@ -72,7 +72,7 @@ class MovimientoService
      * IMPORTANTE: stock_almacen se almacena en UNIDADES (sacos/empaques base), NO en KG.
      * Se usa la misma conversión de empaque que usaba el viejo Producto::updateStock().
      *
-     * @param  array $params Datos del ingreso
+     * @param  array  $params  Datos del ingreso
      * @return Movimiento El movimiento registrado
      */
     public function registrarIngreso(array $params): Movimiento
@@ -81,17 +81,17 @@ class MovimientoService
 
         // Saldos ANTES del movimiento (en unidades base del producto)
         $stockAnterior = (float) $producto->stock_almacen;
-        $costoActual   = (float) $producto->costo_unitario;
+        $costoActual = (float) $producto->costo_unitario;
         $valorAnterior = $stockAnterior * $costoActual;
 
         // Cantidades del movimiento
-        $cantidad       = (float) ($params['cantidad'] ?? 0);
-        $cantidadKg     = (float) ($params['cantidad_kg'] ?? 0);
-        $costoUnitario  = (float) $params['costo_unitario'];
+        $cantidad = (float) ($params['cantidad'] ?? 0);
+        $cantidadKg = (float) ($params['cantidad_kg'] ?? 0);
+        $costoUnitario = (float) $params['costo_unitario'];
 
         // Conversión de empaque: convertir cantidad a unidades base del producto
         // Replica la lógica del viejo Producto::updateStock()
-        $empaqueDetalle  = (float) ($params['empaque'] ?? $producto->empaque);
+        $empaqueDetalle = (float) ($params['empaque'] ?? $producto->empaque);
         $empaqueProducto = (float) $producto->empaque;
 
         if ($empaqueDetalle <= 0 || $empaqueProducto <= 0) {
@@ -110,7 +110,13 @@ class MovimientoService
         // Stock en unidades base del producto
         $stockNuevo = round($stockAnterior + $cantidadStock, 4);
         $valorNuevo = $valorAnterior + $costoTotal;
-        $costoNuevo = $stockNuevo > 0 ? round($valorNuevo / $stockNuevo, 4) : $costoUnitario;
+
+        // UMBRAL CPP: Si stock_nuevo >= 20 calcular CPP normal, sino usar costo_unitario de la entrada
+        if ($stockNuevo >= 20) {
+            $costoNuevo = round($valorNuevo / $stockNuevo, 4);
+        } else {
+            $costoNuevo = $costoUnitario;
+        }
 
         // El costo_unitario que guardamos en el Kardex debe ser siempre por UNIDAD BASE (ej: saco)
         // para que recalcularKardexProducto() funcione correctamente.
@@ -119,35 +125,35 @@ class MovimientoService
 
         // Crear registro de movimiento
         $movimiento = Movimiento::create([
-            'fecha'             => $params['fecha'],
-            'tipo'              => $params['tipo'],
-            'transaccion_tipo'  => $params['transaccion_tipo'],
-            'transaccion_id'    => $params['transaccion_id'],
-            'detalle_id'        => $params['detalle_id'] ?? null,
-            'producto_id'       => $params['producto_id'],
-            'producto_nombre'   => $params['producto_nombre'] ?? $producto->nombre,
-            'empaque'           => $empaqueDetalle,
-            'unidad_codigo'     => $params['unidad_codigo'] ?? $producto->unidad_codigo,
-            'cantidad'          => $cantidad,
-            'cantidad_kg'       => $cantidadKg,
-            'entrada'           => $cantidadStock,
-            'salida'            => 0,
-            'costo_unitario'    => round($costoUnitarioBase, 4),
-            'costo_total'       => round($costoTotal, 4),
-            'stock_anterior'    => round($stockAnterior, 4),
-            'costo_actual'      => round($costoActual, 4),
-            'valor_anterior'    => round($valorAnterior, 4),
-            'stock_nuevo'       => round($stockNuevo, 4),
-            'costo_nuevo'       => round($costoNuevo, 4),
-            'valor_nuevo'       => round($valorNuevo, 4),
-            'user_id'           => $params['user_id'] ?? auth()->id(),
-            'comentario'        => $params['comentario'] ?? null,
+            'fecha' => $params['fecha'],
+            'tipo' => $params['tipo'],
+            'transaccion_tipo' => $params['transaccion_tipo'],
+            'transaccion_id' => $params['transaccion_id'],
+            'detalle_id' => $params['detalle_id'] ?? null,
+            'producto_id' => $params['producto_id'],
+            'producto_nombre' => $params['producto_nombre'] ?? $producto->nombre,
+            'empaque' => $empaqueDetalle,
+            'unidad_codigo' => $params['unidad_codigo'] ?? $producto->unidad_codigo,
+            'cantidad' => $cantidad,
+            'cantidad_kg' => $cantidadKg,
+            'entrada' => $cantidadStock,
+            'salida' => 0,
+            'costo_unitario' => round($costoUnitarioBase, 4),
+            'costo_total' => round($costoTotal, 4),
+            'stock_anterior' => round($stockAnterior, 4),
+            'costo_actual' => round($costoActual, 4),
+            'valor_anterior' => round($valorAnterior, 4),
+            'stock_nuevo' => round($stockNuevo, 4),
+            'costo_nuevo' => round($costoNuevo, 4),
+            'valor_nuevo' => round($valorNuevo, 4),
+            'user_id' => $params['user_id'] ?? auth()->id(),
+            'comentario' => $params['comentario'] ?? null,
         ]);
 
         // Actualizar producto con saldos nuevos
         $producto->update([
-            'stock_almacen'  => round($stockNuevo, 4),
-            'stock_almacen'   => round($stockNuevo, 4),
+            'stock_almacen' => round($stockNuevo, 4),
+            'stock_almacen' => round($stockNuevo, 4),
             'costo_unitario' => round($costoNuevo, 4),
         ]);
 
@@ -164,7 +170,7 @@ class MovimientoService
      *
      * IMPORTANTE: stock_almacen se almacena en UNIDADES (sacos/empaques base), NO en KG.
      *
-     * @param  array $params Datos de la salida
+     * @param  array  $params  Datos de la salida
      * @return Movimiento El movimiento registrado
      */
     public function registrarSalida(array $params): Movimiento
@@ -173,15 +179,15 @@ class MovimientoService
 
         // Saldos ANTES del movimiento (en unidades base del producto)
         $stockAnterior = (float) $producto->stock_almacen;
-        $costoActual   = (float) $producto->costo_unitario;
+        $costoActual = (float) $producto->costo_unitario;
         $valorAnterior = $stockAnterior * $costoActual;
 
         // Cantidades del movimiento
-        $cantidad   = (float) ($params['cantidad'] ?? 0);
+        $cantidad = (float) ($params['cantidad'] ?? 0);
         $cantidadKg = (float) ($params['cantidad_kg'] ?? 0);
 
         // Conversión de empaque: convertir cantidad a unidades base del producto
-        $empaqueDetalle  = (float) ($params['empaque'] ?? $producto->empaque);
+        $empaqueDetalle = (float) ($params['empaque'] ?? $producto->empaque);
         $empaqueProducto = (float) $producto->empaque;
 
         if ($empaqueDetalle <= 0 || $empaqueProducto <= 0) {
@@ -194,7 +200,7 @@ class MovimientoService
             : round($cantidad * ($empaqueDetalle / $empaqueProducto), 4);
 
         // En salidas: costo = CPP vigente (no cambia, salvo excepciones)
-        $usarCostoExacto = !empty($params['usar_costo_exacto']);
+        $usarCostoExacto = ! empty($params['usar_costo_exacto']);
         $costoMovimiento = $usarCostoExacto ? (float) ($params['costo_unitario'] ?? $costoActual) : $costoActual;
 
         $costoTotal = $cantidadStock * $costoMovimiento;
@@ -206,35 +212,35 @@ class MovimientoService
 
         // Crear registro de movimiento
         $movimiento = Movimiento::create([
-            'fecha'             => $params['fecha'],
-            'tipo'              => $params['tipo'],
-            'transaccion_tipo'  => $params['transaccion_tipo'],
-            'transaccion_id'    => $params['transaccion_id'],
-            'detalle_id'        => $params['detalle_id'] ?? null,
-            'producto_id'       => $params['producto_id'],
-            'producto_nombre'   => $params['producto_nombre'] ?? $producto->nombre,
-            'empaque'           => $empaqueDetalle,
-            'unidad_codigo'     => $params['unidad_codigo'] ?? $producto->unidad_codigo,
-            'cantidad'          => $cantidad,
-            'cantidad_kg'       => $cantidadKg,
-            'entrada'           => 0,
-            'salida'            => $cantidadStock,
-            'costo_unitario'    => round($costoMovimiento, 4),
-            'costo_total'       => round($costoTotal, 4),
-            'stock_anterior'    => round($stockAnterior, 4),
-            'costo_actual'      => round($costoActual, 4),
-            'valor_anterior'    => round($valorAnterior, 4),
-            'stock_nuevo'       => round($stockNuevo, 4),
-            'costo_nuevo'       => round($costoNuevo, 4),
-            'valor_nuevo'       => round($valorNuevo, 4),
-            'user_id'           => $params['user_id'] ?? auth()->id(),
-            'comentario'        => $params['comentario'] ?? null,
+            'fecha' => $params['fecha'],
+            'tipo' => $params['tipo'],
+            'transaccion_tipo' => $params['transaccion_tipo'],
+            'transaccion_id' => $params['transaccion_id'],
+            'detalle_id' => $params['detalle_id'] ?? null,
+            'producto_id' => $params['producto_id'],
+            'producto_nombre' => $params['producto_nombre'] ?? $producto->nombre,
+            'empaque' => $empaqueDetalle,
+            'unidad_codigo' => $params['unidad_codigo'] ?? $producto->unidad_codigo,
+            'cantidad' => $cantidad,
+            'cantidad_kg' => $cantidadKg,
+            'entrada' => 0,
+            'salida' => $cantidadStock,
+            'costo_unitario' => round($costoMovimiento, 4),
+            'costo_total' => round($costoTotal, 4),
+            'stock_anterior' => round($stockAnterior, 4),
+            'costo_actual' => round($costoActual, 4),
+            'valor_anterior' => round($valorAnterior, 4),
+            'stock_nuevo' => round($stockNuevo, 4),
+            'costo_nuevo' => round($costoNuevo, 4),
+            'valor_nuevo' => round($valorNuevo, 4),
+            'user_id' => $params['user_id'] ?? auth()->id(),
+            'comentario' => $params['comentario'] ?? null,
         ]);
 
         // Actualizar producto: solo stock cambia, CPP se mantiene
         $producto->update([
-            'stock_almacen'  => round($stockNuevo, 4),
-            'stock_almacen'   => round($stockNuevo, 4),
+            'stock_almacen' => round($stockNuevo, 4),
+            'stock_almacen' => round($stockNuevo, 4),
             'costo_unitario' => round($costoNuevo, 4),
         ]);
 
@@ -254,9 +260,8 @@ class MovimientoService
      * 4. Si es VENTA, actualiza rentabilidad en venta_detalles
      * 5. Al final, actualiza el producto con los saldos del último movimiento
      *
-     * @param  int $productoId         ID del producto a recalcular
-     * @param  int $desdeMovimientoId  ID del movimiento desde donde recalcular
-     * @return void
+     * @param  int  $productoId  ID del producto a recalcular
+     * @param  int  $desdeMovimientoId  ID del movimiento desde donde recalcular
      */
     public function recalcularKardexProducto(int $productoId, int $desdeMovimientoId): void
     {
@@ -282,12 +287,16 @@ class MovimientoService
             if ($mov->entrada > 0) {
                 // === ENTRADA (Compra / Preparada Ingreso) ===
                 $cantidadKg = (float) $mov->entrada;
-                $costoMov   = (float) $mov->costo_unitario;
+                $costoMov = (float) $mov->costo_unitario;
                 $costoTotal = $cantidadKg * $costoMov;
 
                 $stockNuevo = $stockActual + $cantidadKg;
                 $valorNuevo = $valorAnterior + $costoTotal;
-                $costoNuevo = $stockNuevo > 0 ? $valorNuevo / $stockNuevo : $costoMov;
+                if ($stockNuevo >= 20) {
+                    $costoNuevo = $valorNuevo / $stockNuevo;
+                } else {
+                    $costoNuevo = $costoMov;
+                }
             } else {
                 // === SALIDA (Venta / Preparada Salida / Préstamo) ===
                 $cantidadKg = (float) $mov->salida;
@@ -301,7 +310,7 @@ class MovimientoService
                     }
                 }
 
-                $costoMov   = $esSalidaForzada ? (float) $mov->costo_unitario : $costoActual;
+                $costoMov = $esSalidaForzada ? (float) $mov->costo_unitario : $costoActual;
                 $costoTotal = $cantidadKg * $costoMov;
 
                 $stockNuevo = $stockActual - $cantidadKg;
@@ -312,13 +321,13 @@ class MovimientoService
             // Actualizar el movimiento con saldos recalculados
             $mov->update([
                 'stock_anterior' => round($stockActual, 4),
-                'costo_actual'   => round($costoActual, 4),
+                'costo_actual' => round($costoActual, 4),
                 'valor_anterior' => round($valorAnterior, 4),
                 'costo_unitario' => round($costoMov, 4),
-                'costo_total'    => round($costoTotal, 4),
-                'stock_nuevo'    => round($stockNuevo, 4),
-                'costo_nuevo'    => round($costoNuevo, 4),
-                'valor_nuevo'    => round($valorNuevo, 4),
+                'costo_total' => round($costoTotal, 4),
+                'stock_nuevo' => round($stockNuevo, 4),
+                'costo_nuevo' => round($costoNuevo, 4),
+                'valor_nuevo' => round($valorNuevo, 4),
             ]);
 
             // Si es VENTA, actualizar rentabilidad en venta_detalles
@@ -338,8 +347,8 @@ class MovimientoService
 
         // Actualizar producto con saldos del último movimiento
         Producto::where('id', $productoId)->update([
-            'stock_almacen'  => round($stockActual, 4),
-            'stock_almacen'   => round($stockActual, 4),
+            'stock_almacen' => round($stockActual, 4),
+            'stock_almacen' => round($stockActual, 4),
             'costo_unitario' => round($costoActual, 4),
         ]);
     }
@@ -359,9 +368,8 @@ class MovimientoService
      * Caso de uso: Al anular una compra, los movimientos originales COMPRA se excluyen
      * y todas las ventas/preparadas posteriores se recalculan con el CPP pre-compra.
      *
-     * @param  int   $productoId    ID del producto a recalcular
-     * @param  array $excluirMovIds IDs de movimientos a excluir (neutralizar) del cálculo
-     * @return void
+     * @param  int  $productoId  ID del producto a recalcular
+     * @param  array  $excluirMovIds  IDs de movimientos a excluir (neutralizar) del cálculo
      */
     public function recalcularKardexExcluyendo(int $productoId, array $excluirMovIds): void
     {
@@ -375,7 +383,7 @@ class MovimientoService
             ->orderBy('id', 'asc')
             ->first();
 
-        if (!$primerExcluido) {
+        if (! $primerExcluido) {
             return;
         }
 
@@ -394,20 +402,21 @@ class MovimientoService
             if (in_array($mov->id, $excluirMovIds)) {
                 $valorActual = $stockActual * $costoActual;
                 $mov->update([
-                    'entrada'        => 0,
-                    'salida'         => 0,
-                    'cantidad'       => 0,
-                    'cantidad_kg'    => 0,
-                    'costo_total'    => 0,
+                    'entrada' => 0,
+                    'salida' => 0,
+                    'cantidad' => 0,
+                    'cantidad_kg' => 0,
+                    'costo_total' => 0,
                     'stock_anterior' => round($stockActual, 4),
-                    'costo_actual'   => round($costoActual, 4),
+                    'costo_actual' => round($costoActual, 4),
                     'valor_anterior' => round($valorActual, 4),
-                    'stock_nuevo'    => round($stockActual, 4),
-                    'costo_nuevo'    => round($costoActual, 4),
-                    'valor_nuevo'    => round($valorActual, 4),
+                    'stock_nuevo' => round($stockActual, 4),
+                    'costo_nuevo' => round($costoActual, 4),
+                    'valor_nuevo' => round($valorActual, 4),
                     'costo_unitario' => 0,
-                    'comentario'     => '[ANULADO] ' . ($mov->comentario ?? $mov->tipo),
+                    'comentario' => '[ANULADO] '.($mov->comentario ?? $mov->tipo),
                 ]);
+
                 // No avanzar saldos: el movimiento no tiene impacto
                 continue;
             }
@@ -418,16 +427,20 @@ class MovimientoService
             if ($mov->entrada > 0) {
                 // === ENTRADA (Compra / Preparada Ingreso / Anulación Venta) ===
                 $cantidadKg = (float) $mov->entrada;
-                $costoMov   = (float) $mov->costo_unitario;
+                $costoMov = (float) $mov->costo_unitario;
                 $costoTotal = $cantidadKg * $costoMov;
 
                 $stockNuevo = $stockActual + $cantidadKg;
                 $valorNuevo = $valorAnterior + $costoTotal;
-                $costoNuevo = $stockNuevo > 0 ? $valorNuevo / $stockNuevo : $costoMov;
+                if ($stockNuevo >= 20) {
+                    $costoNuevo = $valorNuevo / $stockNuevo;
+                } else {
+                    $costoNuevo = $costoMov;
+                }
             } else {
                 // === SALIDA (Venta / Preparada Salida / Anulación Compra) ===
                 $cantidadKg = (float) $mov->salida;
-                $costoMov   = $costoActual; // CPP vigente
+                $costoMov = $costoActual; // CPP vigente
                 $costoTotal = $cantidadKg * $costoMov;
 
                 $stockNuevo = $stockActual - $cantidadKg;
@@ -438,13 +451,13 @@ class MovimientoService
             // Actualizar el movimiento con saldos recalculados
             $mov->update([
                 'stock_anterior' => round($stockActual, 4),
-                'costo_actual'   => round($costoActual, 4),
+                'costo_actual' => round($costoActual, 4),
                 'valor_anterior' => round($valorAnterior, 4),
                 'costo_unitario' => round($costoMov, 4),
-                'costo_total'    => round($costoTotal, 4),
-                'stock_nuevo'    => round($stockNuevo, 4),
-                'costo_nuevo'    => round($costoNuevo, 4),
-                'valor_nuevo'    => round($valorNuevo, 4),
+                'costo_total' => round($costoTotal, 4),
+                'stock_nuevo' => round($stockNuevo, 4),
+                'costo_nuevo' => round($costoNuevo, 4),
+                'valor_nuevo' => round($valorNuevo, 4),
             ]);
 
             // Si es VENTA, actualizar rentabilidad en venta_detalles
@@ -464,8 +477,8 @@ class MovimientoService
 
         // Actualizar producto con saldos del último movimiento procesado
         Producto::where('id', $productoId)->update([
-            'stock_almacen'  => round($stockActual, 4),
-            'stock_almacen'   => round($stockActual, 4),
+            'stock_almacen' => round($stockActual, 4),
+            'stock_almacen' => round($stockActual, 4),
             'costo_unitario' => round($costoActual, 4),
         ]);
     }
@@ -476,20 +489,20 @@ class MovimientoService
      * Actualiza el costo y rentabilidad de un detalle de venta
      * cuando se recalcula el kardex.
      *
-     * @param Movimiento $mov Movimiento de tipo VENTA con detalle_id
+     * @param  Movimiento  $mov  Movimiento de tipo VENTA con detalle_id
      */
     private function actualizarRentabilidadVenta(Movimiento $mov): void
     {
         $detalle = DB::table('venta_detalles')->where('id', $mov->detalle_id)->first();
 
-        if (!$detalle) {
+        if (! $detalle) {
             return;
         }
 
         // Obtener empaque del producto para convertir CPP (por saco) al empaque vendido
         $producto = Producto::find($mov->producto_id);
         $empaqueProducto = (float) ($producto->empaque ?? 1);
-        $empaqueDetalle  = (float) ($detalle->producto_empaque ?? 1);
+        $empaqueDetalle = (float) ($detalle->producto_empaque ?? 1);
 
         // Evitar división entre cero
         if ($empaqueProducto <= 0) {
@@ -500,14 +513,14 @@ class MovimientoService
         // Fórmula: (CPP / empaque_producto) * empaque_detalle_venta
         // Misma lógica que VentaService::calculateDetail() línea 354
         $costoUnitarioNuevo = round(((float) $mov->costo_unitario / $empaqueProducto) * $empaqueDetalle, 4);
-        $costoTotalNuevo    = round($costoUnitarioNuevo * $detalle->cantidad, 4);
-        $rentabilidadNueva  = round($detalle->total - $costoTotalNuevo, 4);
+        $costoTotalNuevo = round($costoUnitarioNuevo * $detalle->cantidad, 4);
+        $rentabilidadNueva = round($detalle->total - $costoTotalNuevo, 4);
 
         // Actualizar detalle de venta con costo convertido
         DB::table('venta_detalles')->where('id', $mov->detalle_id)->update([
             'costo_unitario' => round($costoUnitarioNuevo, 4),
-            'costo_total'    => $costoTotalNuevo,
-            'rentabilidad'   => $rentabilidadNueva,
+            'costo_total' => $costoTotalNuevo,
+            'rentabilidad' => $rentabilidadNueva,
         ]);
 
         // Recalcular rentabilidad total de la venta
@@ -528,45 +541,45 @@ class MovimientoService
      * Permite que los cambios de Costo Promedio Ponderado (CPP) viajen en cascada
      * desde la compra de insumos hacia los productos finales elaborados.
      *
-     * @param Movimiento $mov Movimiento de tipo PREPARADA_SALIDA con detalle_id
+     * @param  Movimiento  $mov  Movimiento de tipo PREPARADA_SALIDA con detalle_id
      */
     private function actualizarCostoPreparada(Movimiento $mov): void
     {
         $detalle = DB::table('preparada_detalles')->where('id', $mov->detalle_id)->first();
 
-        if (!$detalle) {
+        if (! $detalle) {
             return;
         }
 
         $costoUnitarioInsumo = (float) $mov->costo_unitario;
-        $costoTotalInsumo    = (float) $mov->costo_total;
+        $costoTotalInsumo = (float) $mov->costo_total;
 
         // 1) Actualizar detalle del insumo en la preparada con el nuevo costo
         DB::table('preparada_detalles')->where('id', $mov->detalle_id)->update([
             'precio_unitario' => round($costoUnitarioInsumo, 4),
-            'salida_soles'    => round($costoTotalInsumo, 4),
+            'salida_soles' => round($costoTotalInsumo, 4),
         ]);
 
         // 2) Recalcular el costo total invertido en la preparada de forma sumatoria
         $preparadaId = $detalle->preparada_id;
-        
+
         $nuevoTotalSoles = DB::table('preparada_detalles')
             ->where('preparada_id', $preparadaId)
             ->sum('salida_soles');
 
         $preparada = DB::table('preparadas')->where('id', $preparadaId)->first();
-        if (!$preparada) {
+        if (! $preparada) {
             return;
         }
 
-        $cantidadProductoFinal   = (float) $preparada->ingreso_saco;
-        $nuevoCostoUnitarioFinal = $cantidadProductoFinal > 0 
-            ? round($nuevoTotalSoles / $cantidadProductoFinal, 4) 
+        $cantidadProductoFinal = (float) $preparada->ingreso_saco;
+        $nuevoCostoUnitarioFinal = $cantidadProductoFinal > 0
+            ? round($nuevoTotalSoles / $cantidadProductoFinal, 4)
             : round($nuevoTotalSoles, 4);
 
         // 3) Actualizar la cabecera de la preparada con el nuevo costo total
         DB::table('preparadas')->where('id', $preparadaId)->update([
-            'ingreso_soles'  => round($nuevoTotalSoles, 4),
+            'ingreso_soles' => round($nuevoTotalSoles, 4),
             'costo_unitario' => $nuevoCostoUnitarioFinal,
         ]);
 
@@ -579,18 +592,18 @@ class MovimientoService
         // Si existe el ingreso del producto final, comprobamos si varió para no causar loops en vano
         if ($movIngresoFinal) {
             $cantidadStock = (float) $movIngresoFinal->entrada;
-            $costoUnitarioBaseKardex = $cantidadStock > 0 
-                ? $nuevoTotalSoles / $cantidadStock 
+            $costoUnitarioBaseKardex = $cantidadStock > 0
+                ? $nuevoTotalSoles / $cantidadStock
                 : $nuevoCostoUnitarioFinal;
-            
+
             // Verificamos matemáticamente si cambió el costo base
-            if (abs((float)$movIngresoFinal->costo_total - $nuevoTotalSoles) > 0.001 || 
-                abs((float)$movIngresoFinal->costo_unitario - $costoUnitarioBaseKardex) > 0.0001) {
-                
+            if (abs((float) $movIngresoFinal->costo_total - $nuevoTotalSoles) > 0.001 ||
+                abs((float) $movIngresoFinal->costo_unitario - $costoUnitarioBaseKardex) > 0.0001) {
+
                 // Actualizamos costo EN ESTE MOVIMIENTO
                 $movIngresoFinal->update([
                     'costo_unitario' => round($costoUnitarioBaseKardex, 4),
-                    'costo_total'    => round($nuevoTotalSoles, 4),
+                    'costo_total' => round($nuevoTotalSoles, 4),
                 ]);
 
                 // 5) Llamada RECURSIVA para recalcular la cadena del Kardex del Producto Final

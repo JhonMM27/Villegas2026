@@ -17,8 +17,8 @@
         'pago_forma_codigo': 'fecha_venta',
         'fecha_venta': 'fecha_vencimiento',
         'fecha_vencimiento': 'principal',
-        'principal': 'producto_nombre',
-        'deposito': 'producto_nombre',
+        'principal': 'deposito',
+        'deposito': 'consorcio',
         'consorcio': 'producto_nombre',
         'producto_nombre': 'cantidad'
     };
@@ -233,7 +233,8 @@
         if (key === 'ArrowDown' || key === 'ArrowUp') {
             if (COBRANZA_FIELDS.includes(fieldId)) {
                 e.preventDefault();
-                moveToCobranza(fieldId, key);
+                const dir = map[key];
+                moveToCobranza(fieldId, dir);
                 return;
             }
         }

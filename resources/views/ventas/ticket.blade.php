@@ -181,7 +181,7 @@
         </div>
 
         {{-- Espacio final para el corte de papel --}}
-        <div style="height: 5mm;"></div>
+        <div style="height: 4mm;"></div>
 
     </div>
 </body>

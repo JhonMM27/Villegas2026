@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\PlanillaAdelanto;
 use App\Models\PlanillaPago;
 use App\Models\PlanillaPagoDetalle;
 use Illuminate\Database\Eloquent\Collection;
@@ -12,8 +13,7 @@ use Illuminate\Support\Facades\DB;
 class PlanillaPagoService
 {
     public function __construct(
-        protected EmpleadoService $empleadoService,
-        protected PlanillaAdelantoService $adelantoService
+        protected EmpleadoService $empleadoService
     ) {}
 
     public function getAll(): Collection
@@ -40,7 +40,7 @@ class PlanillaPagoService
 
     public function findById(int $id): ?PlanillaPago
     {
-        return PlanillaPago::with(['empleado', 'detalles', 'adelantos'])->find($id);
+        return PlanillaPago::with(['empleado', 'detalles', 'adelantosRecords'])->find($id);
     }
 
     public function existePagoMes(int $empleadoId, int $mes, int $anio): bool
@@ -123,6 +123,29 @@ class PlanillaPagoService
 
             return $pago->save();
         });
+    }
+
+    public function recalcularPago(PlanillaPago $pago): bool
+    {
+        if ($pago->estado === 'pagado') {
+            return false;
+        }
+
+        $disponible = $this->empleadoService->calcularDisponible(
+            $pago->empleado_id,
+            $pago->mes,
+            $pago->anio
+        );
+
+        $totalAdelantos = (float) PlanillaAdelanto::where('empleado_id', $pago->empleado_id)
+            ->delMes($pago->mes, $pago->anio)
+            ->sum('monto');
+
+        $pago->sueldo_base = $disponible;
+        $pago->adelantos = $totalAdelantos;
+        $pago->total_pagar = $disponible + (float) $pago->horas_extras;
+
+        return $pago->save();
     }
 
     public function getResumenMensual(int $mes, int $anio): array

@@ -43,6 +43,7 @@ class PlanillaPrestamoService
         return DB::transaction(function () use ($data) {
             $prestamo = PlanillaPrestamo::create([
                 'empleado_id' => $data['empleado_id'],
+                'numero_interno' => $data['numero_interno'],
                 'monto_original' => $data['monto_original'],
                 'saldo_pendiente' => $data['monto_original'],
                 'fecha_prestamo' => $data['fecha_prestamo'],
@@ -82,18 +83,67 @@ class PlanillaPrestamoService
             }
 
             $pago = PlanillaPrestamoPago::create([
+                'numero_interno' => $data['numero_interno'],
                 'planilla_prestamo_id' => $prestamoId,
                 'monto_pagado' => $montoPago,
                 'fecha_pago' => $data['fecha_pago'],
                 'observaciones' => $data['observaciones'] ?? null,
-                'importe_p' => 0,
-                'importe_d' => 0,
-                'importe_c' => $montoPago,
+                'importe_p' => $data['importe_p'] ?? 0,
+                'importe_d' => $data['importe_d'] ?? 0,
+                'importe_c' => $data['importe_c'] ?? $montoPago,
+            ]);
+
+            $prestamo->refresh();
+            $prestamo->actualizarSaldo();
+
+            return $pago;
+        });
+    }
+
+    public function getPagos(int $prestamoId): Collection
+    {
+        return PlanillaPrestamoPago::where('planilla_prestamo_id', $prestamoId)
+            ->orderBy('fecha_pago', 'desc')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    public function findPagoById(int $id): ?PlanillaPrestamoPago
+    {
+        return PlanillaPrestamoPago::with('prestamo.empleado')->find($id);
+    }
+
+    public function updatePago(PlanillaPrestamoPago $pago, array $data): bool
+    {
+        return DB::transaction(function () use ($pago, $data) {
+            $prestamo = $pago->prestamo;
+            $montoAnterior = (float) $pago->monto_pagado;
+            $montoNuevo = (float) $data['monto_pagado'];
+
+            $pago->update([
+                'numero_interno' => $data['numero_interno'],
+                'monto_pagado' => $montoNuevo,
+                'fecha_pago' => $data['fecha_pago'],
+                'observaciones' => $data['observaciones'] ?? null,
+                'importe_p' => $data['importe_p'] ?? 0,
+                'importe_d' => $data['importe_d'] ?? 0,
+                'importe_c' => $data['importe_c'] ?? $montoNuevo,
             ]);
 
             $prestamo->actualizarSaldo();
 
-            return $pago;
+            return true;
+        });
+    }
+
+    public function deletePago(PlanillaPrestamoPago $pago): bool
+    {
+        return DB::transaction(function () use ($pago) {
+            $prestamo = $pago->prestamo;
+            $pago->delete();
+            $prestamo->actualizarSaldo();
+
+            return true;
         });
     }
 

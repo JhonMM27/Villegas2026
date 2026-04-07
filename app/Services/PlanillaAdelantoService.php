@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\PlanillaAdelanto;
+use App\Models\PlanillaPago;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 class PlanillaAdelantoService
 {
     public function __construct(
-        protected EmpleadoService $empleadoService
+        protected EmpleadoService $empleadoService,
+        protected PlanillaPagoService $pagoService
     ) {}
 
     public function getAll(): Collection
@@ -36,19 +38,20 @@ class PlanillaAdelantoService
     public function create(array $data): PlanillaAdelanto
     {
         return DB::transaction(function () use ($data) {
+            $empleadoId = (int) $data['empleado_id'];
+            $mes = (int) date('m', strtotime($data['fecha']));
+            $anio = (int) date('Y', strtotime($data['fecha']));
+
             $monto = (float) $data['monto'];
-            $disponible = $this->empleadoService->calcularDisponible(
-                (int) $data['empleado_id'],
-                (int) date('m', strtotime($data['fecha'])),
-                (int) date('Y', strtotime($data['fecha']))
-            );
+            $disponible = $this->empleadoService->calcularDisponible($empleadoId, $mes, $anio);
 
             if ($monto > $disponible) {
                 throw new \Exception("El monto excede el disponible ({$disponible})");
             }
 
-            return PlanillaAdelanto::create([
-                'empleado_id' => $data['empleado_id'],
+            $adelanto = PlanillaAdelanto::create([
+                'empleado_id' => $empleadoId,
+                'numero_interno' => $data['numero_interno'],
                 'monto' => $data['monto'],
                 'fecha' => $data['fecha'],
                 'planilla_pago_id' => $data['planilla_pago_id'] ?? null,
@@ -57,17 +60,46 @@ class PlanillaAdelantoService
                 'importe_d' => $data['deposito'] ?? 0,
                 'importe_c' => $data['consorcio'] ?? 0,
             ]);
+
+            $this->recalcularPagoSiExiste($empleadoId, $mes, $anio);
+
+            return $adelanto;
         });
     }
 
     public function update(PlanillaAdelanto $adelanto, array $data): bool
     {
-        return $adelanto->update($data);
+        $oldEmpleadoId = $adelanto->empleado_id;
+        $oldMes = (int) $adelanto->fecha->format('m');
+        $oldAnio = (int) $adelanto->fecha->format('Y');
+
+        $result = $adelanto->update($data);
+
+        $newEmpleadoId = (int) ($data['empleado_id'] ?? $adelanto->empleado_id);
+        $newFecha = $data['fecha'] ?? $adelanto->fecha->format('Y-m-d');
+        $newMes = (int) date('m', strtotime($newFecha));
+        $newAnio = (int) date('Y', strtotime($newFecha));
+
+        $this->recalcularPagoSiExiste($oldEmpleadoId, $oldMes, $oldAnio);
+
+        if ($oldEmpleadoId !== $newEmpleadoId || $oldMes !== $newMes || $oldAnio !== $newAnio) {
+            $this->recalcularPagoSiExiste($newEmpleadoId, $newMes, $newAnio);
+        }
+
+        return $result;
     }
 
     public function delete(PlanillaAdelanto $adelanto): bool
     {
-        return $adelanto->delete();
+        $empleadoId = $adelanto->empleado_id;
+        $mes = (int) $adelanto->fecha->format('m');
+        $anio = (int) $adelanto->fecha->format('Y');
+
+        $result = $adelanto->delete();
+
+        $this->recalcularPagoSiExiste($empleadoId, $mes, $anio);
+
+        return $result;
     }
 
     public function getTotalAdelantosMes(int $empleadoId, int $mes, int $anio): float
@@ -75,5 +107,17 @@ class PlanillaAdelantoService
         return (float) PlanillaAdelanto::where('empleado_id', $empleadoId)
             ->delMes($mes, $anio)
             ->sum('monto');
+    }
+
+    private function recalcularPagoSiExiste(int $empleadoId, int $mes, int $anio): void
+    {
+        $pago = PlanillaPago::where('empleado_id', $empleadoId)
+            ->delMes($mes, $anio)
+            ->pendientes()
+            ->first();
+
+        if ($pago) {
+            $this->pagoService->recalcularPago($pago);
+        }
     }
 }

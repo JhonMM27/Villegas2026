@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\PlanillaAdelanto;
 use App\Services\EmpleadoService;
 use App\Services\PlanillaAdelantoService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
 
@@ -16,7 +17,7 @@ class PlanillaAdelantoController extends Controller
         protected PlanillaAdelantoService $adelantoService,
         protected EmpleadoService $empleadoService
     ) {
-        $this->middleware('can:planilla_adelantos_list')->only(['index', 'edit']);
+        $this->middleware('can:planilla_adelantos_list')->only(['index', 'edit', 'printTicket']);
         $this->middleware('can:planilla_adelantos_create')->only(['store']);
         $this->middleware('can:planilla_adelantos_edit')->only(['update']);
         $this->middleware('can:planilla_adelantos_delete')->only(['destroy']);
@@ -26,7 +27,7 @@ class PlanillaAdelantoController extends Controller
     {
         if ($request->ajax()) {
             $data = PlanillaAdelanto::with('empleado')
-                ->select(['id', 'empleado_id', 'monto', 'fecha', 'observaciones'])
+                ->select(['id', 'numero_interno', 'empleado_id', 'monto', 'fecha', 'observaciones'])
                 ->orderByDesc('id');
 
             return DataTables::of($data)
@@ -37,15 +38,18 @@ class PlanillaAdelantoController extends Controller
                         <i class="bi bi-eye"></i>
                     </button>';
 
+                    $buttons .= '<a href="'.route('planilla-adelantos.imprimir', $row->id).'" target="_blank" class="btn btn-sm btn-secondary me-1" title="Imprimir">
+                        <i class="bi bi-printer"></i>
+                    </a>';
+
                     if (auth()->user()->can('planilla_adelantos_edit')) {
                         $buttons .= '<button class="btn btn-sm btn-warning me-1" onclick="adelantoManager.showEditModal('.$row->id.')"><i class="bi bi-pencil"></i></button>';
                     }
 
                     if (auth()->user()->can('planilla_adelantos_delete')) {
-                        $buttons .= view('components.button-delete', [
-                            'id' => $row->id,
-                            'texto' => $row->empleado->nombre.' - S/'.$row->monto,
-                        ])->render();
+                        $buttons .= '<button class="btn btn-sm btn-danger me-1" onclick="window.adelantoManager.confirmDelete('.$row->id.')">
+                            <i class="bi bi-trash"></i>
+                        </button>';
                     }
 
                     return '<div class="btn-group">'.$buttons.'</div>';
@@ -100,7 +104,7 @@ class PlanillaAdelantoController extends Controller
 
     public function update(Request $request, $id)
     {
-        $adelanto = $this->adelantoService->findById($id);
+        $adelanto = $this->adelantoService->findById((int) $id);
         if (! $adelanto) {
             return response()->json(['success' => false, 'message' => 'Adelanto no encontrado'], 404);
         }
@@ -146,8 +150,13 @@ class PlanillaAdelantoController extends Controller
 
     protected function validateData(Request $request, $id = null)
     {
+        $uniqueRule = $id 
+            ? "unique:planilla_adelantos,numero_interno,{$id},id"
+            : 'unique:planilla_adelantos,numero_interno';
+
         return $request->validate([
             'empleado_id' => 'required|exists:empleados,id',
+            'numero_interno' => "required|integer|{$uniqueRule}",
             'monto' => 'required|numeric|min:0.01',
             'fecha' => 'required|date',
             'observaciones' => 'nullable|string',
@@ -155,5 +164,24 @@ class PlanillaAdelantoController extends Controller
             'deposito' => 'nullable|numeric|min:0',
             'consorcio' => 'nullable|numeric|min:0',
         ]);
+    }
+
+    public function printTicket($id)
+    {
+        $adelanto = PlanillaAdelanto::with('empleado')->findOrFail($id);
+
+        $empresa = (object) [
+            'razon_social' => 'CONSORCIOS VILLEGAS E.I.R.L.',
+            'direccion' => 'Carretera Pomalca KM 3. Atras de Ferreteria Herrera',
+            'ruc' => '20538937321',
+            'celular' => '967984895 - 978431737 - 915177079',
+        ];
+
+        $pdf = Pdf::loadView('planilla.adelantos.ticket', compact('adelanto', 'empresa'))
+            ->setPaper([0, 0, 226.77, 600], 'portrait')
+            ->setOption('isRemoteEnabled', true)
+            ->setOption('defaultFont', 'DejaVu Sans');
+
+        return $pdf->stream("adelanto_{$adelanto->numero_interno}.pdf");
     }
 }

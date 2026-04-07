@@ -14,6 +14,7 @@ class PlanillaPrestamo extends Model
 
     protected $fillable = [
         'empleado_id',
+        'numero_interno',
         'monto_original',
         'saldo_pendiente',
         'fecha_prestamo',
@@ -28,6 +29,7 @@ class PlanillaPrestamo extends Model
         'monto_original' => 'decimal:2',
         'saldo_pendiente' => 'decimal:2',
         'fecha_prestamo' => 'date',
+        'numero_interno' => 'int',
     ];
 
     public function empleado(): BelongsTo
@@ -55,6 +57,7 @@ class PlanillaPrestamo extends Model
         }
 
         $this->save();
+        $this->refresh();
     }
 
     public function scopeActivos($query)

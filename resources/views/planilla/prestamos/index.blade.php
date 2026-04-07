@@ -18,7 +18,7 @@
                             <thead>
                                 <tr>
                                     <th>Opciones</th>
-                                    <th>ID</th>
+                                    <th>N° Interno</th>
                                     <th>Empleado</th>
                                     <th>Monto Original</th>
                                     <th>Saldo Pendiente</th>
@@ -60,7 +60,7 @@ class PrestamoManager {
             ajax: { url: this.baseUrl, type: 'GET' },
             columns: [
                 { data: 'action', name: 'action', orderable: false, searchable: false },
-                { data: 'id', name: 'id' },
+                { data: 'numero_interno', name: 'numero_interno' },
                 { data: 'empleado_id', name: 'empleado_id' },
                 { data: 'monto_original', name: 'monto_original' },
                 { data: 'saldo_pendiente', name: 'saldo_pendiente' },
@@ -245,6 +245,7 @@ class PrestamoManager {
         document.getElementById('method_field').value = '';
         this.form.action = this.baseUrl;
         this.form.reset();
+        document.getElementById('numero_interno').value = '';
         document.getElementById('fecha_prestamo').value = new Date().toISOString().split('T')[0];
         document.getElementById('empleado_id').value = '';
         document.getElementById('empleado_nombre').value = '';
@@ -265,6 +266,7 @@ class PrestamoManager {
             document.getElementById('modalTitle').textContent = 'Editar Préstamo';
             document.getElementById('method_field').value = 'PUT';
             this.form.action = `${this.baseUrl}/${id}`;
+            document.getElementById('numero_interno').value = response.prestamo.numero_interno;
             document.getElementById('empleado_id').value = response.prestamo.empleado_id;
             document.getElementById('empleado_nombre').value = response.prestamo.empleado?.nombre || '';
             document.getElementById('fecha_prestamo').value = response.prestamo.fecha_prestamo;
@@ -300,7 +302,7 @@ class PrestamoManager {
                 <div class="modal-dialog modal-xl">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h4 class="modal-title fs-5" id="modalTitle">Detalle del Préstamo: ${p.empleado?.nombre || '-'}</h4>
+                            <h4 class="modal-title fs-5" id="modalTitle">Detalle del Préstamo: ${p.empleado?.nombre || '-'} - N° ${p.numero_interno}</h4>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
@@ -309,13 +311,17 @@ class PrestamoManager {
                                     <div class="border border-primary rounded p-3 h-100">
                                         <h6 class="text-primary mb-3"><i class="bi bi-person me-2"></i>Datos del Préstamo</h6>
                                         <div class="row mb-2">
-                                            <div class="col-12">
-                                                <label class="form-label text-muted small mb-1">Empleado</label>
-                                                <p class="fw-bold mb-2">${p.empleado?.nombre || '-'}</p>
+                                            <div class="col-6">
+                                                <label class="form-label text-muted small mb-1">N° Interno</label>
+                                                <p class="fw-bold mb-2">${p.numero_interno}</p>
                                             </div>
                                             <div class="col-6">
                                                 <label class="form-label text-muted small mb-1">Fecha</label>
-                                                <p class="fw-bold mb-0">${new Date(p.fecha_prestamo).toLocaleDateString()}</p>
+                                                <p class="fw-bold mb-2">${new Date(p.fecha_prestamo).toLocaleDateString()}</p>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label text-muted small mb-1">Empleado</label>
+                                                <p class="fw-bold mb-2">${p.empleado?.nombre || '-'}</p>
                                             </div>
                                             <div class="col-6">
                                                 <label class="form-label text-muted small mb-1">Estado</label>
@@ -343,15 +349,15 @@ class PrestamoManager {
                                         <div class="row mb-2">
                                             <div class="col-12">
                                                 <label class="form-label text-muted small mb-1">Monto Original</label>
-                                                <p class="fw-bold mb-2 text-primary fs-5">S/ ${parseFloat(p.monto_original).toFixed(2)}</p>
+                                                <p id="montosOriginal" class="fw-bold mb-2 text-primary fs-5">S/ ${parseFloat(p.monto_original).toFixed(2)}</p>
                                             </div>
                                             <div class="col-6">
                                                 <label class="form-label text-muted small mb-1">Total Pagado</label>
-                                                <p class="fw-bold mb-0 text-success">S/ ${totalPagado.toFixed(2)}</p>
+                                                <p id="montosTotalPagado" class="fw-bold mb-0 text-success">S/ ${totalPagado.toFixed(2)}</p>
                                             </div>
                                             <div class="col-6">
                                                 <label class="form-label text-muted small mb-1">Saldo Pendiente</label>
-                                                <p class="fw-bold mb-0 ${parseFloat(p.saldo_pendiente) > 0 ? 'text-danger' : 'text-success'}">S/ ${parseFloat(p.saldo_pendiente).toFixed(2)}</p>
+                                                <p id="montosSaldo" class="fw-bold mb-0 ${parseFloat(p.saldo_pendiente) > 0 ? 'text-danger' : 'text-success'}">S/ ${parseFloat(p.saldo_pendiente).toFixed(2)}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -387,21 +393,33 @@ class PrestamoManager {
                             <div class="row mt-3">
                                 <div class="col-lg-12">
                                     <div class="border border-secondary rounded p-3">
-                                        <h6 class="text-secondary mb-3"><i class="bi bi-clock-history me-2"></i>Historial de Pagos</h6>
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h6 class="text-secondary mb-0"><i class="bi bi-clock-history me-2"></i>Historial de Pagos</h6>
+                                            <div class="btn-group">
+                                                <a href="${this.baseUrl}/${p.id}/pagos" class="btn btn-sm btn-info">
+                                                    <i class="bi bi-list me-1"></i> Ver Todos
+                                                </a>
+                                                ${p.estado === 'activo' ? `
+                                                <button type="button" class="btn btn-sm btn-success" onclick="prestamoManager.mostrarPago(${p.id})">
+                                                    <i class="bi bi-plus-circle me-1"></i> Registrar Pago
+                                                </button>
+                                                ` : ''}
+                                            </div>
+                                        </div>
                                         <div class="table-responsive">
                                             <table class="table table-bordered table-sm table-hover mb-0">
                                                 <thead class="table-light text-center">
                                                     <tr>
-                                                        <th>#</th>
-                                                        <th>Fecha de Pago</th>
-                                                        <th>Monto Pagado</th>
-                                                        <th>Observaciones</th>
+                                                        <th>N°</th>
+                                                        <th>Fecha</th>
+                                                        <th>Monto</th>
+                                                        <th>Obs</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     ${p.pagos && p.pagos.length > 0 ? p.pagos.map((pago, index) => `
                                                         <tr>
-                                                            <td class="text-center">${index + 1}</td>
+                                                            <td class="text-center">${pago.numero_interno || (index + 1)}</td>
                                                             <td class="text-center">${new Date(pago.fecha_pago).toLocaleDateString()}</td>
                                                             <td class="text-end text-success fw-bold">S/ ${parseFloat(pago.monto_pagado).toFixed(2)}</td>
                                                             <td>${pago.observaciones || '-'}</td>
@@ -418,6 +436,9 @@ class PrestamoManager {
                             <small class="text-muted me-auto">
                                 Creado: ${p.created_at ? new Date(p.created_at).toLocaleDateString() : 'N/A'}
                             </small>
+                            <a href="${this.baseUrl}/${p.id}/imprimir" target="_blank" class="btn btn-secondary">
+                                <i class="bi bi-printer me-1"></i> Imprimir Préstamo
+                            </a>
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                         </div>
                     </div>
@@ -433,7 +454,38 @@ class PrestamoManager {
         }
     }
 
+    async actualizarMontosPrestamo(id) {
+        try {
+            const response = await fetch(`${this.baseUrl}/${id}/montos`);
+            const data = await response.json();
+
+            if (data.success === false) {
+                return;
+            }
+
+            const totalPagado = data.monto_original - data.saldo_pendiente;
+
+            const elOriginal = document.getElementById('montosOriginal');
+            const elTotalPagado = document.getElementById('montosTotalPagado');
+            const elSaldo = document.getElementById('montosSaldo');
+
+            if (elOriginal) elOriginal.textContent = `S/ ${data.monto_original.toFixed(2)}`;
+            if (elTotalPagado) elTotalPagado.textContent = `S/ ${totalPagado.toFixed(2)}`;
+            if (elSaldo) {
+                elSaldo.textContent = `S/ ${data.saldo_pendiente.toFixed(2)}`;
+                elSaldo.className = `fw-bold mb-0 ${data.saldo_pendiente > 0 ? 'text-danger' : 'text-success'}`;
+            }
+        } catch (error) {
+            console.error('Error al actualizar montos:', error);
+        }
+    }
+
     mostrarPago(id) {
+        const verDetalleModal = bootstrap.Modal.getInstance(document.getElementById('modalVerPrestamo'));
+        if (verDetalleModal) {
+            verDetalleModal.hide();
+        }
+        
         this.prestamoActual = id;
         const pagoHtml = `
         <div class="modal fade" id="modalPagoPrestamo" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
@@ -446,6 +498,11 @@ class PrestamoManager {
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="numero_pago" class="form-label">Número de Pago</label>
+                                <input type="number" id="numero_pago" name="numero_interno" class="form-control form-control-sm" min="1" required>
+                                <div class="invalid-feedback"></div>
+                            </div>
                             <div class="mb-3">
                                 <label for="monto_pagado" class="form-label">Monto a Pagar</label>
                                 <input type="number" id="monto_pagado" name="monto_pagado" class="form-control form-control-sm" step="0.01" min="0.01" required>
@@ -477,6 +534,7 @@ class PrestamoManager {
         document.getElementById('formPagoPrestamo').addEventListener('submit', (e) => {
             e.preventDefault();
             const formData = new FormData();
+            formData.append('numero_interno', document.getElementById('numero_pago').value);
             formData.append('monto_pagado', document.getElementById('monto_pagado').value);
             formData.append('fecha_pago', document.getElementById('fecha_pago').value);
             formData.append('observaciones', document.getElementById('observaciones_pago').value);
@@ -495,6 +553,7 @@ class PrestamoManager {
                     this.showNotification('success', 'Pago registrado correctamente');
                     modal.hide();
                     this.tabla.ajax.reload(null, false);
+                    this.actualizarMontosPrestamo(this.prestamoActual);
                 } else {
                     this.showNotification('error', result.message);
                 }
@@ -507,33 +566,43 @@ class PrestamoManager {
     }
 
     confirmDelete(id) {
-        if (!confirm('¿Está seguro de eliminar este préstamo?')) {
-            return;
-        }
+        Swal.fire({
+            title: '¿Eliminar Préstamo?',
+            text: '¿Está seguro de eliminar este préstamo? Esta acción no se puede deshacer.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: '<i class="bi bi-trash me-1"></i> Sí, eliminar',
+            cancelButtonText: 'Cancelar',
+            reverseButtons: true
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch(`${this.baseUrl}/${id}`, {
+                        method: 'POST',
+                        body: new URLSearchParams({
+                            _method: 'DELETE',
+                            _token: document.querySelector('meta[name="csrf-token"]').content
+                        }),
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json'
+                        }
+                    });
 
-        fetch(`${this.baseUrl}/${id}`, {
-            method: 'POST',
-            body: new URLSearchParams({
-                _method: 'DELETE',
-                _token: document.querySelector('meta[name="csrf-token"]').content
-            }),
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Accept': 'application/json'
+                    const data = await response.json();
+                    if (data.success) {
+                        this.showNotification('success', 'Préstamo eliminado correctamente');
+                        this.tabla.ajax.reload(null, false);
+                    } else {
+                        this.showNotification('error', data.message);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    this.showNotification('error', 'Error al eliminar');
+                }
             }
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                this.showNotification('success', 'Préstamo eliminado correctamente');
-                this.tabla.ajax.reload(null, false);
-            } else {
-                this.showNotification('error', data.message);
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            this.showNotification('error', 'Error al eliminar');
         });
     }
 }
