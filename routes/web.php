@@ -176,6 +176,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/gastos/{id}/imprimir', [GastoController::class, 'printTicket'])->name('gastos.imprimir');
     Route::resource('gastos', GastoController::class)->except(['create', 'edit']);
 
+    // Reporte Gastos
+    Route::get('reportes/gastos/resumen', [GastoController::class, 'reporteResumen'])->name('reportes.gastos.resumen');
+    Route::get('reportes/gastos/resumen/export', [GastoController::class, 'exportarResumen'])->name('reportes.gastos.resumen.export');
+    Route::get('reportes/gastos/resumen/imprimir', [GastoController::class, 'imprimirResumen'])->name('reportes.gastos.resumen.imprimir');
+
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::post('/logout', function () {

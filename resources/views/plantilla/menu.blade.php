@@ -199,6 +199,13 @@
                             </a>
                         </li>
                         @endcan
+                        @can('gastos_report')
+                        <li class="nav-item">
+                            <a href="{{route('reportes.gastos.resumen')}}" class="nav-link" id="itemReporteGastos">
+                                <p>Reporte Gastos</p>
+                            </a>
+                        </li>
+                        @endcan
                         
                     </ul>
                 </li>

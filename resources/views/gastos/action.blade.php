@@ -36,7 +36,20 @@
                                         <div class="invalid-feedback"></div>
                                     </div>
                                 </div>
-                                <div class="col-lg-12">
+                                <div class="col-lg-6">
+                                    <div class="form-group mb-3">
+                                        <label for="tipo" class="form-label">Tipo</label>
+                                        <select id="tipo" name="tipo" class="form-select form-select-sm">
+                                            <option value="Combustible">Combustible</option>
+                                            <option value="Luz">Luz</option>
+                                            <option value="Reparaciones">Reparaciones</option>
+                                            <option value="Fletes">Fletes</option>
+                                            <option value="Otros" selected>Otros</option>
+                                        </select>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6">
                                     <div class="form-group mb-3">
                                         <label for="responsable" class="form-label">Responsable <span
                                                 class="text-danger">*</span></label>

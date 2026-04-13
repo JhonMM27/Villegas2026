@@ -280,13 +280,12 @@ class ReporteRentabilidadController extends Controller
                 SUM(COALESCE(vd.salida_saco, 0)) as salida_saco,
 
                 SUM(COALESCE(vd.total, 0)) as importe,
-
-                SUM($costoAjustadoExpr) as costo,
-                (SUM(COALESCE(vd.total, 0)) - SUM($costoAjustadoExpr)) as valor,
+                SUM(COALESCE(vd.costo_total, 0)) as costo,
+                SUM(COALESCE(vd.rentabilidad, 0)) as valor,
 
                 CASE
                     WHEN SUM(COALESCE(vd.total, 0)) > 0 THEN
-                        ((SUM(COALESCE(vd.total, 0)) - SUM($costoAjustadoExpr)) / SUM(COALESCE(vd.total, 0))) * 100
+                        (SUM(COALESCE(vd.rentabilidad, 0)) / SUM(COALESCE(vd.total, 0))) * 100
                     ELSE 0
                 END as rentab_pct,
 
@@ -301,8 +300,6 @@ class ReporteRentabilidadController extends Controller
                 'vd.producto_id',
                 DB::raw('COALESCE(vd.producto_nombre, p.nombre)'),
                 DB::raw("COALESCE(l.nombre, '')"),
-
-                // ✅ agrega columnas base para FULL_GROUP_BY
                 'p.empaque',
                 'p.costo_unitario',
             ])
@@ -350,13 +347,12 @@ class ReporteRentabilidadController extends Controller
                 SUM(COALESCE(vd.salida_saco, 0)) as salida_saco,
 
                 SUM(COALESCE(vd.total, 0)) as importe,
-
-                SUM($costoAjustadoExpr) as costo,
-                (SUM(COALESCE(vd.total, 0)) - SUM($costoAjustadoExpr)) as valor,
+                SUM(COALESCE(vd.costo_total, 0)) as costo,
+                SUM(COALESCE(vd.rentabilidad, 0)) as valor,
 
                 CASE
                     WHEN SUM(COALESCE(vd.total, 0)) > 0 THEN
-                        ((SUM(COALESCE(vd.total, 0)) - SUM($costoAjustadoExpr)) / SUM(COALESCE(vd.total, 0))) * 100
+                        (SUM(COALESCE(vd.rentabilidad, 0)) / SUM(COALESCE(vd.total, 0))) * 100
                     ELSE 0
                 END as rentab_pct,
 
@@ -371,8 +367,6 @@ class ReporteRentabilidadController extends Controller
                 'vd.producto_id',
                 DB::raw('COALESCE(vd.producto_nombre, p.nombre)'),
                 DB::raw("COALESCE(l.nombre, '')"),
-
-                // ✅ agrega columnas base para FULL_GROUP_BY
                 'p.empaque',
                 'p.costo_unitario',
             ])
@@ -406,10 +400,10 @@ class ReporteRentabilidadController extends Controller
 
         $ventasFiltradas = DB::table('ventas')
             ->select('id', 'pago_forma_codigo')
-            ->whereBetween('fecha_venta', [$fechaInicio, $fechaFin]);
+            ->whereBetween('fecha_venta', [$fechaInicio, $fechaFin])
+            ->where('estado', '!=', 'anulada');
 
-        //$condContado = "vf.pago_forma_codigo = 'CONTADO'"; // recomendado
-        $condContado = "vf.pago_forma_codigo = 1";
+        $condContado = "vf.pago_forma_codigo = '1'";
 
         $reportes = DB::query()
             ->fromSub($ventasFiltradas, 'vf')
@@ -427,7 +421,6 @@ class ReporteRentabilidadController extends Controller
                 SUM(CASE WHEN NOT($condContado) THEN COALESCE(vd.rentabilidad, 0) ELSE 0 END) as credito,
                 SUM(COALESCE(vd.rentabilidad, 0)) as total
             ")
-            //s->where('estado', '!=', 'anulada')
             ->groupBy('p.linea_id','l.nombre','p.id','p.nombre','p.empaque')
             ->orderBy('l.nombre')
             ->orderBy('p.nombre')
@@ -448,10 +441,10 @@ class ReporteRentabilidadController extends Controller
 
         $ventasFiltradas = DB::table('ventas')
             ->select('id', 'pago_forma_codigo')
-            ->whereBetween('fecha_venta', [$fechaInicio, $fechaFin]);
+            ->whereBetween('fecha_venta', [$fechaInicio, $fechaFin])
+            ->where('estado', '!=', 'anulada');
 
-        //$condContado = "vf.pago_forma_codigo = 'CONTADO'"; // recomendado
-        $condContado = "vf.pago_forma_codigo = 1";
+        $condContado = "vf.pago_forma_codigo = '1'";
 
         $reportes = DB::query()
             ->fromSub($ventasFiltradas, 'vf')
@@ -469,7 +462,6 @@ class ReporteRentabilidadController extends Controller
                 SUM(CASE WHEN NOT($condContado) THEN COALESCE(vd.rentabilidad, 0) ELSE 0 END) as credito,
                 SUM(COALESCE(vd.rentabilidad, 0)) as total
             ")
-            //->where('estado', '!=', 'anulada')
             ->groupBy('p.linea_id','l.nombre','p.id','p.nombre','p.empaque')
             ->orderBy('l.nombre')
             ->orderBy('p.nombre')

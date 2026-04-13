@@ -16,6 +16,7 @@ class Gasto extends Model
         'responsable',
         'numero_recibo',
         'numero_interno',
+        'tipo',
         'monto',
         'importe_p',
         'importe_d',

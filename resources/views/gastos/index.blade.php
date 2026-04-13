@@ -66,9 +66,22 @@ class GastoManager extends CrudManager {
                 url: this.baseUrl,
                 type: 'GET'
             },
-           columns: [
-                { data: 'action', name: 'action', orderable: false, searchable: false},
-                { data: 'fecha_gasto', name: 'fecha_gasto' },
+            columns: [
+                 { data: 'action', name: 'action', orderable: false, searchable: false},
+                 { 
+                     data: 'fecha_gasto', 
+                     name: 'fecha_gasto',
+                     render: function(data) {
+                         if (!data) return '';
+                         const fecha = new Date(data);
+                         const day = String(fecha.getDate()).padStart(2, '0');
+                         const month = String(fecha.getMonth() + 1).padStart(2, '0');
+                         const year = fecha.getFullYear();
+                         const hours = String(fecha.getHours()).padStart(2, '0');
+                         const minutes = String(fecha.getMinutes()).padStart(2, '0');
+                         return `${day}/${month}/${year} ${hours}:${minutes}`;
+                     }
+                 },
                 { data: 'user_nombre', name: 'user_nombre'},                
                 { data: 'descripcion', name: 'descripcion' },
                 { data: 'responsable', name: 'responsable' },
