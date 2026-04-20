@@ -10,12 +10,13 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Yajra\DataTables\DataTables;
 
 class CuentaCorrienteClienteController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('can:cuenta_corriente_report')->only(['index', 'resumenCliente', 'ventasAgrupadaProductoClientePdf', 'ventasDetallePdf', 'detalleCreditosPorCobrarPdf', 'creditosPorCobrarClienteTodosPdf', 'creditosPorCobrarClienteFechasPdf', 'ventasGeneralFechasPdf', 'saldosTodosPdf']);
+        $this->middleware('can:cuenta_corriente_report')->only(['index', 'resumenCliente', 'ventasAgrupadaProductoClientePdf', 'ventasDetallePdf', 'detalleCreditosPorCobrarPdf', 'creditosPorCobrarClienteTodosPdf', 'creditosPorCobrarClienteFechasPdf', 'ventasGeneralFechasPdf', 'saldosTodosPdf', 'creditosPorCobrarIndex', 'creditosPorCobrarData']);
     }
 
     public function index(Request $request)
@@ -391,6 +392,55 @@ class CuentaCorrienteClienteController extends Controller
         $nombreArchivo = $nombreLimpio.'_'.$idPart.'.pdf';
 
         return $pdf->stream('creditos_por_cobrar_'.$nombreArchivo);
+    }
+
+    public function creditosPorCobrarIndex(Request $request)
+    {
+        return view('cuenta-cliente.reportes.creditos_por_cobrar');
+    }
+
+    public function creditosPorCobrarData(Request $request)
+    {
+        $query = Venta::query()
+            ->select([
+                'id',
+                'fecha_venta',
+                'comprobante_tipo_codigo',
+                'serie',
+                'correlativo',
+                'total',
+                'abonos',
+                'saldo',
+                'estado',
+                'cliente_nombre',
+            ])
+            ->where('saldo', '>', 0)
+            ->where('estado', '!=', 'anulada')
+            ->orderBy('fecha_venta', 'asc');
+
+        if ($request->has('cliente_ids') && is_array($request->cliente_ids) && count($request->cliente_ids) > 0) {
+            $query->whereIn('cliente_id', $request->cliente_ids);
+        }
+
+        return DataTables::of($query)
+            ->addColumn('action', function ($row) {
+                $verUrl = route('ventas.ver', $row->id);
+                $ticketUrl = route('ventas.imprimir', $row->id);
+
+                return '<div class="btn-group">
+                    <button class="btn btn-sm btn-primary btn-view-venta" data-id="'.$row->id.'">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <a href="'.$ticketUrl.'" target="_blank" class="btn btn-sm btn-secondary">
+                        <i class="bi bi-printer"></i>
+                    </a>
+                </div>';
+            })
+            ->addColumn('documento', function ($row) {
+                return trim(($row->comprobante_tipo_codigo ? $row->comprobante_tipo_codigo.' ' : '').$row->serie.'-'.$row->correlativo);
+            })
+            ->rawColumns(['action'])
+            ->make(true);
     }
 
     public function creditosPorCobrarClienteFechasPdf(Request $request)

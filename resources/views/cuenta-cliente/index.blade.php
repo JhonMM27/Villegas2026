@@ -115,6 +115,11 @@
                                         </button>
                                         
 
+                                        <button type="button" class="btn btn-primary btn-sm"
+                                            onclick="window.location.href='{{ route('cuenta.corriente.cliente.creditos_por_cobrar') }}'">
+                                            Créditos por Cobrar
+                                        </button>
+
                                         <button type="button" class="btn btn-secondary btn-sm btn-report" data-tab="1"
                                             data-target="#reporteTab1" data-cliente="si" data-fecha="range" data-dia="no"
                                             data-url="{{ route('cuenta.corriente.cliente.ventas_producto_cliente_pdf') }}">

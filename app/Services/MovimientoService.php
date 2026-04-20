@@ -75,7 +75,7 @@ class MovimientoService
      * @param  array  $params  Datos del ingreso
      * @return Movimiento El movimiento registrado
      */
-    public function registrarIngreso(array $params): Movimiento
+    public function registrarIngreso(array $params, bool $aplicarUmbral = false): Movimiento
     {
         $producto = Producto::findOrFail($params['producto_id']);
 
@@ -111,17 +111,14 @@ class MovimientoService
         $stockNuevo = round($stockAnterior + $cantidadStock, 4);
         $valorNuevo = $valorAnterior + $costoTotal;
 
-        // UMBRAL CPP: Si stock_nuevo >= 20 calcular CPP normal, sino usar costo_unitario de la entrada
-        if ($stockNuevo >= 20) {
-            $costoNuevo = round($valorNuevo / $stockNuevo, 4);
-        } else {
+        // UMBRAL CPP: Si aplicarUmbral=true Y stock_nuevo < 20, usar costo_unitario de la entrada
+        // Para Compras/Préstamos (aplicarUmbral=false): siempre calcular CPP normal
+        // Para Preparadas/Núcleos (aplicarUmbral=true): aplicar umbral de 20
+        if ($aplicarUmbral && $stockNuevo < 20) {
             $costoNuevo = $costoUnitario;
+        } else {
+            $costoNuevo = round($valorNuevo / $stockNuevo, 4);
         }
-
-        // El costo_unitario que guardamos en el Kardex debe ser siempre por UNIDAD BASE (ej: saco)
-        // para que recalcularKardexProducto() funcione correctamente.
-        // costo_unitario_base = costo_total / cantidad_en_unidades_base
-        $costoUnitarioBase = $cantidadStock > 0 ? $costoTotal / $cantidadStock : $costoUnitario;
 
         // Crear registro de movimiento
         $movimiento = Movimiento::create([
@@ -138,7 +135,7 @@ class MovimientoService
             'cantidad_kg' => $cantidadKg,
             'entrada' => $cantidadStock,
             'salida' => 0,
-            'costo_unitario' => round($costoUnitarioBase, 4),
+            'costo_unitario' => round($costoNuevo, 4),
             'costo_total' => round($costoTotal, 4),
             'stock_anterior' => round($stockAnterior, 4),
             'costo_actual' => round($costoActual, 4),
@@ -152,7 +149,6 @@ class MovimientoService
 
         // Actualizar producto con saldos nuevos
         $producto->update([
-            'stock_almacen' => round($stockNuevo, 4),
             'stock_almacen' => round($stockNuevo, 4),
             'costo_unitario' => round($costoNuevo, 4),
         ]);
@@ -292,10 +288,10 @@ class MovimientoService
 
                 $stockNuevo = $stockActual + $cantidadKg;
                 $valorNuevo = $valorAnterior + $costoTotal;
-                if ($stockNuevo >= 20) {
-                    $costoNuevo = $valorNuevo / $stockNuevo;
-                } else {
+                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
                     $costoNuevo = $costoMov;
+                } else {
+                    $costoNuevo = $valorNuevo / $stockNuevo;
                 }
             } else {
                 // === SALIDA (Venta / Preparada Salida / Préstamo) ===
@@ -347,7 +343,6 @@ class MovimientoService
 
         // Actualizar producto con saldos del último movimiento
         Producto::where('id', $productoId)->update([
-            'stock_almacen' => round($stockActual, 4),
             'stock_almacen' => round($stockActual, 4),
             'costo_unitario' => round($costoActual, 4),
         ]);
@@ -432,10 +427,10 @@ class MovimientoService
 
                 $stockNuevo = $stockActual + $cantidadKg;
                 $valorNuevo = $valorAnterior + $costoTotal;
-                if ($stockNuevo >= 20) {
-                    $costoNuevo = $valorNuevo / $stockNuevo;
-                } else {
+                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
                     $costoNuevo = $costoMov;
+                } else {
+                    $costoNuevo = $valorNuevo / $stockNuevo;
                 }
             } else {
                 // === SALIDA (Venta / Preparada Salida / Anulación Compra) ===
@@ -477,7 +472,6 @@ class MovimientoService
 
         // Actualizar producto con saldos del último movimiento procesado
         Producto::where('id', $productoId)->update([
-            'stock_almacen' => round($stockActual, 4),
             'stock_almacen' => round($stockActual, 4),
             'costo_unitario' => round($costoActual, 4),
         ]);

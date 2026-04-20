@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 @include('pdf.styles', [
-  'title' => "Créditos por cobrar" . (!empty($clienteNombre) ? " - Cliente: {$clienteNombre}" : '')
+    'title' => 'Créditos por cobrar' . (!empty($clienteNombre) ? " - Cliente: {$clienteNombre}" : ''),
 ])
+
 <body>
 
     <!-- ENCABEZADO FIJO -->
@@ -20,7 +21,7 @@
                     <small>Usuario: {{ auth()->user()->name }}</small>
                 </td>
             </tr>
-            @if(!empty($clienteNombre))
+            @if (!empty($clienteNombre))
                 <tr>
                     <td colspan="2">Cliente: <strong>{{ $clienteNombre }}</strong></td>
                 </tr>
@@ -55,12 +56,12 @@
                     <td>{{ $r->documento }}</td>
                     <td>{{ $r->tipo_venta }}</td>
 
-                    <td class="text-right">{{ number_format((float)$r->total, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$r->acuenta, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$r->abonos, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$r->saldo, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $r->total, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $r->acuenta, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $r->abonos, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $r->saldo, 2) }}</td>
 
-                    <td class="text-right">{{ (int)$r->items }}</td>
+                    <td class="text-right">{{ (int) $r->items }}</td>
                     <td>{{ $r->cliente_nombre }}</td>
                     <td>{{ $r->user_nombre }}</td>
                 </tr>
@@ -70,17 +71,27 @@
                 </tr>
             @endforelse
 
-            @if(count($reportes) > 0)
-                <tr class="total-row">
+            @if (count($reportes) > 0)
+                <tr class="total-row" style="background: #f5f5f5;">
                     <td colspan="4" class="text-right">TOTAL GENERAL:</td>
 
-                    <td class="text-right">{{ number_format((float)$totTotal, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$totAcuenta, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$totAbonos, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$totSaldo, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $totTotal, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $totAcuenta, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $totAbonos, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $totSaldo, 2) }}</td>
 
-                    <td class="text-right">{{ (int)$totItems }}</td>
+                    <td class="text-right">{{ (int) $totItems }}</td>
                     <td colspan="2"></td>
+                </tr>
+
+                <tr style="border-top: 3px solid #2c3e50; background: #fff3cd;">
+                    <td colspan="7" style="text-align:right; font-weight:700; font-size:14px; padding:8px;">
+                        SALDO:
+                    </td>
+                    <td class="text-right" style="font-weight:900; font-size:16px; padding:8px; color:#c0392b;">
+                        {{ number_format($totSaldo, 2) }}
+                    </td>
+                    <td colspan="3"></td>
                 </tr>
             @endif
         </tbody>
@@ -91,28 +102,29 @@
 
     <table class="reporte">
         <thead>
-        <tr>
-            <th class="nowrap">Fecha</th>
-            <th>Documento</th>
-            <th>Detalle</th>
-            <th class="text-right">Pago</th>
-        </tr>
+            <tr>
+                <th class="nowrap">Fecha</th>
+                <th>Documento</th>
+                <th>Detalle</th>
+                <th class="text-right">Pago</th>
+            </tr>
         </thead>
         <tbody>
-        @forelse($abonosSueltos ?? [] as $p)
-            <tr class="row-abono">
-                <td class="nowrap">{{ \Carbon\Carbon::parse($p->fecha_provisional)->format('d/m/Y') }}</td>
-                <td>{{ 'REC ' . ($p->numero_recibo ?? '') }}</td>
-                <td>ABONO</td>
-                <td class="text-right">{{ number_format((float)($p->monto ?? 0), 2) }}</td>
-            </tr>
-        @empty
-            <tr>
-                <td colspan="4" class="text-center">Sin abonos sueltos en el rango.</td>
-            </tr>
-        @endforelse
+            @forelse($abonosSueltos ?? [] as $p)
+                <tr class="row-abono">
+                    <td class="nowrap">{{ \Carbon\Carbon::parse($p->fecha_provisional)->format('d/m/Y') }}</td>
+                    <td>{{ 'REC ' . ($p->numero_recibo ?? '') }}</td>
+                    <td>ABONO</td>
+                    <td class="text-right">{{ number_format((float) ($p->monto ?? 0), 2) }}</td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="4" class="text-center">Sin abonos sueltos en el rango.</td>
+                </tr>
+            @endforelse
         </tbody>
     </table>
 
 </body>
+
 </html>

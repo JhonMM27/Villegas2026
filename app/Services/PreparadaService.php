@@ -94,7 +94,7 @@ class PreparadaService
                 'cantidad' => $preparada->ingreso_saco,
                 'cantidad_kg' => $preparada->ingreso_kg,
                 'costo_unitario' => $preparada->costo_unitario,
-            ]);
+            ], true);
 
             return $preparada;
         });
@@ -322,7 +322,7 @@ class PreparadaService
                     'cantidad_kg' => $preparada->ingreso_kg,
                     'costo_unitario' => $preparada->costo_unitario,
                     'comentario' => 'Rectificación de preparada',
-                ]);
+                ], true);
                 $productosAfectados[] = $preparada->producto_id;
             }
 

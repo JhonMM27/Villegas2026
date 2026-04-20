@@ -94,7 +94,7 @@ class NucleoPreparadaService
                 'cantidad' => $preparada->ingreso_saco,
                 'cantidad_kg' => $preparada->ingreso_kg,
                 'costo_unitario' => $preparada->costo_unitario,
-            ]);
+            ], true);
 
             return $preparada;
         });
@@ -254,7 +254,7 @@ class NucleoPreparadaService
                 'cantidad_kg' => $preparada->ingreso_kg,
                 'costo_unitario' => $preparada->costo_unitario,
                 'comentario' => 'Rectificación de nucleo_preparada',
-            ]);
+            ], true);
             $productosAfectados[] = $preparada->nucleo_id;
 
             // 7) Recalcular Kardex para productos afectados

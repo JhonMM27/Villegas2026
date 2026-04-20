@@ -339,6 +339,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('cuenta.corriente.cliente.creditos_cobrar_dias_pdf');
     Route::get('/cuenta-corriente/cliente/creditos_cobrar_dias_agrupado_clientes/pdf', [CuentaCorrienteClienteController::class, 'creditosPorCobrarDiasAgrupadoClientePdf'])
         ->name('cuenta.corriente.cliente.creditos_cobrar_dias_agrupado_clientes_pdf');
+    Route::get('/cuenta-corriente/cliente/creditos-por-cobrar', [CuentaCorrienteClienteController::class, 'creditosPorCobrarIndex'])
+        ->name('cuenta.corriente.cliente.creditos_por_cobrar');
+    Route::get('/cuenta-corriente/cliente/creditos-por-cobrar/data', [CuentaCorrienteClienteController::class, 'creditosPorCobrarData'])
+        ->name('cuenta.corriente.cliente.creditos_por_cobrar_data');
     Route::get('/cuenta-corriente/cliente/saldos_acumuladosdias_cliente/pdf', [CuentaCorrienteClienteController::class, 'saldosAcumuladosClienteDiasPdf'])
         ->name('cuenta.corriente.cliente.saldos_acumuladosdias_cliente_pdf');
     Route::get('/cuenta-corriente/cliente/saldos_acumuladosfechas_cliente/pdf', [CuentaCorrienteClienteController::class, 'saldosAcumuladosClienteFechasPdf'])

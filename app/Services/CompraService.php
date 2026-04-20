@@ -170,24 +170,11 @@ class CompraService
 
                 $costoCompletoPorUnidad = (float) $detalle->costo_unitario + (float) $detalle->costo_unitario_servicio;
 
-                // --- CÓDIGO ANTERIOR CON ERROR DE CÁLCULO (OMITÍA SERVICIO PORQUE $detalle->total EN JS NO LO INCLUYE) ---
-                // $costoTotalCompra = (float)$detalle->total;
-                // $costoUnitarioBase = (float) $detalle->costo_unitario + (float) $detalle->costo_unitario_servicio;
-                // // Si hay stock, calculamos el costo unitario base dividiendo el total por la cantidad en stock base
-                // if ($cantidadStock > 0) {
-                //     $costoUnitarioBase = $costoTotalCompra / $cantidadStock;
-                // }
-                // -------------------------------------------------------------------------------------------------------------
-
-                // --- NUEVO CÓDIGO (LÓGICA IDÉNTICA A createCompra) ---
                 $costoTotalCompra = (float) $detalle->cantidad * $costoCompletoPorUnidad;
 
-                if ($cantidadStock > 0) {
-                    $costoUnitarioBase = $costoTotalCompra / $cantidadStock;
-                } else {
-                    $costoUnitarioBase = $costoCompletoPorUnidad;
-                }
-                // -----------------------------------------------------
+                $costoUnitarioBase = $cantidadStock > 0
+                    ? round($costoTotalCompra / $cantidadStock, 4)
+                    : round($costoCompletoPorUnidad, 4);
 
                 if ($movNeutralizado) {
                     // Restauramos el movimiento original neutralizado
@@ -206,6 +193,7 @@ class CompraService
                     $productosAfectados[] = $detalle->producto_id;
                 } else {
                     // Si por alguna razón no hay neutralizado (ej: producto nuevo en rectificación), creamos uno
+                    // registrarIngreso calculará el CPP real automáticamente
                     $this->movimientoService->registrarIngreso([
                         'tipo' => MovimientoService::TIPO_COMPRA,
                         'fecha' => $compraAnulada->fecha_compra,
@@ -218,7 +206,7 @@ class CompraService
                         'unidad_codigo' => $detalle->unidad_codigo,
                         'cantidad' => $detalle->cantidad,
                         'cantidad_kg' => $detalle->cantidad_kgm,
-                        'costo_unitario' => round($costoUnitarioBase, 4),
+                        'costo_unitario' => $costoCompletoPorUnidad,
                     ]);
                     $productosAfectados[] = $detalle->producto_id;
                 }

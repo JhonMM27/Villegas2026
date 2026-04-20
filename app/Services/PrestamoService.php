@@ -373,7 +373,9 @@ class PrestamoService
                     $empaqueFinal = (float) ($detalle->producto_empaque ?? 1);
                     $cantidadBase = round($detalle->cantidad * ($empaqueFinal / $empaqueBase), 4);
                     $costoTotalMov = $detalle->total ?? ($detalle->cantidad * $detalle->valor_unitario);
-                    $costoUnitarioBase = $cantidadBase > 0 ? $costoTotalMov / $cantidadBase : (float) $detalle->valor_unitario;
+                    $costoUnitarioBase = $cantidadBase > 0
+                        ? round($costoTotalMov / $cantidadBase, 4)
+                        : round((float) $detalle->valor_unitario, 4);
 
                     $updateParams = [
                         'detalle_id' => $detalle->id,
