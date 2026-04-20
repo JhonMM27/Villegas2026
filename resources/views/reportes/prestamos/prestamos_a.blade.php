@@ -124,6 +124,7 @@
         });
 
         document.body.addEventListener('click', function(e) {
+            // VER - Mostrar detalle
             if (e.target && (e.target.matches('.btn-view-prestamo') || e.target.closest('.btn-view-prestamo'))) {
                 const button = e.target.closest('.btn-view-prestamo');
                 const prestamoId = button.getAttribute('data-id');
@@ -140,7 +141,7 @@
                         let modalContainer = document.getElementById('modalContainer');
                         if (!modalContainer) {
                             modalContainer = document.createElement('div');
-                            modalContainer.id = 'modalContainerFechas';
+                            modalContainer.id = 'modalContainer';
                             document.body.appendChild(modalContainer);
                         }
                         modalContainer.innerHTML = html;
@@ -153,6 +154,32 @@
                         console.error(err);
                         alert('Ocurrió un error al cargar el detalle.');
                     });
+            }
+
+            // REGISTRAR DEVOLUCION
+            if (e.target && (e.target.matches('.btn-registrar-devolucion') || e.target.closest('.btn-registrar-devolucion'))) {
+                const button = e.target.closest('.btn-registrar-devolucion');
+                const prestamoId = button.getAttribute('data-id');
+                const tipo = button.getAttribute('data-tipo');
+                if (!prestamoId) return;
+
+                // Cerrar modal Ver (prestamos.view)
+                const modalVerEl = document.querySelector('#modalContainer .modal.show');
+                if (modalVerEl) {
+                    const modalInstance = bootstrap.Modal.getInstance(modalVerEl);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                }
+
+                // Verificar que existe prestamoManager (definido en prestamos/index.blade.php)
+                if (typeof prestamoManager !== 'undefined' && typeof prestamoManager.devolucionShowModal === 'function') {
+                    prestamoManager.devolucionShowModal(prestamoId, tipo);
+                } else {
+                    // Si no existe, ir a la pagina de prestamos y abrir ahi
+                    alert('Redirigiendo a gestión de préstamos...');
+                    window.location.href = "{{ url('prestamos') }}/" + prestamoId + '/ver';
+                }
             }
         });
 

@@ -35,6 +35,7 @@
                                         <option value="Luz">Luz</option>
                                         <option value="Reparaciones">Reparaciones</option>
                                         <option value="Fletes">Fletes</option>
+                                        <option value="Administrativo">Administrativo</option>
                                         <option value="Otros">Otros</option>
                                     </select>
                                 </div>

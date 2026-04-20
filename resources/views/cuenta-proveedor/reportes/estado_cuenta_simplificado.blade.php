@@ -114,7 +114,7 @@
             white-space: nowrap;
         }
 
-        .row-venta td {
+        .row-compra td {
             font-weight: 700;
         }
 
@@ -156,19 +156,19 @@
         </table>
     </div>
 
-    <div class="title">Estado de Cuenta del Cliente (Simplificado)</div>
+    <div class="title">Estado de Cuenta del Proveedor (Simplificado)</div>
 
     <div class="box">
         <table>
             <tr>
                 <td style="width:65%;">
-                    <div><strong>Cliente:</strong> {{ $clienteNombre }}</div>
-                    <div><strong>Dirección:</strong> {{ $clienteData->direccion ?? '' }}</div>
-                    <div><strong>Teléfono:</strong> {{ $clienteData->telefono ?? '' }}</div>
+                    <div><strong>Proveedor:</strong> {{ $proveedorNombre }}</div>
+                    <div><strong>Dirección:</strong> {{ $proveedorData->direccion ?? '' }}</div>
+                    <div><strong>Teléfono:</strong> {{ $proveedorData->telefono ?? '' }}</div>
                 </td>
                 <td class="text-right" style="width:35%;">
                     <div><strong>Saldo anterior:</strong> {{ number_format((float) ($saldoInicial ?? 0), 2) }}</div>
-                    <div><strong>Saldo final (ventas):</strong> {{ number_format($saldoFinal, 2) }}</div>
+                    <div><strong>Saldo final (compras):</strong> {{ number_format($saldoFinal, 2) }}</div>
                     <div><strong>Saldo a favor:</strong> {{ number_format((float) ($totAbonoSuelto ?? 0), 2) }}</div>
                 </td>
             </tr>
@@ -177,26 +177,25 @@
 
     <table class="report">
 
-        <!-- ✅ Anchos FIJOS por colgroup (más confiable en PDF) -->
         <colgroup>
-            <col style="width: 90px;"> <!-- Doc. Venta -->
-            <col style="width: 90px;"> <!-- Referencia -->
-            <col style="width: 45px; text-align:center;"> <!-- Fecha Venta (más angosta) -->
-            <col style="width: 65px;"> <!-- Imp Venta -->
-            <col style="width: 65px;"> <!-- Cobranza -->
-            <col style="width: 60px;"> <!-- Saldo -->
-            <col style="width: 60px;"> <!-- N Recibo -->
-            <col style="width: 65px;"> <!-- Acum Monto -->
-            <col style="width: 55px;"> <!-- Acum Fecha -->
+            <col style="width: 90px;">
+            <col style="width: 90px;">
+            <col style="width: 45px; text-align:center;">
+            <col style="width: 65px;">
+            <col style="width: 65px;">
+            <col style="width: 60px;">
+            <col style="width: 60px;">
+            <col style="width: 65px;">
+            <col style="width: 55px;">
         </colgroup>
 
         <thead>
             <tr>
-                <th>Doc. Venta</th>
+                <th>Doc. Compra</th>
                 <th>Referencia</th>
-                <th class="center">Fecha Venta</th>
-                <th class="num">Imp Venta</th>
-                <th class="num">Cobranza</th>
+                <th class="center">Fecha Compra</th>
+                <th class="num">Imp Compra</th>
+                <th class="num">Pago</th>
                 <th class="num">Saldo</th>
                 <th>N Recibo</th>
                 <th class="num" colspan="2">Acumulado</th>
@@ -205,17 +204,13 @@
 
         <tbody>
             @php
-                /* Acumulador: suma de cada valor mostrado en la columna SALDO */
                 $totalSaldoSuma = 0.0;
-
                 $saldoAcum = (float) ($saldoInicial ?? 0);
-
                 $provUsado = [];
 
-                // total por provisional
                 $provTotales = [];
-                foreach ($ventas ?? collect() as $__v) {
-                    $__pagos = $__v->pagos ?? collect();
+                foreach ($compras ?? collect() as $__c) {
+                    $__pagos = $__c->pagos ?? collect();
                     $__pagos = is_array($__pagos) ? collect($__pagos) : $__pagos;
 
                     foreach ($__pagos as $__p) {
@@ -243,51 +238,48 @@
                 }
             @endphp
 
-            <tr class="row-venta">
+            <tr class="row-compra">
                 <td class="nowrap">{{ $ini->copy()->subDay()->format('d/m/Y') }}</td>
                 <td colspan="7">SALDO ANTERIOR</td>
                 <td class="num" colspan="2">{{ number_format($saldoAcum, 2) }}</td>
             </tr>
 
-            @forelse($ventas as $v)
+            @forelse($compras as $c)
                 @php
-                    $pagos = $v->pagos ?? collect();
+                    $pagos = $c->pagos ?? collect();
                     $pagos = is_array($pagos) ? collect($pagos) : $pagos;
                     $nPagos = $pagos->count();
 
-                    $docVenta =
-                        $v->documento ??
+                    $docCompra =
+                        $c->documento ??
                         trim(
-                            ($v->comprobante_tipo_codigo ? $v->comprobante_tipo_codigo . ' ' : '') .
-                                $v->serie .
+                            ($c->comprobante_tipo_codigo ? $c->comprobante_tipo_codigo . ' ' : '') .
+                                $c->serie .
                                 '-' .
-                                $v->correlativo,
+                                $c->correlativo,
                         );
 
-                    $refVenta = $v->pago_forma_nombre ?? '';
-                    $fechaVentaFmt = \Carbon\Carbon::parse($v->fecha_venta)->format('d/m/Y');
+                    $refCompra = $c->pago_forma_nombre ?? '';
+                    $fechaCompraFmt = \Carbon\Carbon::parse($c->fecha_compra)->format('d/m/Y');
 
-                    $impVenta = (float) ($v->credito_base ?? 0);
+                    $impCompra = (float) ($c->credito_base ?? 0);
+                    $saldoCompra = (float) ($c->saldo_inicio_rango ?? 0);
 
-                    $saldoVenta = (float) ($v->saldo_inicio_rango ?? 0);
-
-                    $saldoAcum += $saldoVenta;
+                    $saldoAcum += $saldoCompra;
                 @endphp
 
                 @if ($nPagos === 0)
                     @php
-                        /* Sin pagos: el saldo mostrado es saldoVenta */
-                        $totalSaldoSuma += $saldoVenta;
+                        $totalSaldoSuma += $saldoCompra;
                     @endphp
-                    <tr class="row-venta">
-                        <td class="nowrap">{{ $docVenta }}</td>
-                        <td>{{ $refVenta }}</td>
-                        <td class="center">{{ $fechaVentaFmt }}</td>
-                        <td class="num">{{ number_format($impVenta, 2) }}</td>
+                    <tr class="row-compra">
+                        <td class="nowrap">{{ $docCompra }}</td>
+                        <td>{{ $refCompra }}</td>
+                        <td class="center">{{ $fechaCompraFmt }}</td>
+                        <td class="num">{{ number_format($impCompra, 2) }}</td>
                         <td class="num">0.00</td>
-                        <td class="num">{{ number_format($saldoVenta, 2) }}</td>
+                        <td class="num">{{ number_format($saldoCompra, 2) }}</td>
                         <td class="nowrap"></td>
-
                         <td class="num"></td>
                         <td class="num"></td>
                     </tr>
@@ -305,10 +297,8 @@
                             $esPrimero = $i === 0;
                             $esUltimo = $i === $nPagos - 1;
 
-                            // Solo actualizar acumulado en el último pago de la venta
                             if ($esUltimo) {
-                                $saldoAcum -= $saldoVenta - $saldoDespues;
-                                // Solo sumar al total el saldo FINAL de esta venta (no los intermedios)
+                                $saldoAcum -= $saldoCompra - $saldoDespues;
                                 $totalSaldoSuma += $saldoDespues;
                             }
 
@@ -336,16 +326,15 @@
                         @endphp
 
                         <tr class="row-pago">
-                            <td class="nowrap">{{ $esPrimero ? $docVenta : '' }}</td>
-                            <td>{{ $esPrimero ? $refVenta : '' }}</td>
-                            <td class="center">{{ $esPrimero ? $fechaVentaFmt : '' }}</td>
-                            <td class="num">{{ $esPrimero ? number_format($impVenta, 2) : '' }}</td>
+                            <td class="nowrap">{{ $esPrimero ? $docCompra : '' }}</td>
+                            <td>{{ $esPrimero ? $refCompra : '' }}</td>
+                            <td class="center">{{ $esPrimero ? $fechaCompraFmt : '' }}</td>
+                            <td class="num">{{ $esPrimero ? number_format($impCompra, 2) : '' }}</td>
 
                             <td class="num">{{ number_format($monto, 2) }}</td>
                             <td class="num">{{ number_format($saldoDespues, 2) }}</td>
                             <td class="nowrap">{{ $nRecibo }}</td>
 
-                            <!-- ✅ Acumulado en 2 celdas -->
                             <td class="num">
                                 @if ($mostrarProv && $provTotal > 0)
                                     <span
@@ -367,7 +356,6 @@
                 </tr>
             @endforelse
 
-            {{-- ✅ Fila TOTAL al final de la columna Saldo --}}
             <tr style="border-top: 2px solid #333;">
                 <td colspan="5" style="text-align:right; font-weight:700; padding:4px;">TOTAL SALDO:</td>
                 <td class="num" style="font-weight:700; padding:4px; border-top:2px solid #333;">
@@ -378,8 +366,7 @@
         </tbody>
     </table>
 
-    {{-- CUADRO DE ABONOS SUELTOS --}}
-    <div class="section-title">Saldo a favor (abonos sin venta asociada)</div>
+    <div class="section-title">Saldo a favor (abonos sin compra asociada)</div>
 
     <table class="report">
         <thead>

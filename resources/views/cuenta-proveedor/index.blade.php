@@ -66,10 +66,11 @@
 
                                 <div class="col-12 col-lg-4">
                                     <div class="d-flex flex-wrap gap-2">
-                                        <button type="button" class="btn btn-danger btn-sm btn-report"
+                                        <button type="button" class="btn btn-info btn-sm btn-report"
                                                 data-tab="1"
                                                 data-target="#reporteTab1"
-                                                data-url="{{ route('cuenta.corriente.proveedor.compras_producto_proveedor_pdf') }}">
+                                                data-proveedor="si" data-fecha="range" data-dia="no"
+                                                data-url="{{ route('cuenta.corriente.proveedor.estado_cuenta_simplificado_pdf') }}">
                                             Estado de Cuenta
                                         </button>
                                         <button type="button" class="btn btn-secondary btn-sm btn-report" data-tab="1"
@@ -138,18 +139,6 @@
                                 </div>
                                 <div class="col-12 col-lg-8">
                                     <div class="d-flex flex-wrap gap-2">
-                                        <button type="button" class="btn btn-secondary btn-sm btn-report" data-tab="2"
-                                            data-target="#reporteTab2" data-proveedor="no" data-fecha="none" data-dia="no"
-                                            data-url="{{ route('cuenta.corriente.proveedor.creditos_pagar_todos_pdf') }}">
-                                            Relación de créditos por pagar
-                                        </button>
-                                        <!--
-                                        <button type="button" class="btn btn-secondary btn-sm btn-report" data-tab="2"
-                                            data-target="#reporteTab2" data-proveedor="no" data-fecha="none" data-dia="no"
-                                            data-url="{{ route('cuenta.corriente.proveedor.resumen_creditos_pagar_pdf') }}">
-                                            Resumen Créditos por Pagar
-                                        </button>
-                                        -->  
                                     </div>
                                 </div>
                             </div>
@@ -166,6 +155,11 @@
 
                                 <div class="col-12 col-lg-8">
                                     <div class="d-flex flex-wrap gap-2">
+                                        <button type="button" class="btn btn-secondary btn-sm btn-report" data-tab="2"
+                                            data-target="#reporteTab2" data-proveedor="no" data-fecha="range" data-dia="no"
+                                            data-url="{{ route('cuenta.corriente.proveedor.creditos_pagar_todos_pdf') }}">
+                                            Relación de créditos por pagar
+                                        </button>
                                         <button type="button" class="btn btn-secondary btn-sm btn-report" data-tab="2"
                                             data-target="#reporteTab2" data-proveedor="no" data-fecha="range" data-dia="no"
                                             data-url="{{ route('cuenta.corriente.proveedor.saldo_fechas_solicitada_pdf') }}">

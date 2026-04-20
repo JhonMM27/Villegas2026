@@ -1045,8 +1045,11 @@
             }
 
             async devolucionShowModal(id, tipo) {
+                console.log('>>> devolucionShowModal INICIO');
+                console.log('>>> id:', id, 'tipo:', tipo);
                 try {
                     const response = await this.fetchData(`${this.baseUrl}/${id}`);
+                    console.log('>>> fetchData response:', response);
 
                     this.isEditing = false;
                     this.resetForm();
@@ -1292,6 +1295,11 @@
                     const button = e.target.closest('.btn-registrar-devolucion');
                     const prestamoId = button.getAttribute('data-id');
                     const tipo = button.getAttribute('data-tipo');
+                    console.log('>>> BTN DEVOLUCION CLICKED');
+                    console.log('>>> prestamoId:', prestamoId);
+                    console.log('>>> tipo:', tipo);
+                    console.log('>>> button element:', button);
+                    console.log('>>> button dataset:', button.dataset);
                     if (!prestamoId) return;
 
                     // 🔴 CERRAR MODAL "VER"
@@ -1304,6 +1312,7 @@
                     }
 
                     // 🟢 ABRIR MODAL DUPLICAR
+                    console.log('>>> LLAMANDO devolucionShowModal...');
                     prestamoManager.devolucionShowModal(prestamoId, tipo);
                 }
             });

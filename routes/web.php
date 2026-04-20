@@ -363,6 +363,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('cuenta.corriente.proveedor.creditos_pagar_proveedor_todos_pdf');
     Route::get('/cuenta-corriente/proveedor/creditos_pagar_proveedor_fechas/pdf', [CuentaCorrienteProveedorController::class, 'creditosPorPagarProveedorFechasPdf'])
         ->name('cuenta.corriente.proveedor.creditos_pagar_proveedor_fechas_pdf');
+    Route::get('/cuenta-corriente/proveedor/estado_cuenta/pdf', [CuentaCorrienteProveedorController::class, 'estadoCuentaProveedorPdf'])
+        ->name('cuenta.corriente.proveedor.estado_cuenta_pdf');
+    Route::get('/cuenta-corriente/proveedor/estado_cuenta_simplificado/pdf', [CuentaCorrienteProveedorController::class, 'estadoCuentaProveedorPdf'])
+        ->name('cuenta.corriente.proveedor.estado_cuenta_simplificado_pdf');
     Route::get('/cuenta-corriente/proveedor/compras_general_fechas/pdf', [CuentaCorrienteProveedorController::class, 'comprasGeneralFechasPdf'])
         ->name('cuenta.corriente.proveedor.compras_general_fechas_pdf');
     /*Route::get('/cuenta-corriente/proveedor/saldos/pdf', [CuentaCorrienteProveedorController::class, 'saldosTodosPdf'])
@@ -411,7 +415,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/planilla-prestamos/{id}/imprimir', [PlanillaPrestamoController::class, 'printTicket'])->name('planilla-prestamos.imprimir');
     Route::get('/planilla-prestamos/{id}/montos', [PlanillaPrestamoController::class, 'getMontos'])->name('planilla-prestamos.montos');
     Route::post('/planilla-prestamos/{id}/pagar', [PlanillaPrestamoController::class, 'registrarPago'])->name('planilla-prestamos.pagar');
-    
+
     // Pagos de Prestamos
     Route::get('/planilla-prestamos/{prestamoId}/pagos', [PlanillaPrestamoController::class, 'pagosIndex'])->name('planilla-prestamos.pagos-index');
     Route::get('/planilla-prestamos/{prestamoId}/pagos/data', [PlanillaPrestamoController::class, 'pagosData'])->name('planilla-prestamos.pagos-data');
@@ -420,7 +424,7 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/planilla-prestamos/pagos/{id}', [PlanillaPrestamoController::class, 'updatePago'])->name('planilla-prestamos.pagos-update');
     Route::delete('/planilla-prestamos/pagos/{id}', [PlanillaPrestamoController::class, 'destroyPago'])->name('planilla-prestamos.pagos-destroy');
     Route::get('/planilla-prestamos/pagos/{id}/imprimir', [PlanillaPrestamoController::class, 'printPagoTicket'])->name('planilla-prestamos.pagos-imprimir');
-    
+
     Route::resource('planilla-prestamos', PlanillaPrestamoController::class)->except(['create']);
 
     // Planilla - Pagos

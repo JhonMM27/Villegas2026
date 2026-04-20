@@ -334,6 +334,8 @@ class VentaController extends Controller
     {
         $venta = Venta::with(['cliente'])->findOrFail($id);
 
+        $correlativoFormateado = str_pad($venta->correlativo, 8, '0', STR_PAD_LEFT);
+
         $empresa = (object) [
             'razon_social' => 'CONSORCIOS VILLEGAS E.I.R.L.',
             'direccion' => 'Carretera Pomalca KM 3'."\n".'A espaldas de Ferretería Herrera',
@@ -349,7 +351,7 @@ class VentaController extends Controller
             ->setOption('isRemoteEnabled', true)
             ->setOption('defaultFont', 'DejaVu Sans');
 
-        return $pdf->stream("ticket_{$venta->id}.pdf");
+        return $pdf->stream("NP - venta {$venta->serie}-{$correlativoFormateado}.pdf");
     }
 
     /**

@@ -14,25 +14,28 @@
                     <div class="row">
                         <div class="col-lg-6">
                             <div class="row">
-                              <div class="col-lg-6">
-                                <label for="fecha_gasto" class="form-label">Fecha Gasto <span class="text-danger"></span></label>
-                                <input type="datetime-local" id="fecha_gasto" name="fecha_gasto" class="form-control form-control-sm">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                              <div class="col-lg-6">
-                                  <div class="form-group mb-3">
-                                      <label for="numero_interno" class="form-label">Número interno <span
-                                              class="text-danger"></span></label>
-                                      <input type="text" id="numero_interno" name="numero_interno" class="form-control form-control-sm">
-                                      <div class="invalid-feedback"></div>
-                                  </div>
+                                <div class="col-lg-6">
+                                    <label for="fecha_gasto" class="form-label">Fecha Gasto <span
+                                            class="text-danger"></span></label>
+                                    <input type="datetime-local" id="fecha_gasto" name="fecha_gasto"
+                                        class="form-control form-control-sm">
+                                    <div class="invalid-feedback"></div>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="form-group mb-3">
+                                        <label for="numero_interno" class="form-label">Número interno <span
+                                                class="text-danger"></span></label>
+                                        <input type="text" id="numero_interno" name="numero_interno"
+                                            class="form-control form-control-sm">
+                                        <div class="invalid-feedback"></div>
+                                    </div>
                                 </div>
                                 <div class="col-lg-12">
                                     <div class="form-group mb-3">
                                         <label for="descripcion" class="form-label">Descripción <span
                                                 class="text-danger">*</span></label>
-                                        <input type="text" id="descripcion" name="descripcion" class="form-control form-control-sm"
-                                            required>
+                                        <input type="text" id="descripcion" name="descripcion"
+                                            class="form-control form-control-sm" required>
                                         <div class="invalid-feedback"></div>
                                     </div>
                                 </div>
@@ -44,6 +47,7 @@
                                             <option value="Luz">Luz</option>
                                             <option value="Reparaciones">Reparaciones</option>
                                             <option value="Fletes">Fletes</option>
+                                            <option value="Administrativo">Administrativo</option>
                                             <option value="Otros" selected>Otros</option>
                                         </select>
                                         <div class="invalid-feedback"></div>
@@ -53,11 +57,11 @@
                                     <div class="form-group mb-3">
                                         <label for="responsable" class="form-label">Responsable <span
                                                 class="text-danger">*</span></label>
-                                        <input type="text" id="responsable" name="responsable" class="form-control form-control-sm"
-                                            required>
+                                        <input type="text" id="responsable" name="responsable"
+                                            class="form-control form-control-sm" required>
                                         <div class="invalid-feedback"></div>
                                     </div>
-                                </div>                                
+                                </div>
                             </div>
                         </div>
                         <divv class="col-lg-6">

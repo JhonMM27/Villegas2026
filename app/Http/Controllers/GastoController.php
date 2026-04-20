@@ -174,7 +174,7 @@ class GastoController extends Controller
             'deposito' => 'nullable|numeric|min:0',
             'consorcio' => 'nullable|numeric|min:0',
             'total_cobranza' => 'nullable|numeric|min:0.01',
-            'tipo' => 'nullable|string|in:Combustible,Luz,Reparaciones,Fletes,Otros',
+            'tipo' => 'nullable|string|in:Combustible,Luz,Reparaciones,Fletes,Administrativo,Otros',
         ]);
     }
 

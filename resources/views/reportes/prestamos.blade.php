@@ -68,6 +68,7 @@
     <!--end::Row-->
 </div>
 @endsection
+@include('prestamos.action')
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -172,6 +173,456 @@
 
         input.addEventListener('blur', () => setTimeout(clearSuggestions, 200));
     }
+
+    // ================== PRESTAMO MANAGER PARA DEVOLUCIONES ==================
+    class PrestamoManagerDevolucion {
+        constructor() {
+            this.baseUrl = "{{ url('prestamos') }}";
+            this.modal = null;
+            this.saldosPendientes = {};
+            this.isEditing = false;
+            this.elements = {
+                modalTitle: document.getElementById('modalTitle'),
+                methodField: document.getElementById('method_field'),
+            };
+            this.form = document.getElementById('formUpdate');
+            this.initModal();
+            this.setupFormSubmit();
+        }
+
+        initModal() {
+            const modalEl = document.getElementById('modalUpdate');
+            if (modalEl) {
+                this.modal = new bootstrap.Modal(modalEl);
+            }
+        }
+
+        setupFormSubmit() {
+            if (!this.form) return;
+            this.form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleSubmit();
+            });
+        }
+
+        async handleSubmit() {
+            const formData = new FormData(this.form);
+            const submitBtn = document.getElementById('btnSubmit');
+            if (submitBtn) submitBtn.disabled = true;
+
+            try {
+                const response = await fetch(this.form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok && (data.success === true || data.status === true)) {
+                    this.modal?.hide();
+                    Swal.fire({
+                        icon: 'success',
+                        title: data.message || 'Devolución registrada correctamente',
+                        timer: 3000,
+                        timerProgressBar: true,
+                        showConfirmButton: false
+                    });
+                    if (typeof window.tablaPrestamos !== 'undefined' && window.tablaPrestamos.ajax) {
+                        window.tablaPrestamos.ajax.reload(null, false);
+                    }
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: data.message || 'Error al registrar la devolución',
+                    });
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error de conexión o formato de respuesta',
+                });
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        }
+
+        async fetchData(url) {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Error fetching data');
+            return response.json();
+        }
+
+        obtenerFechaHoraActual() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        async getSerie(codigo) {
+            const urlSerie = "{{ route('prestamos.get-serie') }}";
+            try {
+                const response = await fetch(
+                    `${urlSerie}?comprobante_tipo_codigo=${codigo}`
+                );
+                const data = await response.json();
+                if (data.serie && data.numero) {
+                    document.getElementById('serie').value = data.serie;
+                    document.getElementById('correlativo').value = data.numero;
+                }
+            } catch (error) {
+                console.error('Error al obtener la serie:', error);
+            }
+        }
+
+        async devolucionShowModal(id, tipo) {
+            try {
+                const response = await this.fetchData(`${this.baseUrl}/${id}`);
+
+                this.isEditing = false;
+                this.resetForm();
+
+                this.elements.modalTitle.textContent =
+                    'Devolución préstamo ' + response.comprobante_tipo_codigo + ' ' + response.serie + '-' + response.correlativo;
+
+                this.elements.methodField.value = 'POST';
+                document.getElementById('es_rectificacion').value = '0';
+                document.getElementById('prestamo_anulado_id').value = '';
+                let nuevoTipo = '';
+                let nuevoComprobante = '';
+                let razonSocial = '';
+                let clienteId = '';
+
+                switch (tipo) {
+                    case 'PA':
+                        nuevoTipo = 'DD';
+                        nuevoComprobante = 'DP';
+                        razonSocial = response.cliente_destino?.razon_social || '';
+                        clienteId = response.cliente_destino?.id || '';
+                        break;
+                    case 'PD':
+                        nuevoTipo = 'DA';
+                        nuevoComprobante = 'SD';
+                        razonSocial = response.cliente_origen?.razon_social || '';
+                        clienteId = response.cliente_origen?.id || '';
+                        break;
+                }
+                document.getElementById('prestamo_referencia_id').value = id;
+                document.getElementById('cliente_razon_social').value = razonSocial;
+                document.getElementById('cliente_id').value = clienteId;
+
+                document.getElementById('movimiento_tipo').value = nuevoTipo;
+                document.getElementById('comprobante_tipo_codigo').value = nuevoComprobante;
+                this.getSerie(nuevoComprobante);
+
+                document.getElementById('fecha_prestamo').value = this.obtenerFechaHoraActual();
+                document.getElementById('usuario_nombre').textContent = @json(auth()->user()->name);
+
+                this.updateDetailsTable(response.detalles, response.saldos || {});
+                document.getElementById('total').value = parseFloat(response.total).toFixed(2);
+
+                this.form.action = this.baseUrl;
+                this.saldosPendientes = response.saldos || {};
+
+                this.modal.show();
+
+            } catch (error) {
+                console.error('Error al cargar los datos:', error);
+                alert('Error al cargar los datos de devolución');
+            }
+        }
+
+        resetForm() {
+            if (this.form) this.form.reset();
+            document.getElementById('producto_nombre').value = '';
+            document.getElementById('producto_id').value = '';
+            document.getElementById('prestamo_referencia_id').value = '';
+            document.getElementById('cliente_razon_social').value = '';
+            document.getElementById('cliente_id').value = '';
+        }
+
+        buildUnidadSelect(fracciones, unidadCodigo) {
+            if (!fracciones || fracciones.length === 0) {
+                return '<span class="badge bg-secondary">Sin unidad</span>';
+            }
+            let optionsHtml = '';
+            fracciones.forEach(f => {
+                const selected = f.unidad_codigo === unidadCodigo ? 'selected' : '';
+                optionsHtml += `<option value="${f.unidad_codigo}" data-empaque="${f.empaque || 1}" ${selected}>${f.descripcion || f.unidad_codigo}</option>`;
+            });
+            return `<select class="form-select form-select-sm selectUnidad">${optionsHtml}</select>`;
+        }
+
+        updateDetailsTable(detalles = [], saldos = {}) {
+            const tbody = document.querySelector('#tablaDetalles tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            detalles.forEach(detalle => {
+                const producto = detalle.producto || {};
+                const id = detalle.producto_id;
+
+                let cantidadInicial = +detalle.cantidad;
+                if (saldos && saldos[id]) {
+                    const empaqueBase = parseFloat(detalle.producto_empaque) || 1;
+                    cantidadInicial = parseFloat(saldos[id].pendiente) / empaqueBase;
+                }
+
+                const productoFormateado = {
+                    id: id,
+                    codigo: producto.codigo ?? null,
+                    nombre: detalle.producto_nombre,
+                    costo_unitario: detalle.valor_unitario,
+                    afectacion_tipo_codigo: producto.afectacion_tipo_codigo,
+                    unidad_codigo: detalle.unidad_codigo,
+                    empaque: detalle.producto_empaque,
+                    fracciones: producto.fracciones || [],
+                    afectacion_tipo: {
+                        codigo: producto.afectacion_tipo?.codigo,
+                        porcentaje: producto.afectacion_tipo?.porcentaje
+                    },
+                    unidad: {
+                        codigo: detalle.unidad_codigo,
+                        descripcion: detalle.unidad_nombre
+                    },
+                    total_manual: "1"
+                };
+
+                this.addProductoToTable(productoFormateado, cantidadInicial, +detalle.valor_unitario, null);
+            });
+        }
+
+        addProductoToTable(item, cantidad = 1, precio_unitario = null, subtotal = null) {
+            const tbody = document.querySelector('#tablaDetalles tbody');
+            document.getElementById('producto_id').value = '';
+            document.getElementById('producto_nombre').value = '';
+
+            const fracciones = item.fracciones || [];
+            const fraccionActual = fracciones.find(f => f.unidad_codigo === item.unidad_codigo) || fracciones[0];
+            const empaqueInicial = fraccionActual ? parseFloat(fraccionActual.empaque || 1) : parseFloat(item.empaque || 1) || 1;
+            const baseEmpaque = parseFloat(item.empaque) || 1;
+            const costoUnitarioBase = parseFloat(item.costo_unitario) || 0;
+            let precioCalculado = (costoUnitarioBase / baseEmpaque) * empaqueInicial;
+            const precioConImpuesto = precio_unitario != null ? parseFloat(precio_unitario) : precioCalculado;
+
+            const existingRow = [...tbody.querySelectorAll('tr')].find(row => row.dataset.productoId == item.id);
+            if (existingRow) {
+                const inputCantidad = existingRow.querySelector('.inputCantidad');
+                inputCantidad.value = parseFloat(inputCantidad.value || 0) + cantidad;
+                if (this.saldosPendientes && this.saldosPendientes[item.id]) {
+                    this.validarFila(existingRow, item.id);
+                } else {
+                    const inputCantidadKgm = existingRow.querySelector('.inputCantidadKgm');
+                    const empaque = parseFloat(existingRow.dataset.empaque || 1);
+                    if (inputCantidadKgm) {
+                        inputCantidadKgm.value = (parseFloat(inputCantidad.value) * empaque).toFixed(2);
+                    }
+                }
+                const precio = parseFloat(existingRow.querySelector('.inputPrecioUnitario').value) || precioConImpuesto;
+                existingRow.querySelector('.inputTotal').value = (precio * parseFloat(inputCantidad.value)).toFixed(2);
+                this.calculateTotals();
+            } else {
+                const rowCount = tbody.rows.length + 1;
+                const porcentaje = parseFloat(item.afectacion_tipo?.porcentaje || 0);
+                const sub = subtotal ?? (precioConImpuesto * cantidad);
+
+                const tr = document.createElement('tr');
+                tr.dataset.productoId = item.id;
+                tr.dataset.afectacionPorcentaje = porcentaje;
+                tr.dataset.afectacionCodigo = item.afectacion_tipo_codigo || '10';
+                tr.dataset.empaque = empaqueInicial;
+                tr.dataset.totalManual = "0";
+
+                tr.innerHTML = `
+                    <td class="text-center">
+                        <button type="button" class="btn btn-danger btn-sm btnEliminarFila">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                    <td class="text-center">${rowCount}</td>
+                    <td>(${item.id}) ${item.nombre || ''}</td>
+                    <td>${this.buildUnidadSelect(fracciones, item.unidad_codigo)}</td>
+                    <td class="tdEmpaque">${empaqueInicial}</td>
+                    <td>
+                        <input type="number" name="detalles[${rowCount}][cantidad]" value="${cantidad}" step="any" class="form-control form-control-sm inputCantidad">
+                    </td>
+                    <td>
+                        <input type="number" name="detalles[${rowCount}][cantidad_kgm]" value="${(cantidad * empaqueInicial).toFixed(2)}" step="any" class="form-control form-control-sm inputCantidadKgm">
+                    </td>
+                    <td class="text-end">
+                        <input type="number" name="detalles[${rowCount}][precio_unitario]" value="${precioConImpuesto.toFixed(4)}" step="any" class="form-control form-control-sm inputPrecioUnitario">
+                    </td>
+                    <td class="text-end">
+                        <input type="number" name="detalles[${rowCount}][total]" value="${sub.toFixed(2)}" step="any" class="form-control form-control-sm inputTotal">
+                    </td>
+                    <input type="hidden" name="detalles[${rowCount}][producto_id]" value="${item.id}">
+                    <input type="hidden" name="detalles[${rowCount}][unidad_codigo]" value="${item.unidad_codigo || ''}">
+                    <input type="hidden" name="detalles[${rowCount}][empaque]" value="${empaqueInicial}">
+                `;
+
+                // ─── Evento: cambio de cantidad_kgm (validar contra saldo pendiente) ───
+                const inputCantidadKgm = tr.querySelector('.inputCantidadKgm');
+                const inputCantidadObj = tr.querySelector('.inputCantidad');
+                inputCantidadKgm.addEventListener('input', (e) => {
+                    const empaque = parseFloat(tr.dataset.empaque || 1);
+                    const cantidadKgm = parseFloat(e.target.value) || 0;
+
+                    if (this.saldosPendientes && this.saldosPendientes[item.id]) {
+                        const saldoPendiente = parseFloat(this.saldosPendientes[item.id].pendiente);
+                        if (cantidadKgm > (saldoPendiente + 0.0001)) {
+                            e.target.value = saldoPendiente.toFixed(2);
+                            inputCantidadObj.value = (saldoPendiente / empaque).toFixed(2);
+                        } else {
+                            inputCantidadObj.value = (cantidadKgm / empaque).toFixed(2);
+                        }
+                    } else {
+                        inputCantidadObj.value = empaque > 0 ? (cantidadKgm / empaque).toFixed(2) : 0;
+                    }
+
+                    tr.dataset.totalManual = "0";
+                    this.recalcularFilaAuto(tr);
+                });
+
+                // ─── Evento: cambio directo de cantidad (validar contra saldo pendiente) ───
+                inputCantidadObj.addEventListener('input', (e) => {
+                    const empaque = parseFloat(tr.dataset.empaque || 1);
+                    const cantidad = parseFloat(e.target.value) || 0;
+                    const cantidadKgm = cantidad * empaque;
+
+                    if (this.saldosPendientes && this.saldosPendientes[item.id]) {
+                        const saldoPendiente = parseFloat(this.saldosPendientes[item.id].pendiente);
+                        if (cantidadKgm > (saldoPendiente + 0.0001)) {
+                            e.target.value = (saldoPendiente / empaque).toFixed(2);
+                            inputCantidadKgm.value = saldoPendiente.toFixed(2);
+                        } else {
+                            inputCantidadKgm.value = cantidadKgm.toFixed(2);
+                        }
+                    } else {
+                        inputCantidadKgm.value = cantidadKgm.toFixed(2);
+                    }
+
+                    tr.dataset.totalManual = "0";
+                    this.recalcularFilaAuto(tr);
+                });
+
+                // ─── Evento: cambio de unidad (recacular cantidad según nuevo empaque) ───
+                const selectUnidad = tr.querySelector('.selectUnidad');
+                if (selectUnidad) {
+                    selectUnidad.addEventListener('change', (e) => {
+                        const nuevaUnidadCodigo = e.target.value;
+                        const nuevaOpcion = e.target.options[e.target.selectedIndex];
+                        const nuevoEmpaque = parseFloat(nuevaOpcion.dataset.empaque) || 1;
+                        const kgmActual = parseFloat(inputCantidadKgm.value) || 0;
+
+                        tr.dataset.empaque = nuevoEmpaque;
+                        tr.querySelector('.tdEmpaque').textContent = nuevoEmpaque.toFixed(2);
+                        tr.querySelector('input[name*="[empaque]"]').value = nuevoEmpaque;
+
+                        const nuevaCantidad = nuevoEmpaque > 0 ? (kgmActual / nuevoEmpaque) : 0;
+                        inputCantidadObj.value = nuevaCantidad.toFixed(2);
+                        inputCantidadKgm.value = kgmActual.toFixed(2);
+
+                        tr.dataset.totalManual = "0";
+                        this.recalcularFilaAuto(tr);
+                    });
+                }
+
+                // ─── Evento: eliminar fila ───
+                tr.querySelector('.btnEliminarFila').addEventListener('click', () => {
+                    tr.remove();
+                    this.reindexDetalles();
+                    this.calculateTotals();
+                });
+
+                tbody.appendChild(tr);
+                this.calculateTotals();
+            }
+        }
+
+        recalcularFilaAuto(tr) {
+            const inputCantidad = tr.querySelector('.inputCantidad');
+            const inputPrecio = tr.querySelector('.inputPrecioUnitario');
+            const inputTotal = tr.querySelector('.inputTotal');
+            const empaque = parseFloat(tr.dataset.empaque) || 1;
+
+            const cantidad = parseFloat(inputCantidad.value) || 0;
+            const precio = parseFloat(inputPrecio.value) || 0;
+            const total = cantidad * precio;
+
+            inputTotal.value = total.toFixed(2);
+            const inputCantidadKgm = tr.querySelector('.inputCantidadKgm');
+            if (inputCantidadKgm) {
+                inputCantidadKgm.value = (cantidad * empaque).toFixed(2);
+            }
+            this.calculateTotals();
+        }
+
+        reindexDetalles() {
+            const tbody = document.querySelector('#tablaDetalles tbody');
+            if (!tbody) return;
+            [...tbody.querySelectorAll('tr')].forEach((tr, index) => {
+                const num = index + 1;
+                tr.querySelector('td:nth-child(2)').textContent = num;
+                const inputs = tr.querySelectorAll('input');
+                inputs.forEach(input => {
+                    const name = input.name;
+                    if (name) {
+                        input.name = name.replace(/detalles\[\d+\]/, `detalles[${num}]`);
+                    }
+                });
+            });
+        }
+
+        calculateTotals() {
+            const tbody = document.querySelector('#tablaDetalles tbody');
+            if (!tbody) return;
+            let total = 0;
+            tbody.querySelectorAll('tr').forEach(row => {
+                const totalInput = row.querySelector('.inputTotal');
+                if (totalInput) {
+                    total += parseFloat(totalInput.value) || 0;
+                }
+            });
+            document.getElementById('total').value = total.toFixed(2);
+        }
+
+        validarFila(row, productoId) {
+            if (!row || !productoId) return;
+            const inputCantidad = row.querySelector('.inputCantidad');
+            const inputCantidadKgm = row.querySelector('.inputCantidadKgm');
+            const inputPrecio = row.querySelector('.inputPrecioUnitario');
+            const empaque = parseFloat(row.dataset.empaque) || 1;
+
+            if (!inputCantidad || !inputCantidadKgm) return;
+
+            const cantidad = parseFloat(inputCantidad.value) || 0;
+            const cantidadKgm = cantidad * empaque;
+
+            if (this.saldosPendientes && this.saldosPendientes[productoId]) {
+                const saldoPendiente = parseFloat(this.saldosPendientes[productoId].pendiente);
+                if (cantidadKgm > (saldoPendiente + 0.0001)) {
+                    inputCantidad.value = (saldoPendiente / empaque).toFixed(2);
+                    inputCantidadKgm.value = saldoPendiente.toFixed(2);
+                    const precio = parseFloat(inputPrecio?.value) || 0;
+                    row.querySelector('.inputTotal').value = ((saldoPendiente / empaque) * precio).toFixed(2);
+                    this.calculateTotals();
+                    return;
+                }
+            }
+
+            inputCantidadKgm.value = cantidadKgm.toFixed(2);
+        }
+    }
+
+    const prestamoManager = new PrestamoManagerDevolucion();
 
     document.getElementById('mnuPrestamos').classList.add('menu-open');
     document.getElementById('itemReportePrestamos')?.classList.add('active');
