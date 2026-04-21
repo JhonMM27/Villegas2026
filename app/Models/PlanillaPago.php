@@ -19,6 +19,8 @@ class PlanillaPago extends Model
         'sueldo_base',
         'horas_extras',
         'adelantos',
+        'dias_faltados',
+        'descuento_faltas',
         'total_pagar',
         'fecha_pago',
         'estado',
@@ -32,6 +34,8 @@ class PlanillaPago extends Model
         'sueldo_base' => 'decimal:2',
         'horas_extras' => 'decimal:2',
         'adelantos' => 'decimal:2',
+        'dias_faltados' => 'decimal:2',
+        'descuento_faltas' => 'decimal:2',
         'total_pagar' => 'decimal:2',
         'fecha_pago' => 'date',
     ];

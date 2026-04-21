@@ -131,6 +131,12 @@
                                                             {{ number_format($resumen['total_horas_extras'], 2) }}</td>
                                                     </tr>
                                                     <tr>
+                                                        <td>Total Días Faltantes</td>
+                                                        <td class="text-end fw-bold text-danger">
+                                                            {{ number_format((float) $resumen['total_dias_faltas'], 2) }} - S/ {{ number_format((float) $resumen['total_descuento_faltas'], 2) }}
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
                                                         <td>Total General a Pagar</td>
                                                         <td class="text-end fw-bold">S/
                                                             {{ number_format($resumen['total_general'], 2) }}</td>
@@ -159,82 +165,86 @@
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive">
-                                    <table class="table table-striped table-sm">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>ID</th>
-                                                <th>Período</th>
-                                                <th class="text-end">Sueldo Base</th>
-                                                <th class="text-end">H. Extras</th>
-                                                <th class="text-end">Adelantos</th>
-                                                <th class="text-end">Total Pagar</th>
-                                                <th class="text-end">Pagado</th>
-                                                <th class="text-end">Pendiente</th>
-                                                <th>Estado</th>
-                                                <th>Fecha Pago</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @forelse($pagos as $pago)
-                                                @php
-                                                    $pagado = (float) $pago->total_pagar;
-                                                    $pendiente =
-                                                        $pago->estado === 'pendiente' ? (float) $pago->total_pagar : 0;
-                                                @endphp
-                                                <tr>
-                                                    <td>{{ $pago->id }}</td>
-                                                    <td>{{ str_pad($pago->mes, 2, '0', STR_PAD_LEFT) }}/{{ $pago->anio }}
-                                                    </td>
-                                                    <td class="text-end">S/
-                                                        {{ number_format((float) $pago->sueldo_base, 2) }}</td>
-                                                    <td class="text-end">S/
-                                                        {{ number_format((float) $pago->horas_extras, 2) }}</td>
-                                                    <td class="text-end">S/
-                                                        {{ number_format((float) $pago->adelantos, 2) }}</td>
-                                                    <td class="text-end">S/
-                                                        {{ number_format((float) $pago->total_pagar, 2) }}</td>
-                                                    <td class="text-end">
-                                                        {{ $pago->estado === 'pagado' ? 'S/ ' . number_format((float) $pago->total_pagar, 2) : '-' }}
-                                                    </td>
-                                                    <td class="text-end">
-                                                        {{ $pendiente > 0 ? 'S/ ' . number_format($pendiente, 2) : '-' }}
-                                                    </td>
-                                                    <td>
-                                                        @if ($pago->estado === 'pagado')
-                                                            <span class="badge bg-success">Pagado</span>
-                                                        @else
-                                                            <span class="badge bg-warning">Pendiente</span>
-                                                        @endif
-                                                    </td>
-                                                    <td>{{ $pago->fecha_pago ? \Carbon\Carbon::parse($pago->fecha_pago)->format('d/m/Y') : '-' }}
-                                                    </td>
-                                                </tr>
-                                            @empty
-                                                <tr>
-                                                    <td colspan="10" class="text-center">No hay pagos registrados para
-                                                        este empleado</td>
-                                                </tr>
-                                            @endforelse
-                                        </tbody>
-                                        <tfoot class="table-light">
-                                            <tr>
-                                                <th colspan="2" class="text-end">TOTALES:</th>
-                                                <th class="text-end">S/
-                                                    {{ number_format($resumen['total_sueldo_base'], 2) }}</th>
-                                                <th class="text-end">S/
-                                                    {{ number_format($resumen['total_horas_extras'], 2) }}</th>
-                                                <th class="text-end">S/ {{ number_format($resumen['total_adelantos'], 2) }}
-                                                </th>
-                                                <th class="text-end">S/ {{ number_format($resumen['total_general'], 2) }}
-                                                </th>
-                                                <th class="text-end">S/ {{ number_format($resumen['total_pagado'], 2) }}
-                                                </th>
-                                                <th class="text-end">S/ {{ number_format($resumen['total_pendiente'], 2) }}
-                                                </th>
-                                                <th colspan="2"></th>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
+                                            <table class="table table-striped table-sm">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>ID</th>
+                                                        <th>Período</th>
+                                                        <th class="text-end">Sueldo Base</th>
+                                                        <th class="text-end">H. Extras</th>
+                                                        <th class="text-end">Días Faltas</th>
+                                                        <th class="text-end">Desc. Faltas</th>
+                                                        <th class="text-end">Total Pagar</th>
+                                                        <th class="text-end">Pagado</th>
+                                                        <th class="text-end">Pendiente</th>
+                                                        <th>Estado</th>
+                                                        <th>Fecha Pago</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @forelse($pagos as $pago)
+                                                        @php
+                                                            $pagado = (float) $pago->total_pagar;
+                                                            $pendiente =
+                                                                $pago->estado === 'pendiente' ? (float) $pago->total_pagar : 0;
+                                                        @endphp
+                                                        <tr>
+                                                            <td>{{ $pago->id }}</td>
+                                                            <td>{{ str_pad($pago->mes, 2, '0', STR_PAD_LEFT) }}/{{ $pago->anio }}
+                                                            </td>
+                                                            <td class="text-end">S/
+                                                                {{ number_format((float) $pago->sueldo_base, 2) }}</td>
+                                                            <td class="text-end">S/
+                                                                {{ number_format((float) $pago->horas_extras, 2) }}</td>
+                                                            <td class="text-end">{{ number_format((float) ($pago->dias_faltados ?? 0), 2) }}
+                                                            </td>
+                                                            <td class="text-end text-danger">S/
+                                                                {{ number_format((float) ($pago->descuento_faltas ?? 0), 2) }}</td>
+                                                            <td class="text-end">S/
+                                                                {{ number_format((float) $pago->total_pagar, 2) }}</td>
+                                                            <td class="text-end">
+                                                                {{ $pago->estado === 'pagado' ? 'S/ ' . number_format((float) $pago->total_pagar, 2) : '-' }}
+                                                            </td>
+                                                            <td class="text-end">
+                                                                {{ $pendiente > 0 ? 'S/ ' . number_format($pendiente, 2) : '-' }}
+                                                            </td>
+                                                            <td>
+                                                                @if ($pago->estado === 'pagado')
+                                                                    <span class="badge bg-success">Pagado</span>
+                                                                @else
+                                                                    <span class="badge bg-warning">Pendiente</span>
+                                                                @endif
+                                                            </td>
+                                                            <td>{{ $pago->fecha_pago ? \Carbon\Carbon::parse($pago->fecha_pago)->format('d/m/Y') : '-' }}
+                                                            </td>
+                                                        </tr>
+                                                    @empty
+                                                        <tr>
+                                                            <td colspan="12" class="text-center">No hay pagos registrados para
+                                                                este empleado</td>
+                                                        </tr>
+                                                    @endforelse
+                                                </tbody>
+                                                <tfoot class="table-light">
+                                                    <tr>
+                                                        <th colspan="2" class="text-end">TOTALES:</th>
+                                                        <th class="text-end">S/
+                                                            {{ number_format($resumen['total_sueldo_base'], 2) }}</th>
+                                                        <th class="text-end">S/
+                                                            {{ number_format($resumen['total_horas_extras'], 2) }}</th>
+                                                        <th></th>
+                                                        <th class="text-end">S/ {{ number_format($pagos->sum('descuento_faltas'), 2) }}
+                                                        </th>
+                                                        <th class="text-end">S/ {{ number_format($resumen['total_general'], 2) }}
+                                                        </th>
+                                                        <th class="text-end">S/ {{ number_format($resumen['total_pagado'], 2) }}
+                                                        </th>
+                                                        <th class="text-end">S/ {{ number_format($resumen['total_pendiente'], 2) }}
+                                                        </th>
+                                                        <th colspan="2"></th>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
                                 </div>
                             </div>
                         </div>

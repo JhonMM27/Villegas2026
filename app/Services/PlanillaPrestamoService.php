@@ -14,6 +14,7 @@ class PlanillaPrestamoService
     public function getAll(): Collection
     {
         return PlanillaPrestamo::with('empleado')
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->orderByDesc('id')
             ->get();
     }

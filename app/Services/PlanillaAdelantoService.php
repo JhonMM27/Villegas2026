@@ -19,6 +19,7 @@ class PlanillaAdelantoService
     public function getAll(): Collection
     {
         return PlanillaAdelanto::with('empleado')
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->orderByDesc('fecha')
             ->get();
     }

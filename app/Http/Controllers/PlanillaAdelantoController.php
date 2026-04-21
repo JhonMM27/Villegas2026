@@ -27,6 +27,7 @@ class PlanillaAdelantoController extends Controller
     {
         if ($request->ajax()) {
             $data = PlanillaAdelanto::with('empleado')
+                ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
                 ->select(['id', 'numero_interno', 'empleado_id', 'monto', 'fecha', 'observaciones'])
                 ->orderByDesc('id');
 
@@ -150,7 +151,7 @@ class PlanillaAdelantoController extends Controller
 
     protected function validateData(Request $request, $id = null)
     {
-        $uniqueRule = $id 
+        $uniqueRule = $id
             ? "unique:planilla_adelantos,numero_interno,{$id},id"
             : 'unique:planilla_adelantos,numero_interno';
 

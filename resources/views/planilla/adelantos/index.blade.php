@@ -264,7 +264,7 @@ class AdelantoManager {
             document.getElementById('numero_interno').value = response.adelanto.numero_interno;
             document.getElementById('empleado_id').value = response.adelanto.empleado_id;
             document.getElementById('empleado_nombre').value = response.adelanto.empleado?.nombre || '';
-            document.getElementById('fecha').value = response.adelanto.fecha;
+            document.getElementById('fecha').value = response.adelanto.fecha ? response.adelanto.fecha.split('T')[0] : '';
             document.getElementById('monto').value = response.adelanto.monto;
             document.getElementById('observaciones').value = response.adelanto.observaciones || '';
             document.getElementById('principal').value = parseFloat(response.adelanto.importe_p || 0).toFixed(2);

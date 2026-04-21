@@ -231,6 +231,13 @@
                                     {{ number_format($resumen['total_horas_extras'] ?? 0, 2) }}</td>
                             </tr>
                             <tr>
+                                <td>Total Días Faltantes:</td>
+                                <td class="text-right fw-bold" style="color: red;">
+                                    {{ number_format((float) ($resumen['total_dias_faltas'] ?? 0), 2) }} - S/
+                                    {{ number_format((float) ($resumen['total_descuento_faltas'] ?? 0), 2) }}
+                                </td>
+                            </tr>
+                            <tr>
                                 <td>Total General a Pagar:</td>
                                 <td class="text-right fw-bold">S/
                                     {{ number_format($resumen['total_general'] ?? 0, 2) }}</td>
@@ -260,7 +267,8 @@
                         <th>Período</th>
                         <th class="text-right">Sueldo Base</th>
                         <th class="text-right">H. Extras</th>
-                        <th class="text-right">Adelantos</th>
+                        <th class="text-right">Días Faltas</th>
+                        <th class="text-right">Desc. Faltas</th>
                         <th class="text-right">Total Pagar</th>
                         <th class="text-center">Estado</th>
                         <th>Fecha Pago</th>
@@ -273,7 +281,9 @@
                             <td>{{ str_pad($pago->mes, 2, '0', STR_PAD_LEFT) }}/{{ $pago->anio }}</td>
                             <td class="text-right">S/ {{ number_format((float) $pago->sueldo_base, 2) }}</td>
                             <td class="text-right">S/ {{ number_format((float) $pago->horas_extras, 2) }}</td>
-                            <td class="text-right">S/ {{ number_format((float) $pago->adelantos, 2) }}</td>
+                            <td class="text-right">{{ number_format((float) ($pago->dias_faltados ?? 0), 2) }}</td>
+                            <td class="text-right" style="color: red;">S/
+                                {{ number_format((float) ($pago->descuento_faltas ?? 0), 2) }}</td>
                             <td class="text-right">S/ {{ number_format((float) $pago->total_pagar, 2) }}</td>
                             <td class="text-center">
                                 @if ($pago->estado === 'pagado')
@@ -292,7 +302,8 @@
                         <th colspan="2" class="text-right">TOTALES:</th>
                         <th class="text-right">S/ {{ number_format($resumen['total_sueldo_base'] ?? 0, 2) }}</th>
                         <th class="text-right">S/ {{ number_format($resumen['total_horas_extras'] ?? 0, 2) }}</th>
-                        <th class="text-right">S/ {{ number_format($resumen['total_adelantos'] ?? 0, 2) }}</th>
+                        <th></th>
+                        <th class="text-right">S/ {{ number_format($resumen['total_descuento_faltas'] ?? 0, 2) }}</th>
                         <th class="text-right">S/ {{ number_format($resumen['total_general'] ?? 0, 2) }}</th>
                         <th colspan="2"></th>
                     </tr>
@@ -330,7 +341,8 @@
                             <th>Período</th>
                             <th class="text-right">Sueldo Base</th>
                             <th class="text-right">H. Extras</th>
-                            <th class="text-right">Adelantos</th>
+                            <th class="text-right">Días Faltas</th>
+                            <th class="text-right">Desc. Faltas</th>
                             <th class="text-right">Total Pagar</th>
                             <th class="text-center">Estado</th>
                             <th>Fecha Pago</th>
@@ -343,7 +355,9 @@
                                 <td>{{ str_pad($pago->mes, 2, '0', STR_PAD_LEFT) }}/{{ $pago->anio }}</td>
                                 <td class="text-right">S/ {{ number_format((float) $pago->sueldo_base, 2) }}</td>
                                 <td class="text-right">S/ {{ number_format((float) $pago->horas_extras, 2) }}</td>
-                                <td class="text-right">S/ {{ number_format((float) $pago->adelantos, 2) }}</td>
+                                <td class="text-right">{{ number_format((float) ($pago->dias_faltados ?? 0), 2) }}</td>
+                                <td class="text-right" style="color: red;">S/
+                                    {{ number_format((float) ($pago->descuento_faltas ?? 0), 2) }}</td>
                                 <td class="text-right">S/ {{ number_format((float) $pago->total_pagar, 2) }}</td>
                                 <td class="text-center">
                                     @if ($pago->estado === 'pagado')
@@ -362,7 +376,8 @@
                             <th colspan="2" class="text-right">SUBTOTAL:</th>
                             <th class="text-right">S/ {{ number_format($empPagos->sum('sueldo_base'), 2) }}</th>
                             <th class="text-right">S/ {{ number_format($empPagos->sum('horas_extras'), 2) }}</th>
-                            <th class="text-right">S/ {{ number_format($empPagos->sum('adelantos'), 2) }}</th>
+                            <th></th>
+                            <th class="text-right">S/ {{ number_format($empPagos->sum('descuento_faltas'), 2) }}</th>
                             <th class="text-right">S/ {{ number_format($empPagos->sum('total_pagar'), 2) }}</th>
                             <th colspan="2"></th>
                         </tr>
@@ -384,6 +399,28 @@
                 </tr>
             </tfoot>
         </table>
+    @endif
+
+    @if (isset($empleado))
+        <div style="position: fixed; bottom: 60px; left: 0; right: 0; page-break-inside: avoid;">
+            <div style="width: 100%; display: table; border-collapse: collapse;">
+                <div style="display: table-row;">
+                    <div style="display: table-cell; width: 45%; text-align: center; padding: 0 20px;">
+                        <div style="border-top: 1px solid #333; height: 40px;"></div>
+                        <p style="margin: 5px 0 0 0; font-size: 10px;">Firma del Empleado</p>
+                        <p style="margin: 5px 0; font-size: 10px;"><strong>{{ $empleado->nombre }}</strong></p>
+                        <p style="margin: 0; font-size: 10px;">DNI: {{ $empleado->dni }}</p>
+                    </div>
+                    <div style="display: table-cell; width: 10%;"></div>
+                    <div style="display: table-cell; width: 45%; text-align: center; padding: 0 20px;">
+                        <div style="border-top: 1px solid #333; height: 40px;"></div>
+                        <p style="margin: 5px 0 0 0; font-size: 10px;">Firma del Empleador</p>
+                        <p style="margin: 5px 0; font-size: 10px;"><strong>Cesar Villegas Guevara</strong></p>
+                        <p style="margin: 0; font-size: 10px;">DNI: 42874639</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     @endif
 
     <div class="footer">

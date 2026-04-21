@@ -401,7 +401,7 @@
                     </ul>
                 </li>
                 @endcanany
-                @canany(['empleados_list', 'planilla_adelantos_list', 'planilla_prestamos_list', 'planilla_pagos_list', 'planilla_report'])
+                @canany(['empleados_list', 'planilla_adelantos_list', 'planilla_prestamos_list', 'planilla_pagos_list', 'planilla_inasistencias_list', 'planilla_report'])
                 <li class="nav-item" id="mnuPlanilla">
                     <a href="#" class="nav-link">
                         <i class="bi bi-people"></i>
@@ -436,6 +436,13 @@
                         <li class="nav-item">
                             <a href="{{route('planilla-pagos.index')}}" class="nav-link" id="itemPagos">
                                 <p>Pagos</p>
+                            </a>
+                        </li>
+                        @endcan
+                        @can('planilla_inasistencias_list')
+                        <li class="nav-item">
+                            <a href="{{route('planilla-inasistencias.index')}}" class="nav-link" id="itemInasistencias">
+                                <p>Inasistencias</p>
                             </a>
                         </li>
                         @endcan

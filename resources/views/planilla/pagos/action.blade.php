@@ -99,6 +99,31 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="row mt-2">
+                                    <div class="col-lg-3">
+                                        <div class="mb-2">
+                                            <label for="dias_faltados" class="form-label text-muted small">Días
+                                                Faltados</label>
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" id="dias_faltados" name="dias_faltados"
+                                                    class="form-control" step="0.01" min="0" max="30"
+                                                    value="0">
+                                                <span class="input-group-text">días</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-3">
+                                        <div class="mb-2">
+                                            <label class="form-label text-muted small">Desc. Faltas</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">S/</span>
+                                                <span id="descuento_faltas_label"
+                                                    class="form-control bg-light d-flex align-items-center text-danger">0.00</span>
+                                                <input type="hidden" id="descuento_faltas" name="descuento_faltas" value="0">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div class="col-lg-4">
@@ -108,7 +133,7 @@
                                 <div class="text-center">
                                     <h2 class="text-success mb-0">S/ <span id="total_pagar_label">0.00</span></h2>
                                     <input type="hidden" name="total_pagar" id="total_pagar" value="0.00">
-                                    <p class="text-muted small mb-0 mt-1">Disponible + H. Extras</p>
+                                    <p class="text-muted small mb-0 mt-1">Disp. + H. Extras - Desc. Faltas</p>
                                 </div>
                             </div>
                             {{-- <div class="border border-info rounded p-3"> --}}

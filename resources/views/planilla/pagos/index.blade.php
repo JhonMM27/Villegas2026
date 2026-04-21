@@ -13,6 +13,25 @@
                     @endcan
                 </div>
                 <div class="card-body">
+                    <div class="row mb-3 align-items-center">
+                        <div class="col-md-3">
+                            <label class="form-label">Mes / Año</label>
+                            <select id="filtro_mes_anio" class="form-select form-select-sm">
+                                <!-- Opciones generadas por JS -->
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <div id="estado_pagos_mes" class="small mt-2"></div>
+                        </div>
+                        <div class="col-md-5 text-end">
+                            <button type="button" id="btnGenerarPagos" class="btn btn-success btn-sm d-none me-2">
+                                <i class="bi bi-magic"></i> Generar Pagos del Mes
+                            </button>
+                            <button type="button" id="btnConfirmarTodos" class="btn btn-primary btn-sm d-none">
+                                <i class="bi bi-check-all"></i> Confirmar Pagos del Mes
+                            </button>
+                        </div>
+                    </div>
                     <div class="table-responsive">
                         <table id="listadoTable" class="table table-striped table-hover table-sm">
                             <thead>
@@ -49,13 +68,25 @@ class PagoPlanillaManager extends CrudManager {
         this.initializeDataTable();
         this.setupEventListeners();
         this.setupCajaListeners();
+        this.inicializarFiltroMes();
     }
 
     initializeDataTable() {
         this.tabla = $(this.elements.table).DataTable({
             processing: true,
             serverSide: true,
-            ajax: { url: this.baseUrl, type: 'GET' },
+            ajax: {
+                url: this.baseUrl,
+                type: 'GET',
+                data: (d) => {
+                    const mesAnio = document.getElementById('filtro_mes_anio')?.value;
+                    if (mesAnio) {
+                        const [mes, anio] = mesAnio.split('-');
+                        d.mes = mes;
+                        d.anio = anio;
+                    }
+                }
+            },
             columns: [
                 { data: 'action', name: 'action', orderable: false, searchable: false },
                 { data: 'id', name: 'id' },
@@ -67,6 +98,155 @@ class PagoPlanillaManager extends CrudManager {
                 { data: 'estado', name: 'estado' },
                 { data: 'fecha_pago', name: 'fecha_pago' }
             ]
+        });
+    }
+
+    inicializarFiltroMes() {
+        const select = document.getElementById('filtro_mes_anio');
+        if (!select) return;
+
+        const fechaActual = new Date();
+        const anioActual = fechaActual.getFullYear();
+        const mesActual = fechaActual.getMonth() + 1;
+
+        const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+        select.innerHTML = '<option value="">-- Todos los meses --</option>';
+
+        for (let m = 4; m <= mesActual; m++) {
+            const value = `${m}-${anioActual}`;
+            const texto = `${meses[m]} ${anioActual}`;
+            select.innerHTML += `<option value="${value}">${texto}</option>`;
+        }
+
+        select.addEventListener('change', () => this.onCambioMesAnio());
+    }
+
+    async onCambioMesAnio() {
+        const select = document.getElementById('filtro_mes_anio');
+        const estadoDiv = document.getElementById('estado_pagos_mes');
+        const btnGenerar = document.getElementById('btnGenerarPagos');
+        const btnConfirmar = document.getElementById('btnConfirmarTodos');
+        const valor = select.value;
+
+        if (!valor) {
+            estadoDiv.innerHTML = '';
+            btnGenerar.classList.add('d-none');
+            btnConfirmar.classList.add('d-none');
+            this.tabla.ajax.reload();
+            return;
+        }
+
+        const [mes, anio] = valor.split('-').map(Number);
+        const anioActual = new Date().getFullYear();
+        const mesActual = new Date().getMonth() + 1;
+
+        if (anio === anioActual && mes < 4) {
+            estadoDiv.innerHTML = '<span class="text-danger">Sistema no iniciado para este período</span>';
+            btnGenerar.classList.add('d-none');
+            btnConfirmar.classList.add('d-none');
+            return;
+        }
+
+        try {
+            const response = await fetch(`{{ route('planilla-pagos.estado-mes') }}?mes=${mes}&anio=${anio}`);
+            const data = await response.json();
+
+            if (!data.existe) {
+                estadoDiv.innerHTML = '<span class="text-warning">Pagos no generados para este mes</span>';
+                btnGenerar.classList.remove('d-none');
+                btnConfirmar.classList.add('d-none');
+            } else {
+                estadoDiv.innerHTML = data.mensaje;
+                btnGenerar.classList.add('d-none');
+                if (data.pendientes > 0) {
+                    btnConfirmar.classList.remove('d-none');
+                } else {
+                    btnConfirmar.classList.add('d-none');
+                }
+            }
+
+            this.tabla.ajax.reload();
+        } catch (error) {
+            console.error('Error al verificar estado:', error);
+        }
+    }
+
+    async generarPagos() {
+        const select = document.getElementById('filtro_mes_anio');
+        const valor = select.value;
+        if (!valor) return;
+
+        const [mes, anio] = valor.split('-');
+
+        try {
+            const response = await fetch(`{{ route('planilla-pagos.generar') }}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ mes: parseInt(mes), anio: parseInt(anio) })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.showNotification('success', data.message);
+                this.onCambioMesAnio();
+            } else {
+                this.showNotification('error', data.message);
+            }
+        } catch (error) {
+            this.showNotification('error', 'Error al generar pagos');
+            console.error(error);
+        }
+    }
+
+    confirmarPagosDelMes() {
+        const select = document.getElementById('filtro_mes_anio');
+        const valor = select.value;
+        if (!valor) return;
+
+        const [mes, anio] = valor.split('-');
+        const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const nombreMes = meses[parseInt(mes)];
+
+        Swal.fire({
+            title: '¿Confirmar todos los pagos?',
+            text: `Se marcarán como pagados todos los pagos pendientes de ${nombreMes} ${anio}`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, confirmar todos',
+            cancelButtonText: 'Cancelar'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch(`{{ route('planilla-pagos.confirmar-todos') }}`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ mes: parseInt(mes), anio: parseInt(anio) })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.showNotification('success', data.message);
+                        this.tabla.ajax.reload(null, false);
+                        this.onCambioMesAnio();
+                    } else {
+                        this.showNotification('error', data.message);
+                    }
+                } catch (error) {
+                    this.showNotification('error', 'Error al confirmar pagos');
+                    console.error(error);
+                }
+            }
         });
     }
 
@@ -83,6 +263,7 @@ class PagoPlanillaManager extends CrudManager {
         });
 
         document.getElementById('horas_extras')?.addEventListener('input', () => this.calcularTotal());
+        document.getElementById('dias_faltados')?.addEventListener('input', () => this.calcularDescuentoFaltas());
         
         document.getElementById('mes')?.addEventListener('change', () => this.cargarDisponible());
         document.getElementById('anio')?.addEventListener('change', () => this.cargarDisponible());
@@ -169,6 +350,9 @@ class PagoPlanillaManager extends CrudManager {
             document.getElementById('sueldo_planilla').value = parseFloat(data.sueldo_planilla).toFixed(2);
             document.getElementById('sueldo_real').value = parseFloat(data.sueldo_real).toFixed(2);
             document.getElementById('disponible_label').textContent = parseFloat(data.disponible).toFixed(2);
+            document.getElementById('dias_faltados').value = parseFloat(data.dias_faltados || 0).toFixed(2);
+            document.getElementById('descuento_faltas_label').textContent = parseFloat(data.descuento_faltas || 0).toFixed(2);
+            document.getElementById('descuento_faltas').value = parseFloat(data.descuento_faltas || 0).toFixed(2);
             
             this.calcularTotal();
         } catch (error) {
@@ -186,13 +370,23 @@ class PagoPlanillaManager extends CrudManager {
     calcularTotal() {
         const disponible = parseFloat(document.getElementById('disponible_label').textContent) || 0;
         const horasExtras = parseFloat(document.getElementById('horas_extras').value) || 0;
-        const total = disponible + horasExtras;
+        const descuentoFaltas = parseFloat(document.getElementById('descuento_faltas').value) || 0;
+        const total = disponible + horasExtras - descuentoFaltas;
         document.getElementById('total_pagar_label').textContent = total.toFixed(2);
         document.getElementById('total_pagar').value = total.toFixed(2);
         document.getElementById('principal').value = total.toFixed(2);
         document.getElementById('deposito').value = '0.00';
         document.getElementById('consorcio').value = '0.00';
         document.getElementById('total_caja').value = total.toFixed(2);
+    }
+
+    calcularDescuentoFaltas() {
+        const sueldoReal = parseFloat(document.getElementById('sueldo_real').value) || 0;
+        const diasFaltados = parseFloat(document.getElementById('dias_faltados').value) || 0;
+        const descuentoFaltas = diasFaltados * (sueldoReal / 30);
+        document.getElementById('descuento_faltas_label').textContent = descuentoFaltas.toFixed(2);
+        document.getElementById('descuento_faltas').value = descuentoFaltas.toFixed(2);
+        this.calcularTotal();
     }
 
     recalcularTotalCaja() {
@@ -228,6 +422,9 @@ class PagoPlanillaManager extends CrudManager {
         document.getElementById('sueldo_real').value = '0.00';
         document.getElementById('disponible_label').textContent = '0.00';
         document.getElementById('horas_extras').value = '0';
+        document.getElementById('dias_faltados').value = '0.00';
+        document.getElementById('descuento_faltas_label').textContent = '0.00';
+        document.getElementById('descuento_faltas').value = '0';
         document.getElementById('total_pagar_label').textContent = '0.00';
         document.getElementById('total_pagar').value = '0.00';
         document.getElementById('principal').value = '0.00';
@@ -236,6 +433,7 @@ class PagoPlanillaManager extends CrudManager {
         document.getElementById('total_caja').value = '0.00';
         document.getElementById('total_caja').classList.remove('is-invalid');
         document.getElementById('horas_extras').disabled = false;
+        document.getElementById('dias_faltados').disabled = false;
         document.getElementById('empleado_nombre').disabled = false;
         
         const now = new Date();
@@ -262,6 +460,9 @@ class PagoPlanillaManager extends CrudManager {
             document.getElementById('sueldo_real').value = parseFloat(response.empleado.sueldo_real || 0).toFixed(2);
             document.getElementById('disponible_label').textContent = parseFloat(response.sueldo_base || 0).toFixed(2);
             document.getElementById('horas_extras').value = parseFloat(response.horas_extras || 0);
+            document.getElementById('dias_faltados').value = parseFloat(response.dias_faltados || 0).toFixed(2);
+            document.getElementById('descuento_faltas_label').textContent = parseFloat(response.descuento_faltas || 0).toFixed(2);
+            document.getElementById('descuento_faltas').value = parseFloat(response.descuento_faltas || 0).toFixed(2);
             document.getElementById('total_pagar_label').textContent = parseFloat(response.total_pagar || 0).toFixed(2);
             document.getElementById('total_pagar').value = parseFloat(response.total_pagar || 0).toFixed(2);
             
@@ -276,13 +477,14 @@ class PagoPlanillaManager extends CrudManager {
             document.getElementById('total_caja').classList.remove('is-invalid');
             
             document.getElementById('horas_extras').disabled = false;
+            document.getElementById('dias_faltados').disabled = false;
             document.getElementById('empleado_nombre').disabled = true;
             
             const mesSelect = document.getElementById('mes');
             mesSelect.value = response.mes;
-            mesSelect.disabled = true;
+            mesSelect.disabled = false;
             document.getElementById('anio').value = response.anio;
-            document.getElementById('anio').disabled = true;
+            document.getElementById('anio').disabled = false;
 
             this.modal.show();
         } catch (error) {
@@ -365,6 +567,14 @@ class PagoPlanillaManager extends CrudManager {
                                             <div class="col-6">
                                                 <label class="form-label text-muted small mb-1">H. Extras</label>
                                                 <p class="fw-bold mb-1">S/ ${parseFloat(p.horas_extras || 0).toFixed(2)}</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label text-muted small mb-1">Días Faltados</label>
+                                                <p class="fw-bold mb-1">${parseFloat(p.dias_faltados || 0).toFixed(2)} días</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label text-muted small mb-1">Desc. Faltas</label>
+                                                <p class="fw-bold mb-1 text-danger">S/ ${parseFloat(p.descuento_faltas || 0).toFixed(2)}</p>
                                             </div>
                                         </div>
                                         <hr class="my-2">
@@ -472,6 +682,14 @@ class PagoPlanillaManager extends CrudManager {
 
 document.addEventListener('DOMContentLoaded', () => {
     window.pagoManager = new PagoPlanillaManager();
+
+    document.getElementById('btnGenerarPagos')?.addEventListener('click', () => {
+        window.pagoManager.generarPagos();
+    });
+
+    document.getElementById('btnConfirmarTodos')?.addEventListener('click', () => {
+        window.pagoManager.confirmarPagosDelMes();
+    });
 });
 document.getElementById('mnuPlanilla').classList.add('menu-open');
 document.getElementById('itemPagos').classList.add('active');

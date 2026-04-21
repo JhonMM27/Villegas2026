@@ -105,6 +105,7 @@
                 <th class="text-right">PLANILLA</th>
                 <th class="text-right">ADELANTOS</th>
                 <th class="text-right">H. EXTRAS</th>
+                <th class="text-right">DESC. FALTAS</th>
                 <th class="text-right">TOTAL A PAGAR</th>
                 <th>FIRMA</th>
             </tr>
@@ -116,6 +117,7 @@
                 $totalAdelantos = 0;
                 $totalXPorPagar = 0;
                 $totalHorasExtras = 0;
+                $totalDescuentoFaltas = 0;
             @endphp
             @foreach ($pagos as $p)
                 @php
@@ -125,12 +127,14 @@
                     $adelantos = (float) ($p->adelantos_calculado ?? 0);
                     $xPagar = $disponible - $adelantos;
                     $horasExtras = (float) $p->horas_extras;
+                    $descuentoFaltas = (float) ($p->descuento_faltas ?? 0);
 
                     $totalSueldo += $sueldoReal;
                     $totalPlanilla += $sueldoPlanilla;
                     $totalAdelantos += $adelantos;
-                    $totalXPorPagar += $xPagar + $horasExtras;
                     $totalHorasExtras += $horasExtras;
+                    $totalDescuentoFaltas += $descuentoFaltas;
+                    $totalXPorPagar += $xPagar + $horasExtras - $descuentoFaltas;
                 @endphp
                 <tr>
                     <td class="text-left">{{ $p->empleado->nombre ?? 'N/A' }}</td>
@@ -139,7 +143,8 @@
                     <td class="text-right">S/ {{ number_format($sueldoPlanilla, 2) }}</td>
                     <td class="text-right">S/ {{ number_format($adelantos, 2) }}</td>
                     <td class="text-right">S/ {{ number_format($horasExtras, 2) }}</td>
-                    <td class="text-right">S/ {{ number_format($xPagar, 2) }}</td>
+                    <td class="text-right">S/ {{ number_format($descuentoFaltas, 2) }}</td>
+                    <td class="text-right">S/ {{ number_format($xPagar + $horasExtras - $descuentoFaltas, 2) }}</td>
                     <td><span class="signature-box"></span></td>
                 </tr>
             @endforeach
@@ -152,6 +157,7 @@
                 <td class="text-right"><strong>S/ {{ number_format($totalPlanilla, 2) }}</strong></td>
                 <td class="text-right"><strong>S/ {{ number_format($totalAdelantos, 2) }}</strong></td>
                 <td class="text-right"><strong>S/ {{ number_format($totalHorasExtras, 2) }}</strong></td>
+                <td class="text-right"><strong>S/ {{ number_format($totalDescuentoFaltas, 2) }}</strong></td>
                 <td class="text-right"><strong>S/ {{ number_format($totalXPorPagar, 2) }}</strong></td>
                 <td></td>
             </tr>

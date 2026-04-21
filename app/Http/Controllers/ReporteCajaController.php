@@ -405,6 +405,7 @@ class ReporteCajaController extends Controller
         // ======================
         $adelantosList = PlanillaAdelanto::whereBetween('fecha', [$ini, $fin])
             ->with('empleado')
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->select([
                 'id',
                 'fecha',
@@ -419,6 +420,7 @@ class ReporteCajaController extends Controller
 
         $prestamosList = PlanillaPrestamo::whereBetween('fecha_prestamo', [$ini, $fin])
             ->with('empleado')
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->select([
                 'id',
                 'fecha_prestamo',
@@ -433,6 +435,7 @@ class ReporteCajaController extends Controller
 
         $pagosPrestamosList = PlanillaPrestamoPago::whereBetween('fecha_pago', [$ini, $fin])
             ->with(['prestamo.empleado'])
+            ->whereHas('prestamo.empleado', fn ($q) => $q->where('estado', 'activo'))
             ->select([
                 'id',
                 'fecha_pago',
@@ -447,6 +450,7 @@ class ReporteCajaController extends Controller
 
         $pagosPlanillaList = PlanillaPago::whereBetween('fecha_pago', [$ini, $fin])
             ->with('empleado')
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->select([
                 'id',
                 'fecha_pago',

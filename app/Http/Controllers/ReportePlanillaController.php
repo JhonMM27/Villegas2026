@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Empleado;
 use App\Models\PlanillaAdelanto;
+use App\Models\PlanillaInasistencia;
 use App\Models\PlanillaPago;
 use App\Models\PlanillaPrestamo;
 use App\Services\EmpleadoService;
@@ -19,7 +20,7 @@ class ReportePlanillaController extends Controller
         protected PlanillaPagoService $pagoService,
         protected EmpleadoService $empleadoService
     ) {
-        $this->middleware('can:planilla_report')->only(['index', 'mensual', 'porEmpleado', 'adelantosPdf', 'prestamosPdf', 'pagosPendientesPdf', 'empleadoPdf']);
+        $this->middleware('can:planilla_report')->only(['index', 'mensual', 'porEmpleado', 'adelantosPdf', 'prestamosPdf', 'pagosPendientesPdf', 'empleadoPdf', 'inasistenciasPdf']);
     }
 
     public function index()
@@ -60,7 +61,7 @@ class ReportePlanillaController extends Controller
             ->get();
 
         $adelantos = PlanillaAdelanto::where('empleado_id', $empleadoId)
-            ->orderByDesc('fecha')
+            ->orderBy('fecha', 'asc')
             ->get();
 
         $resumen = [
@@ -69,6 +70,8 @@ class ReportePlanillaController extends Controller
             'total_sueldo_base' => $pagos->sum('sueldo_base'),
             'total_horas_extras' => $pagos->sum('horas_extras'),
             'total_adelantos' => $adelantos->sum('monto'),
+            'total_dias_faltas' => $pagos->sum('dias_faltados'),
+            'total_descuento_faltas' => $pagos->sum('descuento_faltas'),
             'total_pagado' => $pagos->where('estado', 'pagado')->sum('total_pagar'),
             'total_pendiente' => $pagos->where('estado', 'pendiente')->sum('total_pagar'),
             'total_general' => $pagos->sum('total_pagar'),
@@ -86,6 +89,7 @@ class ReportePlanillaController extends Controller
 
         $adelantos = PlanillaAdelanto::with('empleado')
             ->whereBetween('fecha', [$fechaInicio, $fechaFin])
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->orderByDesc('fecha')
             ->get();
 
@@ -106,6 +110,7 @@ class ReportePlanillaController extends Controller
         $prestamos = PlanillaPrestamo::with('empleado')
             ->whereBetween('fecha_prestamo', [$fechaInicio, $fechaFin])
             ->whereIn('estado', ['activo', 'pagado'])
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->orderByDesc('fecha_prestamo')
             ->get();
 
@@ -122,6 +127,7 @@ class ReportePlanillaController extends Controller
 
         $pagos = PlanillaPago::with(['empleado'])
             ->where('estado', 'pendiente')
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->orderByDesc('anio')
             ->orderByDesc('mes')
             ->get();
@@ -154,7 +160,8 @@ class ReportePlanillaController extends Controller
         $mesFin = (int) date('m', strtotime($fechaFin));
         $anioFin = (int) date('Y', strtotime($fechaFin));
 
-        $query = PlanillaPago::with('empleado');
+        $query = PlanillaPago::with('empleado')
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'));
 
         if ($empleadoId > 0) {
             $query->where('empleado_id', $empleadoId);
@@ -182,11 +189,12 @@ class ReportePlanillaController extends Controller
             ->orderByDesc('mes')
             ->get();
 
-        $adelantosQuery = PlanillaAdelanto::whereBetween('fecha', [$fechaInicio, $fechaFin]);
+        $adelantosQuery = PlanillaAdelanto::whereBetween('fecha', [$fechaInicio, $fechaFin])
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'));
         if ($empleadoId > 0) {
             $adelantosQuery->where('empleado_id', $empleadoId);
         }
-        $adelantos = $adelantosQuery->orderByDesc('fecha')->get();
+        $adelantos = $adelantosQuery->orderBy('fecha', 'asc')->get();
 
         $totalRegistros = $pagos->count();
 
@@ -201,6 +209,8 @@ class ReportePlanillaController extends Controller
                 'total_sueldo_base' => $pagos->sum('sueldo_base'),
                 'total_horas_extras' => $pagos->sum('horas_extras'),
                 'total_adelantos' => $adelantos->sum('monto'),
+                'total_dias_faltas' => $pagos->sum('dias_faltados'),
+                'total_descuento_faltas' => $pagos->sum('descuento_faltas'),
                 'total_pagado' => $pagos->where('estado', 'pagado')->sum('total_pagar'),
                 'total_pendiente' => $pagos->where('estado', 'pendiente')->sum('total_pagar'),
                 'total_general' => $pagos->sum('total_pagar'),
@@ -213,6 +223,40 @@ class ReportePlanillaController extends Controller
         $pdf = PDF::loadView('planilla.reportes.empleados_pdf', compact('pagos', 'adelantos', 'empresa', 'totalRegistros'));
 
         return $pdf->stream('reporte_empleados.pdf');
+    }
+
+    public function inasistenciasPdf(Request $request)
+    {
+        $empresa = $this->getEmpresa();
+
+        $fechaInicio = $request->get('fecha_inicio', date('Y-01-01'));
+        $fechaFin = $request->get('fecha_fin', date('Y-m-d'));
+        $empleadoId = (int) $request->get('empleado_id', 0);
+
+        $query = PlanillaInasistencia::with('empleado')
+            ->whereBetween('fecha', [$fechaInicio, $fechaFin])
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
+            ->orderBy('fecha', 'desc');
+
+        if ($empleadoId > 0) {
+            $query->where('empleado_id', $empleadoId);
+        }
+
+        $inasistencias = $query->get();
+
+        $totalRegistros = $inasistencias->count();
+        $totalDias = $inasistencias->sum(fn ($i) => $i->medio_dia ? 0.5 : 1.0);
+
+        $pdf = PDF::loadView('planilla.reportes.inasistencias_pdf', compact(
+            'inasistencias',
+            'empresa',
+            'totalRegistros',
+            'totalDias',
+            'fechaInicio',
+            'fechaFin'
+        ));
+
+        return $pdf->stream('reporte_inasistencias.pdf');
     }
 
     private function getEmpresa()

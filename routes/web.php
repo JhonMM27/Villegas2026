@@ -27,6 +27,7 @@ use App\Http\Controllers\PagoFormaController;
 use App\Http\Controllers\PagoMedioController;
 use App\Http\Controllers\PerfilController;
 use App\Http\Controllers\PlanillaAdelantoController;
+use App\Http\Controllers\PlanillaInasistenciaController;
 use App\Http\Controllers\PlanillaPagoController;
 use App\Http\Controllers\PlanillaPrestamoController;
 use App\Http\Controllers\PreparadaController;
@@ -433,8 +434,16 @@ Route::middleware(['auth'])->group(function () {
 
     // Planilla - Pagos
     Route::get('/planilla-pagos/disponible', [PlanillaPagoController::class, 'getDisponibleEmpleado'])->name('planilla-pagos.disponible');
+    Route::post('/planilla-pagos/guardar-faltas', [PlanillaPagoController::class, 'guardarFaltas'])->name('planilla-pagos.guardar-faltas');
+    Route::post('/planilla-pagos/generar', [PlanillaPagoController::class, 'generarPagosMes'])->name('planilla-pagos.generar');
+    Route::post('/planilla-pagos/confirmar-todos', [PlanillaPagoController::class, 'confirmarPagosMes'])->name('planilla-pagos.confirmar-todos');
+    Route::get('/planilla-pagos/estado-mes', [PlanillaPagoController::class, 'estadoPagosMes'])->name('planilla-pagos.estado-mes');
     Route::post('/planilla-pagos/{id}/marcar-pagado', [PlanillaPagoController::class, 'marcarPagado'])->name('planilla-pagos.marcar-pagado');
+    Route::put('/planilla-pagos/{id}', [PlanillaPagoController::class, 'update'])->name('planilla-pagos.update');
     Route::resource('planilla-pagos', PlanillaPagoController::class)->except(['create', 'edit', 'update', 'destroy']);
+
+    // Planilla - Inasistencias
+    Route::resource('planilla-inasistencias', PlanillaInasistenciaController::class)->except(['create', 'edit']);
 
     // Planilla - Reportes
     Route::get('/reportes/planilla', [ReportePlanillaController::class, 'index'])->name('reportes.planilla');
@@ -444,6 +453,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reportes/planilla/prestamos/pdf', [ReportePlanillaController::class, 'prestamosPdf'])->name('reportes.planilla.prestamos');
     Route::get('/reportes/planilla/pagos-pendientes/pdf', [ReportePlanillaController::class, 'pagosPendientesPdf'])->name('reportes.planilla.pagos_pendientes');
     Route::get('/reportes/planilla/empleado/pdf', [ReportePlanillaController::class, 'empleadoPdf'])->name('reportes.planilla.empleado_pdf');
+    Route::get('/reportes/planilla/inasistencias/pdf', [ReportePlanillaController::class, 'inasistenciasPdf'])->name('reportes.planilla.inasistencias');
 
     Route::get('/perfil', [PerfilController::class, 'edit'])->name('perfil.edit');
     Route::put('/perfil', [PerfilController::class, 'update'])->name('perfil.update');

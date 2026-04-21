@@ -85,6 +85,12 @@
                                             data-url="{{ route('reportes.planilla.empleado_pdf') }}">
                                             <i class="bi bi-file-earmark-pdf"></i> Ver Reporte PDF
                                         </button>
+                                        <button type="button" class="btn btn-danger btn-sm btn-report" 
+                                            data-tab="1"
+                                            data-skip-employee="true"
+                                            data-url="{{ route('reportes.planilla.inasistencias') }}">
+                                            <i class="bi bi-exclamation-triangle"></i> Inasistencias
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -93,11 +99,11 @@
                         {{-- TAB 2: Reportes Generales --}}
                         <div class="tab-pane fade" id="tab2" role="tabpanel">
                             <div class="row g-2 align-items-end mb-2">
-                                <div class="col-12 col-lg-3">
+                                <div class="col-12 col-lg-2">
                                     <label class="form-label mb-0">Fecha Inicio</label>
                                     <input type="date" id="fecha_inicio_general" class="form-control form-control-sm" value="{{ date('Y-01-01') }}">
                                 </div>
-                                <div class="col-12 col-lg-3">
+                                <div class="col-12 col-lg-2">
                                     <label class="form-label mb-0">Fecha Fin</label>
                                     <input type="date" id="fecha_fin_general" class="form-control form-control-sm" value="{{ date('Y-m-d') }}">
                                 </div>
@@ -161,16 +167,18 @@
         });
     }
 
-    function getParams(tab) {
+    function getParams(tab, skipEmployeeValidation = false) {
         const params = new URLSearchParams();
 
         if (tab === 1) {
             const empleadoId = $('#filtro_empleado').val();
-            if (!empleadoId) {
+            if (!skipEmployeeValidation && !empleadoId) {
                 showError('Seleccione un empleado');
                 return null;
             }
-            params.append('empleado_id', empleadoId);
+            if (empleadoId) {
+                params.append('empleado_id', empleadoId);
+            }
 
             const fechaInicio = document.getElementById('fecha_inicio').value;
             const fechaFin = document.getElementById('fecha_fin').value;
@@ -214,8 +222,9 @@
             e.preventDefault();
             const url = btn.dataset.url;
             const tab = parseInt(btn.dataset.tab, 10);
+            const skipEmployeeValidation = btn.dataset.skipEmployee === 'true';
 
-            const params = getParams(tab);
+            const params = getParams(tab, skipEmployeeValidation);
             if (!params) return;
 
             const finalUrl = url + '?' + params.toString();
