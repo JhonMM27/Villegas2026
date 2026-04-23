@@ -20,7 +20,7 @@ class ReportePlanillaController extends Controller
         protected PlanillaPagoService $pagoService,
         protected EmpleadoService $empleadoService
     ) {
-        $this->middleware('can:planilla_report')->only(['index', 'mensual', 'porEmpleado', 'adelantosPdf', 'prestamosPdf', 'pagosPendientesPdf', 'empleadoPdf', 'inasistenciasPdf']);
+        $this->middleware('can:planilla_report')->only(['index', 'mensual', 'porEmpleado', 'adelantosPdf', 'prestamosPdf', 'pagosPendientesPdf', 'empleadoPdf', 'inasistenciasPdf', 'trabajadoresPdf']);
     }
 
     public function index()
@@ -257,6 +257,25 @@ class ReportePlanillaController extends Controller
         ));
 
         return $pdf->stream('reporte_inasistencias.pdf');
+    }
+
+    public function trabajadoresPdf()
+    {
+        $empresa = $this->getEmpresa();
+
+        $empleados = Empleado::where('estado', 'activo')
+            ->orderBy('nombre')
+            ->get();
+
+        $totalRegistros = $empleados->count();
+
+        $pdf = PDF::loadView('planilla.reportes.trabajadores_pdf', compact(
+            'empleados',
+            'empresa',
+            'totalRegistros'
+        ));
+
+        return $pdf->stream('reporte_trabajadores.pdf');
     }
 
     private function getEmpresa()

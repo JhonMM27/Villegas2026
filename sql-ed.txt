@@ -26,3 +26,24 @@ CREATE TABLE IF NOT EXISTS planilla_asistencias (
 ALTER TABLE planilla_pagos 
 ADD COLUMN IF NOT EXISTS dias_faltados DECIMAL(5,2) DEFAULT 0 AFTER adelantos,
 ADD COLUMN IF NOT EXISTS descuento_faltas DECIMAL(10,2) DEFAULT 0 AFTER dias_faltados;
+
+
+
+-- Tabla planilla_inasistencias
+CREATE TABLE planilla_inasistencias (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    empleado_id BIGINT UNSIGNED NOT NULL,
+    fecha DATE NOT NULL,
+    medio_dia BOOLEAN DEFAULT FALSE,
+    observacion VARCHAR(255) NULL,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    UNIQUE KEY unique_empleado_fecha (empleado_id, fecha),
+    FOREIGN KEY (empleado_id) REFERENCES empleados(id) ON DELETE CASCADE
+);
+-- Permisos (agregar a la tabla permissions)
+INSERT INTO permissions (name, guard_name, created_at, updated_at) VALUES
+('planilla_inasistencias_list', 'web', NOW(), NOW()),
+('planilla_inasistencias_create', 'web', NOW(), NOW()),
+('planilla_inasistencias_edit', 'web', NOW(), NOW()),
+('planilla_inasistencias_delete', 'web', NOW(), NOW());

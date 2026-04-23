@@ -454,6 +454,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reportes/planilla/pagos-pendientes/pdf', [ReportePlanillaController::class, 'pagosPendientesPdf'])->name('reportes.planilla.pagos_pendientes');
     Route::get('/reportes/planilla/empleado/pdf', [ReportePlanillaController::class, 'empleadoPdf'])->name('reportes.planilla.empleado_pdf');
     Route::get('/reportes/planilla/inasistencias/pdf', [ReportePlanillaController::class, 'inasistenciasPdf'])->name('reportes.planilla.inasistencias');
+    Route::get('/reportes/planilla/trabajadores/pdf', [ReportePlanillaController::class, 'trabajadoresPdf'])->name('reportes.planilla.trabajadores');
 
     Route::get('/perfil', [PerfilController::class, 'edit'])->name('perfil.edit');
     Route::put('/perfil', [PerfilController::class, 'update'])->name('perfil.update');

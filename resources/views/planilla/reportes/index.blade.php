@@ -132,6 +132,11 @@
                                             data-url="{{ route('reportes.planilla.pagos_pendientes') }}">
                                             <i class="bi bi-file-earmark-bar-graph"></i> Pagos Pendientes
                                         </button>
+                                        <button type="button" class="btn btn-info btn-sm btn-report" 
+                                            data-tab="2"
+                                            data-url="{{ route('reportes.planilla.trabajadores') }}">
+                                            <i class="bi bi-people"></i> Trabajadores
+                                        </button>
                                     </div>
                                 </div>
                             </div>

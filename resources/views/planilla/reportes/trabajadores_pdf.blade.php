@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Trabajadores - Planilla</title>
+    <style>
+        @page { margin: 10mm; }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 0; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h2 { margin: 0; }
+        .header p { margin: 2px 0; }
+        .info { margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
+        th { background-color: #f0f0f0; font-weight: bold; }
+        .text-center { text-align: center; }
+        .footer { position: fixed; bottom: 60px; left: 0; right: 0; text-align: center; font-size: 10px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>{{ $empresa->razon_social ?? 'EMPRESA' }}</h2>
+        <p>{{ $empresa->direccion ?? '' }}</p>
+        <p>RUC: {{ $empresa->ruc ?? '' }}</p>
+        <h3>REPORTE DE TRABAJADORES</h3>
+        <p>Fecha: {{ date('d/m/Y') }}</p>
+    </div>
+
+    <div class="info">
+        <strong>Total de Trabajadores:</strong> {{ $totalRegistros }}
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th class="text-center">#</th>
+                <th>Nombre</th>
+                <th>DNI</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($empleados as $index => $emp)
+            <tr>
+                <td class="text-center">{{ $index + 1 }}</td>
+                <td>{{ $emp->nombre }}</td>
+                <td>{{ $emp->dni }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+
+    <div class="footer">
+        Generado: {{ date('d/m/Y H:i:s') }}
+    </div>
+</body>
+</html>
