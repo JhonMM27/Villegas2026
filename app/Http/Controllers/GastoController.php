@@ -24,7 +24,7 @@ class GastoController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $data = Gasto::select(['id', 'fecha_gasto', 'user_nombre', 'descripcion', 'responsable', 'numero_recibo', 'monto']);
+            $data = Gasto::with('gastoTipo')->select(['id', 'fecha_gasto', 'user_nombre', 'descripcion', 'responsable', 'numero_recibo', 'monto', 'gasto_tipo_id']);
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
@@ -102,7 +102,7 @@ class GastoController extends Controller
     public function show($id)
     {
         try {
-            $registro = Gasto::where('id', $id)->firstOrFail();
+            $registro = Gasto::with('gastoTipo')->where('id', $id)->firstOrFail();
 
             return response()->json($registro);
         } catch (\Exception $e) {
@@ -174,7 +174,7 @@ class GastoController extends Controller
             'deposito' => 'nullable|numeric|min:0',
             'consorcio' => 'nullable|numeric|min:0',
             'total_cobranza' => 'nullable|numeric|min:0.01',
-            'tipo' => 'nullable|string|in:Combustible,Luz,Reparaciones,Fletes,Administrativo,Otros',
+            'gasto_tipo_id' => 'nullable|exists:gasto_tipos,id',
         ]);
     }
 
@@ -209,6 +209,14 @@ class GastoController extends Controller
             ->setOption('defaultFont', 'DejaVu Sans');
 
         return $pdf->stream("gasto_{$gasto->id}.pdf");
+    }
+
+    public function selectTipos(Request $request)
+    {
+        $query = \App\Models\GastoTipo::select('id', 'nombre')
+            ->where('activo', true);
+
+        return response()->json($query->get());
     }
 
     public function reporteResumen(Request $request)

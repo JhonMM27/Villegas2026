@@ -1,6 +1,24 @@
 @extends('plantilla.app')
 @push('estilos')
-
+<style>
+@media (max-width: 576px) {
+    #tab3 .d-flex,
+    #tab1 .d-flex,
+    #tab2 .d-flex {
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
+    }
+    #tab3 .d-flex .form-control,
+    #tab1 .d-flex .form-control,
+    #tab2 .d-flex .form-control {
+        min-width: 100px;
+    }
+    #tab3 .d-flex select,
+    #tab3 .d-flex .btn {
+        min-width: 80px;
+    }
+}
+</style>
 @endpush
 @section('contenido')
 <div class="container-fluid">
@@ -12,6 +30,7 @@
                     <ul class="nav nav-pills">
                         <li class="nav-item"><a class="nav-link active" href="#tab1" data-bs-toggle="tab">Estado de cuenta Préstamo A</a></li>
                         <li class="nav-item"><a class="nav-link" href="#tab2" data-bs-toggle="tab">Estado de cuenta Préstamo DE</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#tab3" data-bs-toggle="tab">Reporte General</a></li>
                     </ul>
                 </div>
                 <div class="card-body">
@@ -55,6 +74,23 @@
 
                             <div id="reporteTab2">
                                 @include('reportes.prestamos.prestamos_de', ['reportes' => collect(), 'fechaInicio' => null, 'fechaFin' => null, 'cliente_origen_id' => null])
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="tab3">
+                            <div class="d-flex flex-nowrap mb-2" style="overflow: visible;">
+                                <select id="movimiento_tipo" class="form-control form-control-sm me-2">
+                                    <option value="ALL">Todos</option>
+                                    <option value="PA">Préstamos A (Otorgados)</option>
+                                    <option value="PD">Préstamos DE (Recibidos)</option>
+                                </select>
+                                <input type="date" id="fecha_inicio_general" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
+                                <input type="date" id="fecha_fin_general" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <button id="btnFiltrarGeneral" class="btn btn-primary btn-sm me-2">Filtrar</button>
+                                <a href="#" id="btnPdfGeneral" target="_blank" class="btn btn-danger">PDF</a>
+                            </div>
+
+                            <div id="reporteTab3">
+                                @include('reportes.prestamos.prestamos_general', ['reportes' => collect(), 'fechaInicio' => null, 'fechaFin' => null, 'movimientoTipo' => 'ALL'])
                             </div>
                         </div>
                     </div>

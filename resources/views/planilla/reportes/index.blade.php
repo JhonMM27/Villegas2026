@@ -80,12 +80,16 @@
                             <div class="row g-2 align-items-end mb-2">
                                 <div class="col-12 col-lg-4">
                                     <div class="d-flex flex-wrap gap-2">
-                                        <button type="button" class="btn btn-primary btn-sm btn-report" 
+                                        <button type="button" class="btn btn-primary btn-sm btn-report"
                                             data-tab="1"
                                             data-url="{{ route('reportes.planilla.empleado_pdf') }}">
                                             <i class="bi bi-file-earmark-pdf"></i> Ver Reporte PDF
                                         </button>
-                                        <button type="button" class="btn btn-danger btn-sm btn-report" 
+                                        <button type="button" class="btn btn-warning btn-sm" id="btnDescargarTodos"
+                                            data-tab="1">
+                                            <i class="bi bi-file-earmark-pdf"></i> Descargar PDFs
+                                        </button>
+                                        <button type="button" class="btn btn-secondary btn-sm btn-report"
                                             data-tab="1"
                                             data-skip-employee="true"
                                             data-url="{{ route('reportes.planilla.inasistencias') }}">
@@ -132,10 +136,15 @@
                                             data-url="{{ route('reportes.planilla.pagos_pendientes') }}">
                                             <i class="bi bi-file-earmark-bar-graph"></i> Pagos Pendientes
                                         </button>
-                                        <button type="button" class="btn btn-info btn-sm btn-report" 
+                                        <button type="button" class="btn btn-info btn-sm btn-report"
                                             data-tab="2"
                                             data-url="{{ route('reportes.planilla.trabajadores') }}">
                                             <i class="bi bi-people"></i> Trabajadores
+                                        </button>
+                                        <button type="button" class="btn btn-success btn-sm btn-report"
+                                            data-tab="2"
+                                            data-url="{{ route('reportes.planilla.trabajadores_sueldo') }}">
+                                            <i class="bi bi-currency-dollar"></i> Trabajadores c/ Sueldo
                                         </button>
                                     </div>
                                 </div>
@@ -220,6 +229,10 @@
             document.getElementById('fecha_fin_general').value = hoy;
         });
 
+        document.getElementById('btnDescargarTodos').addEventListener('click', function() {
+            descargarTodosLosPdfs();
+        });
+
         document.addEventListener('click', function(e) {
             const btn = e.target.closest('.btn-report');
             if (!btn) return;
@@ -247,6 +260,67 @@
             timer: 3000,
             timerProgressBar: true
         });
+    }
+
+    async function descargarTodosLosPdfs() {
+        const fechaInicio = document.getElementById('fecha_inicio').value;
+        const fechaFin = document.getElementById('fecha_fin').value;
+
+        if (!fechaInicio || !fechaFin) {
+            showError('Seleccione un rango de fechas');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Obteniendo lista de PDFs...',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+
+        try {
+            const listUrl = '{{ route('reportes.planilla.empleados_zip') }}?json=1&fecha_inicio=' + fechaInicio + '&fecha_fin=' + fechaFin;
+            const response = await fetch(listUrl);
+            const data = await response.json();
+
+            if (!data.pdfUrls || data.pdfUrls.length === 0) {
+                Swal.fire('Error', 'No hay PDFs disponibles para el período seleccionado', 'error');
+                return;
+            }
+
+            Swal.close();
+
+            for (let i = 0; i < data.pdfUrls.length; i++) {
+                try {
+                    const resp = await fetch(data.pdfUrls[i].url);
+                    const blob = await resp.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = data.pdfUrls[i].name;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+
+                    if (i < data.pdfUrls.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                } catch (e) {
+                    console.error('Error downloading:', data.pdfUrls[i].name, e);
+                }
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Descarga completada',
+                text: 'Se descargaron ' + data.pdfUrls.length + ' archivos PDF',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        } catch (e) {
+            console.error(e);
+            Swal.fire('Error', 'No se pudo iniciar la descarga', 'error');
+        }
     }
 
     function activateMenu(){

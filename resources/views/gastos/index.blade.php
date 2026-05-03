@@ -22,6 +22,7 @@
                                 <tr>
                                     <th>Opciones</th>
                                     <th>Fecha</th>
+                                    <th>Tipo</th>
                                     <th>Usuario</th>
                                     <th>Descripción</th>
                                     <th>Responsable</th>
@@ -69,33 +70,35 @@ class GastoManager extends CrudManager {
             columns: [
                  { data: 'action', name: 'action', orderable: false, searchable: false},
                  { 
-                     data: 'fecha_gasto', 
-                     name: 'fecha_gasto',
-                     render: function(data) {
-                         if (!data) return '';
-                         const fecha = new Date(data);
-                         const day = String(fecha.getDate()).padStart(2, '0');
-                         const month = String(fecha.getMonth() + 1).padStart(2, '0');
-                         const year = fecha.getFullYear();
-                         const hours = String(fecha.getHours()).padStart(2, '0');
-                         const minutes = String(fecha.getMinutes()).padStart(2, '0');
-                         return `${day}/${month}/${year} ${hours}:${minutes}`;
-                     }
-                 },
-                { data: 'user_nombre', name: 'user_nombre'},                
+data: 'fecha_gasto',
+                      name: 'fecha_gasto',
+                      render: function(data) {
+                          if (!data) return '';
+                          const fecha = new Date(data);
+                          const day = String(fecha.getDate()).padStart(2, '0');
+                          const month = String(fecha.getMonth() + 1).padStart(2, '0');
+                          const year = fecha.getFullYear();
+                          const hours = String(fecha.getHours()).padStart(2, '0');
+                          const minutes = String(fecha.getMinutes()).padStart(2, '0');
+                          return `${day}/${month}/${year} ${hours}:${minutes}`;
+                      }
+                  },
+                 { data: 'gasto_tipo.nombre', name: 'gasto_tipo.nombre' },
+                 { data: 'user_nombre', name: 'user_nombre'},
                 { data: 'descripcion', name: 'descripcion' },
                 { data: 'responsable', name: 'responsable' },
                 { data: 'numero_recibo', name: 'numero_recibo' },
                 { data: 'monto', name: 'monto' }
             ],
             columnDefs: [
-                { targets: 0, width: '15%', className: 'text-center' },
-                { targets: 1, width: '15%' },
-                { targets: 2, width: '15%' },
-                { targets: 3, width: '20%', className: 'text-center' },
-                { targets: 4, width: '15%' },
-                { targets: 5, width: '10%' },
-                { targets: 6, width: '10%' },
+                { targets: 0, width: '12%', className: 'text-center' },
+                { targets: 1, width: '13%' },
+                { targets: 2, width: '10%' },
+                { targets: 3, width: '12%' },
+                { targets: 4, width: '18%' },
+                { targets: 5, width: '12%' },
+                { targets: 6, width: '8%' },
+                { targets: 7, width: '10%' },
             ],
             responsive: true,
             order: [[1, 'desc']]
@@ -105,16 +108,15 @@ class GastoManager extends CrudManager {
     async showEditModal(id) {
         try {
             const response = await this.fetchData(`${this.baseUrl}/${id}`);
-            
+
             this.isEditing = true;
             this.resetForm();
-            
+
             this.elements.modalTitle.textContent = 'Editar Gasto: '+ response.numero_recibo;
             this.elements.methodField.value = 'PUT';
-            
+
             // Llenar campos específicos
             document.getElementById('fecha_gasto').value = (response.fecha_gasto || '').replace(' ', 'T').slice(0,16);
-            //document.getElementById('numero_recibo').value = response.numero_recibo || '';
             document.getElementById('numero_interno').value = response.numero_interno || '';
             document.getElementById('total_cobranza').value = response.monto || 0;
             document.getElementById('principal').value = response.importe_p || 0;
@@ -125,15 +127,20 @@ class GastoManager extends CrudManager {
             document.getElementById('descripcion').value = response.descripcion || '';
 
             this.form.action = `${this.baseUrl}/${id}`;
-            
+
+            await this.loadTiposGasto();
+            if (response.gasto_tipo_id) {
+                document.getElementById('gasto_tipo_id').value = response.gasto_tipo_id;
+            }
+
             this.modal.show();
-            
+
         } catch (error) {
             this.showNotification('error', 'Error al cargar los datos');
             console.error('Error al cargar datos:', error);
         }
     }
-    
+
     focusFirstField() {
         document.getElementById('principal').focus();
         const modalEl = this.modal._element;
@@ -144,10 +151,33 @@ class GastoManager extends CrudManager {
         }, { once: true });
     }
 
-    showCreateModal(){
+    showCreateModal() {
         super.showCreateModal();
         this.elements.modalTitle.textContent = 'Nuevo Gasto';
         document.getElementById('fecha_gasto').value = this.obtenerFechaHoraActual();
+        this.loadTiposGasto();
+    }
+
+    async loadTiposGasto() {
+        try {
+            const response = await fetch('{{ route('gastos.tipos.select') }}');
+            const tipos = await response.json();
+
+            const select = document.getElementById('gasto_tipo_id');
+            select.innerHTML = '<option value="">Seleccione tipo</option>';
+            tipos.forEach(tipo => {
+                const option = document.createElement('option');
+                option.value = tipo.id;
+                option.textContent = tipo.nombre;
+                select.appendChild(option);
+            });
+
+            if (tipos.length === 1) {
+                select.value = tipos[0].id;
+            }
+        } catch (error) {
+            console.error('Error cargando tipos de gasto:', error);
+        }
     }
 
     obtenerFechaHoraActual() {

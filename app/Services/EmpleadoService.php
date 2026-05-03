@@ -31,7 +31,22 @@ class EmpleadoService
 
     public function update(Empleado $empleado, array $data): bool
     {
-        return $empleado->update($data);
+        $oldSueldoReal = (float) $empleado->sueldo_real;
+        $oldSueldoPlanilla = (float) $empleado->sueldo_planilla;
+
+        $result = $empleado->update($data);
+
+        if ($result) {
+            $sueldoRealChanged = isset($data['sueldo_real']) && (float) $data['sueldo_real'] !== $oldSueldoReal;
+            $sueldoPlanillaChanged = isset($data['sueldo_planilla']) && (float) $data['sueldo_planilla'] !== $oldSueldoPlanilla;
+
+            if ($sueldoRealChanged || $sueldoPlanillaChanged) {
+                $pagoService = app(\App\Services\PlanillaPagoService::class);
+                $pagoService->recalcularPagosDelEmpleado($empleado->id);
+            }
+        }
+
+        return $result;
     }
 
     public function delete(Empleado $empleado): bool
@@ -71,4 +86,6 @@ class EmpleadoService
 
         return max(0, $baseDisponible - $totalAdelantos);
     }
+
+    
 }

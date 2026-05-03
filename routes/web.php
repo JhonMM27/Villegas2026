@@ -11,6 +11,7 @@ use App\Http\Controllers\ComprobanteSerieController;
 use App\Http\Controllers\ComprobanteTipoController;
 use App\Http\Controllers\ConfiguracionController;
 use App\Http\Controllers\CotizacionController;
+use App\Http\Controllers\CuadreStockController;
 use App\Http\Controllers\CuentaCorrienteClienteController;
 use App\Http\Controllers\CuentaCorrienteProveedorController;
 use App\Http\Controllers\DashboardController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\DocumentoTipoController;
 use App\Http\Controllers\EmpleadoController;
 use App\Http\Controllers\FormulacionController;
 use App\Http\Controllers\GastoController;
+use App\Http\Controllers\GastoTipoController;
 use App\Http\Controllers\KardexController;
 use App\Http\Controllers\LineaController;
 use App\Http\Controllers\NucleoController;
@@ -87,6 +89,11 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('comprobante-series', ComprobanteSerieController::class)->except(['create', 'edit']);
     Route::get('/configuraciones/json', [ConfiguracionController::class, 'json'])->name('configuraciones.json');
     Route::resource('configuraciones', ConfiguracionController::class)->except(['create', 'edit']);
+
+    Route::post('/cuadre-stock/preview', [CuadreStockController::class, 'preview'])->name('cuadre-stock.preview');
+    Route::post('/cuadre-stock/{id}/rectificar', [CuadreStockController::class, 'rectificar'])->name('cuadre-stock.rectificar');
+    Route::resource('cuadre-stock', CuadreStockController::class)->except(['create', 'edit']);
+
     Route::get('/productos/buscar', [ProductoController::class, 'buscar'])->name('productos.buscar');
     Route::get('/productos/buscar-formulacion', [ProductoController::class, 'buscarFormulacion'])->name('productos.buscar-formulacion');
     Route::get('/productos/buscar-formulacion-preparada', [ProductoController::class, 'buscarFormulacionPreparada'])->name('productos.buscar-formulacion-preparada');
@@ -176,6 +183,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/gastos/{id}/ver', [GastoController::class, 'view'])->name('gastos.ver');
     Route::get('/gastos/{id}/imprimir', [GastoController::class, 'printTicket'])->name('gastos.imprimir');
     Route::resource('gastos', GastoController::class)->except(['create', 'edit']);
+
+    // Gasto Tipos
+    Route::get('gastos/tipos/select', [GastoController::class, 'selectTipos'])->name('gastos.tipos.select');
+    Route::resource('gasto-tipos', GastoTipoController::class)->except(['create', 'edit']);
 
     // Reporte Gastos
     Route::get('reportes/gastos/resumen', [GastoController::class, 'reporteResumen'])->name('reportes.gastos.resumen');
@@ -290,6 +301,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reportes/prestamos/de_pendientes', [ReportePrestamoController::class, 'prestamoDePendiente'])->name('reportes.prestamos_de_pendientes');
     Route::get('/reportes/prestamos/de_pendientes/imprimir', [ReportePrestamoController::class, 'imprimirPrestamoDePendiente'])->name('reportes.prestamos_de_pendientes.imprimir');
 
+    Route::get('/reportes/prestamos/general', [ReportePrestamoController::class, 'prestamoGeneral'])->name('reportes.prestamos_general');
+    Route::get('/reportes/prestamos/general/imprimir', [ReportePrestamoController::class, 'imprimirPrestamoGeneral'])->name('reportes.prestamos_general.imprimir');
+
     // Reporte caja
     Route::get('reportes/caja', [ReporteCajaController::class, 'index'])->name('reportes.caja');
     Route::get('/reportes/caja/general', [ReporteCajaController::class, 'general'])->name('reportes.caja.general');
@@ -319,6 +333,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('cuenta.corriente.cliente.ventas_producto_cliente_pdf');
     Route::get('/cuenta-corriente/cliente/ventas-detalles/pdf', [CuentaCorrienteClienteController::class, 'ventasDetallePdf'])
         ->name('cuenta.corriente.cliente.ventas_detalle_pdf');
+    Route::get('/cuenta-corriente/cliente/rentabilidad/pdf', [CuentaCorrienteClienteController::class, 'rentabilidadClienteFechasPdf'])
+        ->name('cuenta.corriente.cliente.rentabilidad_pdf');
+    Route::post('/cuenta-corriente/cliente/rentabilidad', [CuentaCorrienteClienteController::class, 'rentabilidadClienteFechas'])
+        ->name('cuenta.corriente.cliente.rentabilidad');
     Route::get('/cuenta-corriente/cliente/creditos_cobrar_detalles/pdf', [CuentaCorrienteClienteController::class, 'detalleCreditosPorCobrarPdf'])
         ->name('cuenta.corriente.cliente.creditos_cobrar_detalles_pdf');
     Route::get('/cuenta-corriente/cliente/creditos_cobrar_cliente_todos/pdf', [CuentaCorrienteClienteController::class, 'creditosPorCobrarClienteTodosPdf'])
@@ -443,7 +461,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('planilla-pagos', PlanillaPagoController::class)->except(['create', 'edit', 'update', 'destroy']);
 
     // Planilla - Inasistencias
-    Route::resource('planilla-inasistencias', PlanillaInasistenciaController::class)->except(['create', 'edit']);
+    Route::resource('planilla-inasistencias', PlanillaInasistenciaController::class)->except(['create']);
 
     // Planilla - Reportes
     Route::get('/reportes/planilla', [ReportePlanillaController::class, 'index'])->name('reportes.planilla');
@@ -453,8 +471,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reportes/planilla/prestamos/pdf', [ReportePlanillaController::class, 'prestamosPdf'])->name('reportes.planilla.prestamos');
     Route::get('/reportes/planilla/pagos-pendientes/pdf', [ReportePlanillaController::class, 'pagosPendientesPdf'])->name('reportes.planilla.pagos_pendientes');
     Route::get('/reportes/planilla/empleado/pdf', [ReportePlanillaController::class, 'empleadoPdf'])->name('reportes.planilla.empleado_pdf');
+    Route::get('/reportes/planilla/empleado-sueldo', [ReportePlanillaController::class, 'porEmpleadoConSueldo'])->name('reportes.planilla.empleado_sueldo');
+    Route::get('/reportes/planilla/empleado-sueldo/pdf', [ReportePlanillaController::class, 'empleadoConSueldoPdf'])->name('reportes.planilla.empleado_sueldo_pdf');
+    Route::get('/reportes/planilla/empleados/zip', [ReportePlanillaController::class, 'empleadosAllZipPdf'])->name('reportes.planilla.empleados_zip');
     Route::get('/reportes/planilla/inasistencias/pdf', [ReportePlanillaController::class, 'inasistenciasPdf'])->name('reportes.planilla.inasistencias');
     Route::get('/reportes/planilla/trabajadores/pdf', [ReportePlanillaController::class, 'trabajadoresPdf'])->name('reportes.planilla.trabajadores');
+    Route::get('/reportes/planilla/trabajadores-sueldo/pdf', [ReportePlanillaController::class, 'trabajadoresConSueldoPdf'])->name('reportes.planilla.trabajadores_sueldo');
 
     Route::get('/perfil', [PerfilController::class, 'edit'])->name('perfil.edit');
     Route::put('/perfil', [PerfilController::class, 'update'])->name('perfil.update');

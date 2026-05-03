@@ -67,4 +67,8 @@ class Empleado extends Model
         return $query->where('nombre', 'like', "%{$termino}%")
             ->orWhere('dni', 'like', "%{$termino}%");
     }
+
+
+    
+
 }

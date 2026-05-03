@@ -132,6 +132,12 @@
                                             Detalle de ventas
                                         </button>
 
+                                        <button type="button" class="btn btn-success btn-sm btn-report" data-tab="1"
+                                            data-target="#reporteTab1" data-cliente="single" data-fecha="range" data-dia="no"
+                                            data-url="{{ route('cuenta.corriente.cliente.rentabilidad_pdf') }}">
+                                            Rentabilidad por Cliente
+                                        </button>
+
                                         <button type="button" class="btn btn-secondary btn-sm btn-report" data-tab="1"
                                             data-target="#reporteTab1" data-cliente="si" data-fecha="range" data-dia="no"
                                             data-url="{{ route('cuenta.corriente.cliente.creditos_cobrar_detalles_pdf') }}">
@@ -294,13 +300,17 @@
 
         const params = new URLSearchParams();
 
-        if (requireCliente) {
+        if (requireCliente === 'si' || requireCliente === 'single') {
             const clientes = $('#filtro_clientes').val() || [];
             if (clientes.length === 0) {
                 showError('Seleccione un cliente');
                 return null;
             }
-            clientes.forEach(id => params.append('cliente_ids[]', id));
+            if (requireCliente === 'single') {
+                params.append('cliente_id', clientes[0]);
+            } else {
+                clientes.forEach(id => params.append('cliente_ids[]', id));
+            }
         }
 
         // DÍAS (solo si el botón lo requiere)
@@ -367,11 +377,11 @@
 
             const url = btn.dataset.url;
             const tab = parseInt(btn.dataset.tab, 10);
-            const requireCliente = btn.dataset.cliente === 'si';
+            const clienteMode = btn.dataset.cliente;
             const fechaMode = btn.dataset.fecha || 'none';
             const requireDia = btn.dataset.dia === 'si';
 
-            const params = getParams(tab, requireCliente, fechaMode, requireDia);
+            const params = getParams(tab, clienteMode, fechaMode, requireDia);
             if (!params) return;
 
             const finalUrl = params.toString() ?

@@ -17,7 +17,8 @@ class ReportePrestamoController extends Controller
 {
     public function __construct(){
         $this->middleware('can:prestamos_list')->only(
-                ['index', 'prestamoAPendiente','imprimirPrestamoAPediente','prestamoDePendiente','imprimirPrestamoDePendiente']);
+                ['index', 'prestamoAPendiente','imprimirPrestamoAPediente','prestamoDePendiente','imprimirPrestamoDePendiente',
+                'prestamoGeneral', 'imprimirPrestamoGeneral']);
     }
 
     public function index(Request $request)
@@ -444,5 +445,230 @@ class ReportePrestamoController extends Controller
         ]);
 
         return $pdf->stream('prestamos_de'.$clienteEmpresaId.'_fecha_' . now()->format('Ymd_His') . '.pdf');
+    }
+
+    public function prestamoGeneral(Request $request)
+    {
+        $fechaInicio = $request->input('fecha_inicio');
+        $fechaFin = $request->input('fecha_fin');
+        $movimientoTipo = $request->input('movimiento_tipo', 'ALL');
+        if (empty($movimientoTipo)) {
+            $movimientoTipo = 'ALL';
+        }
+
+        $pa = DB::table('prestamo_detalles as d')
+            ->join('prestamos as p', 'p.id', '=', 'd.prestamo_id')
+            ->where('p.movimiento_tipo', 'PA')
+            ->where('p.estado', '!=', 'anulada')
+            ->select(
+                'p.id as prestamo_id',
+                DB::raw("'PA' as movimiento_tipo"),
+                'p.user_nombre',
+                'p.fecha_prestamo',
+                'c.razon_social as cliente_nombre',
+                'p.comprobante_tipo_codigo',
+                'p.serie',
+                'p.correlativo',
+                'd.producto_id',
+                'd.producto_nombre',
+                'd.unidad_nombre',
+                'd.producto_empaque',
+                DB::raw('SUM(d.cantidad) AS cantidad_prestada')
+            )
+            ->leftJoin('clientes as c', 'c.id', '=', 'p.cliente_destino_id')
+            ->groupBy('p.id', 'p.user_nombre', 'p.fecha_prestamo', 'c.razon_social',
+                'p.comprobante_tipo_codigo', 'p.serie', 'p.correlativo',
+                'd.producto_id', 'd.producto_nombre', 'd.unidad_nombre', 'd.producto_empaque');
+
+        $pd = DB::table('prestamo_detalles as d')
+            ->join('prestamos as p', 'p.id', '=', 'd.prestamo_id')
+            ->where('p.movimiento_tipo', 'PD')
+            ->where('p.estado', '!=', 'anulada')
+            ->select(
+                'p.id as prestamo_id',
+                DB::raw("'PD' as movimiento_tipo"),
+                'p.user_nombre',
+                'p.fecha_prestamo',
+                'c.razon_social as cliente_nombre',
+                'p.comprobante_tipo_codigo',
+                'p.serie',
+                'p.correlativo',
+                'd.producto_id',
+                'd.producto_nombre',
+                'd.unidad_nombre',
+                'd.producto_empaque',
+                DB::raw('SUM(d.cantidad) AS cantidad_prestada')
+            )
+            ->leftJoin('clientes as c', 'c.id', '=', 'p.cliente_origen_id')
+            ->groupBy('p.id', 'p.user_nombre', 'p.fecha_prestamo', 'c.razon_social',
+                'p.comprobante_tipo_codigo', 'p.serie', 'p.correlativo',
+                'd.producto_id', 'd.producto_nombre', 'd.unidad_nombre', 'd.producto_empaque');
+
+        if ($movimientoTipo === 'PA') {
+            $prestado = $pa;
+        } elseif ($movimientoTipo === 'PD') {
+            $prestado = $pd;
+        } else {
+            $prestado = $pa->unionAll($pd);
+        }
+
+        $reportes = DB::query()
+            ->fromSub($prestado, 'pa')
+            ->when($fechaInicio && $fechaFin, fn ($q) => $q->whereBetween(DB::raw('DATE(pa.fecha_prestamo)'), [$fechaInicio, $fechaFin]))
+            ->select([
+                'pa.prestamo_id as id',
+                'pa.movimiento_tipo',
+                'pa.user_nombre',
+                'pa.fecha_prestamo',
+                'pa.cliente_nombre',
+                'pa.comprobante_tipo_codigo',
+                'pa.serie',
+                'pa.correlativo',
+                'pa.producto_id',
+                'pa.producto_nombre',
+                'pa.unidad_nombre',
+                'pa.producto_empaque',
+                'pa.cantidad_prestada',
+                DB::raw('0 as cantidad_devuelta'),
+                DB::raw('pa.cantidad_prestada as saldo'),
+            ])
+            ->orderBy('pa.movimiento_tipo', 'asc')
+            ->orderBy('pa.fecha_prestamo', 'desc')
+            ->get();
+
+        foreach ($reportes as $r) {
+            $devuelto = DB::table('prestamos as pd')
+                ->join('prestamo_detalles as dd', 'pd.id', '=', 'dd.prestamo_id')
+                ->where('pd.prestamo_referencia_id', $r->id)
+                ->where('dd.producto_id', $r->producto_id)
+                ->whereIn('pd.movimiento_tipo', $r->movimiento_tipo === 'PA' ? ['DD'] : ['DA'])
+                ->where('pd.estado', '!=', 'anulada')
+                ->sum('dd.cantidad');
+
+            $r->cantidad_devuelta = $devuelto;
+            $r->saldo = round($r->cantidad_prestada - $devuelto, 4);
+        }
+
+        $reportes = collect($reportes)->filter(fn ($r) => $r->saldo > 0)->values();
+
+        return view('reportes.prestamos.prestamos_general', compact(
+            'reportes',
+            'fechaInicio',
+            'fechaFin',
+            'movimientoTipo'
+        ));
+    }
+
+    public function imprimirPrestamoGeneral(Request $request)
+    {
+        $fechaInicio = $request->input('fecha_inicio');
+        $fechaFin = $request->input('fecha_fin');
+        $movimientoTipo = $request->input('movimiento_tipo', 'ALL');
+        if (empty($movimientoTipo)) {
+            $movimientoTipo = 'ALL';
+        }
+
+        $pa = DB::table('prestamo_detalles as d')
+            ->join('prestamos as p', 'p.id', '=', 'd.prestamo_id')
+            ->where('p.movimiento_tipo', 'PA')
+            ->where('p.estado', '!=', 'anulada')
+            ->select(
+                'p.id as prestamo_id',
+                DB::raw("'PA' as movimiento_tipo"),
+                'p.user_nombre',
+                'p.fecha_prestamo',
+                'c.razon_social as cliente_nombre',
+                'p.comprobante_tipo_codigo',
+                'p.serie',
+                'p.correlativo',
+                'd.producto_id',
+                'd.producto_nombre',
+                'd.unidad_nombre',
+                'd.producto_empaque',
+                DB::raw('SUM(d.cantidad) AS cantidad_prestada')
+            )
+            ->leftJoin('clientes as c', 'c.id', '=', 'p.cliente_destino_id')
+            ->groupBy('p.id', 'p.user_nombre', 'p.fecha_prestamo', 'c.razon_social',
+                'p.comprobante_tipo_codigo', 'p.serie', 'p.correlativo',
+                'd.producto_id', 'd.producto_nombre', 'd.unidad_nombre', 'd.producto_empaque');
+
+        $pd = DB::table('prestamo_detalles as d')
+            ->join('prestamos as p', 'p.id', '=', 'd.prestamo_id')
+            ->where('p.movimiento_tipo', 'PD')
+            ->where('p.estado', '!=', 'anulada')
+            ->select(
+                'p.id as prestamo_id',
+                DB::raw("'PD' as movimiento_tipo"),
+                'p.user_nombre',
+                'p.fecha_prestamo',
+                'c.razon_social as cliente_nombre',
+                'p.comprobante_tipo_codigo',
+                'p.serie',
+                'p.correlativo',
+                'd.producto_id',
+                'd.producto_nombre',
+                'd.unidad_nombre',
+                'd.producto_empaque',
+                DB::raw('SUM(d.cantidad) AS cantidad_prestada')
+            )
+            ->leftJoin('clientes as c', 'c.id', '=', 'p.cliente_origen_id')
+            ->groupBy('p.id', 'p.user_nombre', 'p.fecha_prestamo', 'c.razon_social',
+                'p.comprobante_tipo_codigo', 'p.serie', 'p.correlativo',
+                'd.producto_id', 'd.producto_nombre', 'd.unidad_nombre', 'd.producto_empaque');
+
+        if ($movimientoTipo === 'PA') {
+            $prestado = $pa;
+        } elseif ($movimientoTipo === 'PD') {
+            $prestado = $pd;
+        } else {
+            $prestado = $pa->unionAll($pd);
+        }
+
+        $reportes = DB::query()
+            ->fromSub($prestado, 'pa')
+            ->when($fechaInicio && $fechaFin, fn ($q) => $q->whereBetween(DB::raw('DATE(pa.fecha_prestamo)'), [$fechaInicio, $fechaFin]))
+            ->select([
+                'pa.prestamo_id as id',
+                'pa.movimiento_tipo',
+                'pa.user_nombre',
+                'pa.fecha_prestamo',
+                'pa.cliente_nombre',
+                'pa.comprobante_tipo_codigo',
+                'pa.serie',
+                'pa.correlativo',
+                'pa.producto_id',
+                'pa.producto_nombre',
+                'pa.unidad_nombre',
+                'pa.producto_empaque',
+                'pa.cantidad_prestada',
+                DB::raw('0 as cantidad_devuelta'),
+                DB::raw('pa.cantidad_prestada as saldo'),
+            ])
+            ->orderBy('pa.movimiento_tipo', 'asc')
+            ->orderBy('pa.fecha_prestamo', 'desc')
+            ->get();
+
+        foreach ($reportes as $r) {
+            $devuelto = DB::table('prestamos as pd')
+                ->join('prestamo_detalles as dd', 'pd.id', '=', 'dd.prestamo_id')
+                ->where('pd.prestamo_referencia_id', $r->id)
+                ->where('dd.producto_id', $r->producto_id)
+                ->whereIn('pd.movimiento_tipo', $r->movimiento_tipo === 'PA' ? ['DD'] : ['DA'])
+                ->where('pd.estado', '!=', 'anulada')
+                ->sum('dd.cantidad');
+
+            $r->cantidad_devuelta = $devuelto;
+            $r->saldo = round($r->cantidad_prestada - $devuelto, 4);
+        }
+
+        $reportes = collect($reportes)->filter(fn ($r) => $r->saldo > 0)->values();
+
+        $pdf = Pdf::loadView(
+            'reportes.prestamos.prestamos_general_pdf',
+            compact('reportes', 'fechaInicio', 'fechaFin', 'movimientoTipo')
+        )->setPaper('letter', 'portrait')
+            ->setOptions(['defaultFont' => 'Courier']);
+
+        return $pdf->stream('prestamos_general_' . now()->format('Ymd_His') . '.pdf');
     }
 }

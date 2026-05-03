@@ -306,7 +306,7 @@ class CompraController extends Controller
             'detalles.*.empaque' => 'required|numeric',
             'detalles.*.cantidad' => 'required|numeric',
             'detalles.*.precio_unitario' => 'required|numeric',
-            'detalles.*.precio_unitario_servicio' => 'numeric',
+            'detalles.*.precio_unitario_servicio' => 'nullable|numeric|min:0|max:9',
             'detalles.*.total' => 'required|numeric',
         ]);
     }

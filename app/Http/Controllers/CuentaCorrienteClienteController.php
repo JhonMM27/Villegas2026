@@ -213,6 +213,137 @@ class CuentaCorrienteClienteController extends Controller
         return $pdf->stream('reporte_cliente_ventas_detalle.pdf');
     }
 
+    public function rentabilidadClienteFechas(Request $request)
+    {
+        if (! $request->ajax()) {
+            abort(403, 'Acceso no autorizado');
+        }
+
+        $data = $request->validate([
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'cliente_id' => ['required', 'integer', 'exists:clientes,id'],
+        ]);
+
+        $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
+        $fin = Carbon::parse($data['fecha_fin'])->endOfDay();
+        $clienteId = (int) $data['cliente_id'];
+
+        $cliente = Cliente::find($clienteId);
+        $clienteNombre = $cliente ? ($cliente->id.' - '.$cliente->razon_social) : null;
+
+        $reportes = VentaDetalle::query()
+            ->join('ventas as v', 'v.id', '=', 'venta_detalles.venta_id')
+            ->leftJoin('productos as p', 'p.id', '=', 'venta_detalles.producto_id')
+            ->leftJoin('lineas as l', 'l.id', '=', 'p.linea_id')
+            ->select([
+                'venta_detalles.venta_id',
+                'v.fecha_venta',
+
+                'v.comprobante_tipo_codigo',
+                'v.serie',
+                'v.correlativo',
+
+                'v.cliente_id',
+                'v.cliente_nombre',
+
+                'venta_detalles.producto_id',
+                'venta_detalles.producto_nombre',
+                'l.nombre as linea_nombre',
+
+                'venta_detalles.cantidad',
+                'venta_detalles.precio_unitario',
+                'venta_detalles.total',
+
+                DB::raw("CONCAT(v.comprobante_tipo_codigo,' ',v.serie,'-',v.correlativo) as documento"),
+
+                DB::raw('IFNULL(venta_detalles.producto_empaque,0) as empaque_detalle'),
+                DB::raw('IFNULL(p.empaque,0) as empaque_producto'),
+
+                DB::raw('(venta_detalles.cantidad * IFNULL(venta_detalles.producto_empaque, IFNULL(p.empaque,1))) as kg_detalle'),
+
+                DB::raw('venta_detalles.costo_unitario'),
+                DB::raw('venta_detalles.costo_total'),
+
+                DB::raw('(venta_detalles.total - venta_detalles.costo_total) as rentabilidad'),
+            ])
+            ->whereBetween('v.fecha_venta', [$ini, $fin])
+            ->where('v.cliente_id', $clienteId)
+            ->where('v.estado', '!=', 'anulada')
+            ->orderBy('v.fecha_venta')
+            ->orderBy('venta_detalles.venta_id')
+            ->orderBy('venta_detalles.id')
+            ->get();
+
+        return view('cuenta-cliente.reportes.rentabilidad_cliente_fechas', compact('reportes', 'ini', 'fin', 'clienteNombre'));
+    }
+
+    public function rentabilidadClienteFechasPdf(Request $request)
+    {
+        $data = $request->validate([
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'cliente_id' => ['required', 'integer', 'exists:clientes,id'],
+        ]);
+
+        $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
+        $fin = Carbon::parse($data['fecha_fin'])->endOfDay();
+        $clienteId = (int) $data['cliente_id'];
+
+        $cliente = Cliente::find($clienteId);
+        $clienteNombre = $cliente ? ($cliente->id.' - '.$cliente->razon_social) : null;
+
+        $reportes = VentaDetalle::query()
+            ->join('ventas as v', 'v.id', '=', 'venta_detalles.venta_id')
+            ->leftJoin('productos as p', 'p.id', '=', 'venta_detalles.producto_id')
+            ->leftJoin('lineas as l', 'l.id', '=', 'p.linea_id')
+            ->select([
+                'venta_detalles.venta_id',
+                'v.fecha_venta',
+
+                'v.comprobante_tipo_codigo',
+                'v.serie',
+                'v.correlativo',
+
+                'v.cliente_id',
+                'v.cliente_nombre',
+
+                'venta_detalles.producto_id',
+                'venta_detalles.producto_nombre',
+                'l.nombre as linea_nombre',
+
+                'venta_detalles.cantidad',
+                'venta_detalles.precio_unitario',
+                'venta_detalles.total',
+
+                DB::raw("CONCAT(v.comprobante_tipo_codigo,' ',v.serie,'-',v.correlativo) as documento"),
+
+                DB::raw('IFNULL(venta_detalles.producto_empaque,0) as empaque_detalle'),
+                DB::raw('IFNULL(p.empaque,0) as empaque_producto'),
+
+                DB::raw('(venta_detalles.cantidad * IFNULL(venta_detalles.producto_empaque, IFNULL(p.empaque,1))) as kg_detalle'),
+
+                DB::raw('venta_detalles.costo_unitario'),
+                DB::raw('venta_detalles.costo_total'),
+
+                DB::raw('(venta_detalles.total - venta_detalles.costo_total) as rentabilidad'),
+            ])
+            ->whereBetween('v.fecha_venta', [$ini, $fin])
+            ->where('v.cliente_id', $clienteId)
+            ->where('v.estado', '!=', 'anulada')
+            ->orderBy('v.fecha_venta')
+            ->orderBy('venta_detalles.venta_id')
+            ->orderBy('venta_detalles.id')
+            ->get();
+
+        $pdf = Pdf::loadView(
+            'cuenta-cliente.reportes.rentabilidad_cliente_fechas_pdf',
+            compact('reportes', 'ini', 'fin', 'clienteNombre')
+        )->setPaper('letter', 'landscape');
+
+        return $pdf->stream('reporte_rentabilidad_cliente.pdf');
+    }
+
     public function detalleCreditosPorCobrarPdf(Request $request)
     {
         $data = $request->validate([
@@ -1039,28 +1170,21 @@ class CuentaCorrienteClienteController extends Controller
         $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
         $fin = Carbon::parse($data['fecha_fin'])->endOfDay();
 
-        $reportes = DB::table('ventas')
-            ->join('clientes', 'clientes.id', '=', 'ventas.cliente_id')
+        $reportes = DB::table('ventas as v')
+            ->join('clientes as c', 'c.id', '=', 'v.cliente_id')
             ->selectRaw('
-                ventas.cliente_id,
-                ventas.cliente_nombre,
-                SUM(ventas.saldo) as saldo,
-                COUNT(ventas.id) as items,
-                clientes.direccion as domicilio,
-                clientes.telefono as telefono
+                v.cliente_id,
+                MAX(c.razon_social) as cliente_nombre,
+                SUM(v.saldo) as saldo,
+                COUNT(v.id) as items,
+                MAX(c.direccion) as domicilio,
+                MAX(c.telefono) as telefono
             ')
-            // si quieres SOLO créditos por cobrar:
-            ->where('ventas.estado', '!=', 'anulada')
-            ->where('ventas.saldo', '>', 0)
-            // >= 30 días de antigüedad desde la fecha_venta:
-            ->whereBetween('ventas.fecha_venta', [$ini, $fin])
-            ->groupBy(
-                'ventas.cliente_id',
-                'ventas.cliente_nombre',
-                'clientes.direccion',
-                'clientes.telefono'
-            )
-            ->orderBy('ventas.cliente_nombre', 'asc')
+            ->where('v.estado', '!=', 'anulada')
+            ->where('v.saldo', '>', 0)
+            ->whereBetween('v.fecha_venta', [$ini, $fin])
+            ->groupBy('v.cliente_id')
+            ->orderBy('cliente_nombre', 'asc')
             ->get();
 
         $totSaldo = (float) $reportes->sum('saldo');

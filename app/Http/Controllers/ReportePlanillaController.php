@@ -278,6 +278,25 @@ class ReportePlanillaController extends Controller
         return $pdf->stream('reporte_trabajadores.pdf');
     }
 
+    public function trabajadoresConSueldoPdf()
+    {
+        $empresa = $this->getEmpresa();
+
+        $empleados = Empleado::where('estado', 'activo')
+            ->orderBy('nombre')
+            ->get();
+
+        $totalRegistros = $empleados->count();
+
+        $pdf = PDF::loadView('planilla.reportes.trabajadores_sueldo_pdf', compact(
+            'empleados',
+            'empresa',
+            'totalRegistros'
+        ));
+
+        return $pdf->stream('reporte_trabajadores_sueldo.pdf');
+    }
+
     private function getEmpresa()
     {
         return (object) [
@@ -285,6 +304,191 @@ class ReportePlanillaController extends Controller
             'direccion' => 'Carretera Pomalca KM 3',
             'ruc' => '20538937321',
         ];
+    }
+
+    public function porEmpleadoConSueldo(Request $request)
+    {
+        $empleadoId = (int) $request->get('empleado_id');
+        $fechaInicio = $request->get('fecha_inicio', date('Y-01-01'));
+        $fechaFin = $request->get('fecha_fin', date('Y-m-d'));
+
+        $empleado = $this->empleadoService->findById($empleadoId);
+        if (! $empleado) {
+            return redirect()->back()->with('error', 'Empleado no encontrado');
+        }
+
+        $mesInicio = (int) date('m', strtotime($fechaInicio));
+        $anioInicio = (int) date('Y', strtotime($fechaInicio));
+        $mesFin = (int) date('m', strtotime($fechaFin));
+        $anioFin = (int) date('Y', strtotime($fechaFin));
+
+        $query = PlanillaPago::with('adelantos')
+            ->where('empleado_id', $empleadoId);
+
+        if ($anioInicio == $anioFin) {
+            $query->where('anio', $anioInicio)
+                ->whereBetween('mes', [$mesInicio, $mesFin]);
+        } else {
+            $query->where(function ($q) use ($anioInicio, $anioFin, $mesInicio, $mesFin) {
+                $q->where(function ($q1) use ($anioInicio, $mesInicio) {
+                    $q1->where('anio', $anioInicio)->where('mes', '>=', $mesInicio);
+                })->orWhere(function ($q2) use ($anioFin, $mesFin) {
+                    $q2->where('anio', $anioFin)->where('mes', '<=', $mesFin);
+                })->orWhere(function ($q3) use ($anioInicio, $anioFin) {
+                    $q3->where('anio', '>', $anioInicio)->where('anio', '<', $anioFin);
+                });
+            });
+        }
+
+        $pagos = $query->orderByDesc('anio')->orderByDesc('mes')->get();
+
+        $adelantosQuery = PlanillaAdelanto::whereBetween('fecha', [$fechaInicio, $fechaFin])
+            ->where('empleado_id', $empleadoId);
+        $adelantos = $adelantosQuery->orderBy('fecha', 'asc')->get();
+
+        $resumen = [
+            'total_sueldo_planilla' => (float) $empleado->sueldo_planilla,
+            'total_sueldo_real' => (float) $empleado->sueldo_real,
+            'total_sueldo_base' => $pagos->sum('sueldo_base'),
+            'total_horas_extras' => $pagos->sum('horas_extras'),
+            'total_adelantos' => $adelantos->sum('monto'),
+            'total_dias_faltas' => $pagos->sum('dias_faltados'),
+            'total_descuento_faltas' => $pagos->sum('descuento_faltas'),
+            'total_pagado' => $pagos->where('estado', 'pagado')->sum('total_pagar'),
+            'total_pendiente' => $pagos->where('estado', 'pendiente')->sum('total_pagar'),
+            'total_general' => $pagos->sum('total_pagar'),
+        ];
+
+        return view('planilla.reportes.empleado_sueldo', compact('empleado', 'pagos', 'adelantos', 'resumen', 'fechaInicio', 'fechaFin'));
+    }
+
+    public function empleadoConSueldoPdf(Request $request)
+    {
+        $empleadoId = (int) $request->get('empleado_id');
+        $fechaInicio = $request->get('fecha_inicio', date('Y-01-01'));
+        $fechaFin = $request->get('fecha_fin', date('Y-m-d'));
+
+        $empleado = $this->empleadoService->findById($empleadoId);
+        if (! $empleado) {
+            return redirect()->back()->with('error', 'Empleado no encontrado');
+        }
+
+        $empresa = $this->getEmpresa();
+
+        $mesInicio = (int) date('m', strtotime($fechaInicio));
+        $anioInicio = (int) date('Y', strtotime($fechaInicio));
+        $mesFin = (int) date('m', strtotime($fechaFin));
+        $anioFin = (int) date('Y', strtotime($fechaFin));
+
+        $query = PlanillaPago::with('adelantosRecords')
+            ->where('empleado_id', $empleadoId);
+
+        if ($anioInicio == $anioFin) {
+            $query->where('anio', $anioInicio)
+                ->whereBetween('mes', [$mesInicio, $mesFin]);
+        } else {
+            $query->where(function ($q) use ($anioInicio, $anioFin, $mesInicio, $mesFin) {
+                $q->where(function ($q1) use ($anioInicio, $mesInicio) {
+                    $q1->where('anio', $anioInicio)->where('mes', '>=', $mesInicio);
+                })->orWhere(function ($q2) use ($anioFin, $mesFin) {
+                    $q2->where('anio', $anioFin)->where('mes', '<=', $mesFin);
+                })->orWhere(function ($q3) use ($anioInicio, $anioFin) {
+                    $q3->where('anio', '>', $anioInicio)->where('anio', '<', $anioFin);
+                });
+            });
+        }
+
+        $pagos = $query->orderByDesc('anio')->orderByDesc('mes')->get();
+
+        $adelantosQuery = PlanillaAdelanto::whereBetween('fecha', [$fechaInicio, $fechaFin])
+            ->where('empleado_id', $empleadoId);
+        $adelantos = $adelantosQuery->orderBy('fecha', 'asc')->get();
+
+        $resumen = [
+            'total_sueldo_planilla' => (float) $empleado->sueldo_planilla,
+            'total_sueldo_real' => (float) $empleado->sueldo_real,
+            'total_sueldo_base' => $pagos->sum('sueldo_base'),
+            'total_horas_extras' => $pagos->sum('horas_extras'),
+            'total_adelantos' => $adelantos->sum('monto'),
+            'total_dias_faltas' => $pagos->sum('dias_faltados'),
+            'total_descuento_faltas' => $pagos->sum('descuento_faltas'),
+            'total_pagado' => $pagos->where('estado', 'pagado')->sum('total_pagar'),
+            'total_pendiente' => $pagos->where('estado', 'pendiente')->sum('total_pagar'),
+            'total_general' => $pagos->sum('total_pagar'),
+        ];
+
+        $totalRegistros = $pagos->count();
+
+        $pdf = PDF::loadView('planilla.reportes.empleados_pdf', compact('empleado', 'pagos', 'adelantos', 'empresa', 'totalRegistros', 'resumen', 'fechaInicio', 'fechaFin'));
+
+        return $pdf->download('reporte_empleado_'.$empleadoId.'_sueldo.pdf');
+    }
+
+    public function empleadosAllZipPdf(Request $request)
+    {
+        $fechaInicio = $request->get('fecha_inicio', date('Y-01-01'));
+        $fechaFin = $request->get('fecha_fin', date('Y-m-d'));
+
+        $mesInicio = (int) date('m', strtotime($fechaInicio));
+        $anioInicio = (int) date('Y', strtotime($fechaInicio));
+        $mesFin = (int) date('m', strtotime($fechaFin));
+        $anioFin = (int) date('Y', strtotime($fechaFin));
+
+        $empleados = Empleado::where('estado', 'activo')->get();
+
+        if ($empleados->isEmpty()) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['error' => 'No hay empleados activos.'], 400);
+            }
+            return redirect()->back()->with('error', 'No hay empleados activos.');
+        }
+
+        $pdfUrls = [];
+        foreach ($empleados as $empleado) {
+            $query = PlanillaPago::where('empleado_id', $empleado->id);
+
+            if ($anioInicio == $anioFin) {
+                $query->where('anio', $anioInicio)
+                    ->whereBetween('mes', [$mesInicio, $mesFin]);
+            } else {
+                $query->where(function ($q) use ($anioInicio, $anioFin, $mesInicio, $mesFin) {
+                    $q->where(function ($q1) use ($anioInicio, $mesInicio) {
+                        $q1->where('anio', $anioInicio)->where('mes', '>=', $mesInicio);
+                    })->orWhere(function ($q2) use ($anioFin, $mesFin) {
+                        $q2->where('anio', $anioFin)->where('mes', '<=', $mesFin);
+                    })->orWhere(function ($q3) use ($anioInicio, $anioFin) {
+                        $q3->where('anio', '>', $anioInicio)->where('anio', '<', $anioFin);
+                    });
+                });
+            }
+
+            $pagos = $query->orderByDesc('anio')->orderByDesc('mes')->get();
+
+            if ($pagos->count() == 0) {
+                continue;
+            }
+
+            $fileName = 'empleado_' . preg_replace('/[^a-zA-Z0-9]/', '_', $empleado->nombre) . '_' . $empleado->dni . '.pdf';
+            $url = route('reportes.planilla.empleado_sueldo_pdf', [
+                'empleado_id' => $empleado->id,
+                'fecha_inicio' => $fechaInicio,
+                'fecha_fin' => $fechaFin,
+            ]);
+            $pdfUrls[] = ['name' => $fileName, 'url' => $url];
+        }
+
+        if (empty($pdfUrls)) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['error' => 'No hay pagos en el período seleccionado.'], 400);
+            }
+            return redirect()->back()->with('error', 'No hay pagos en el período seleccionado.');
+        }
+
+        if ($request->ajax() || $request->wantsJson() || $request->get('json') === '1') {
+            return response()->json(['pdfUrls' => $pdfUrls]);
+        }
+
+        return view('planilla.reportes.descargar_pdfs', compact('pdfUrls'));
     }
 
     private function getNombreMes(int $mes): string

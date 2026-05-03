@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +18,7 @@ class Gasto extends Model
         'responsable',
         'numero_recibo',
         'numero_interno',
-        'tipo',
+        'gasto_tipo_id',
         'monto',
         'importe_p',
         'importe_d',
@@ -34,5 +36,10 @@ class Gasto extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function gastoTipo()
+    {
+        return $this->belongsTo(GastoTipo::class, 'gasto_tipo_id');
     }
 }

@@ -133,12 +133,6 @@ class CompraManager extends CrudManager {
         if (pagoFormaEl) {
             pagoFormaEl.addEventListener('change', () => this.calcularFechaVencimiento());
         }
-
-        // Recalcular si cambia la fecha de venta
-        const fechaCompraEl = document.getElementById('fecha_compra');
-        if (fechaCompraEl) {
-            fechaCompraEl.addEventListener('change', () => this.calcularFechaVencimiento());
-        }
     }
 
     async handleCompraSuccess(response, isEditing) {
@@ -266,7 +260,7 @@ class CompraManager extends CrudManager {
                     <input type="number" name="detalles[${rowCount}][precio_unitario]" value="${precioConImpuesto.toFixed(4)}" step="any" class="form-control form-control-sm inputPrecioUnitario">
                 </td>
                 <td class="text-end">
-                    <input type="number" name="detalles[${rowCount}][precio_unitario_servicio]" value="${precioServicio.toFixed(2)}" step="any" class="form-control form-control-sm inputPrecioServicio">
+                    <input type="number" name="detalles[${rowCount}][precio_unitario_servicio]" value="${precioServicio.toFixed(2)}" step="any" min="0" max="9" class="form-control form-control-sm inputPrecioServicio">
                 </td>
                 <td class="text-end">
                     <input type="number" name="detalles[${rowCount}][total]" value="${sub.toFixed(2)}" step="any" class="form-control form-control-sm inputTotal">
@@ -350,7 +344,21 @@ class CompraManager extends CrudManager {
                 recalcularFilaAuto();
             });
             if (inputPrecioServicioObj) {
-                inputPrecioServicioObj.addEventListener('input', () => this.calculateTotals());
+                inputPrecioServicioObj.addEventListener('input', () => {
+                    const val = parseFloat(inputPrecioServicioObj.value) || 0;
+                    if (val > 9) {
+                        inputPrecioServicioObj.value = '9';
+                        inputPrecioServicioObj.classList.add('is-invalid');
+                        this.showNotification('warning', 'El precio de servicio no puede exceder 9');
+                    } else if (val < 0) {
+                        inputPrecioServicioObj.value = '0';
+                        inputPrecioServicioObj.classList.add('is-invalid');
+                    } else {
+                        inputPrecioServicioObj.classList.remove('is-invalid');
+                        inputPrecioServicioObj.parentElement.querySelector('.invalid-feedback')?.remove();
+                    }
+                    this.calculateTotals();
+                });
             }
 
             inputTotalObj.addEventListener('input', (e) => {
@@ -1054,6 +1062,19 @@ class CompraManager extends CrudManager {
 } // Fin de la clase CompraManager
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Agregar form submit handler para validar antes de enviar
+    document.getElementById('formUpdate')?.addEventListener('submit', function(e) {
+        const invalidInputs = this.querySelectorAll('.is-invalid');
+        if (invalidInputs.length > 0) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'error',
+                title: 'Error de validación',
+                text: 'Por favor corrija los errores antes de guardar'
+            });
+        }
+    });
+
     const compraManager = new CompraManager();
 
     // Delegación de evento: Rectificar compra (solo visible en compras anuladas)

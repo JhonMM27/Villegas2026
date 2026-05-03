@@ -33,7 +33,7 @@
 
         .info {
             margin-bottom: 10px;
-            font-size: 10px;
+            font-size: 12px;
         }
 
         table {
@@ -148,8 +148,9 @@
     @if (isset($empleado))
         {{-- SINGLE EMPLEADO --}}
         <div class="info">
-            <strong>Empleado:</strong> {{ $empleado->nombre }} ({{ $empleado->dni }}) |
-            <strong>Estado:</strong> {{ ucfirst($empleado->estado) }}
+            <strong>Empleado:</strong> {{ $empleado->nombre }}<br>
+            <strong>DNI:</strong> {{ $empleado->dni ?? '--' }} |
+            <strong>Teléfono:</strong> {{ $empleado->telefono ?? '--' }}
         </div>
 
         <div class="section-title">RESUMEN DE SUELDO</div>
@@ -265,6 +266,8 @@
                     <tr>
                         <th class="text-center">ID</th>
                         <th>Período</th>
+                        <th class="text-right">Sueldo Planilla</th>
+                        <th class="text-right">Sueldo Real</th>
                         <th class="text-right">Sueldo Base</th>
                         <th class="text-right">H. Extras</th>
                         <th class="text-right">Días Faltas</th>
@@ -279,6 +282,8 @@
                         <tr>
                             <td class="text-center">{{ $pago->id }}</td>
                             <td>{{ str_pad($pago->mes, 2, '0', STR_PAD_LEFT) }}/{{ $pago->anio }}</td>
+                            <td class="text-right">S/ {{ number_format((float) $empleado->sueldo_planilla, 2) }}</td>
+                            <td class="text-right">S/ {{ number_format((float) $empleado->sueldo_real, 2) }}</td>
                             <td class="text-right">S/ {{ number_format((float) $pago->sueldo_base, 2) }}</td>
                             <td class="text-right">S/ {{ number_format((float) $pago->horas_extras, 2) }}</td>
                             <td class="text-right">{{ number_format((float) ($pago->dias_faltados ?? 0), 2) }}</td>
@@ -300,6 +305,8 @@
                 <tfoot>
                     <tr>
                         <th colspan="2" class="text-right">TOTALES:</th>
+                        <th></th>
+                        <th></th>
                         <th class="text-right">S/ {{ number_format($resumen['total_sueldo_base'] ?? 0, 2) }}</th>
                         <th class="text-right">S/ {{ number_format($resumen['total_horas_extras'] ?? 0, 2) }}</th>
                         <th></th>

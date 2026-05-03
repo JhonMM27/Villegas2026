@@ -58,6 +58,16 @@ class MovimientoService
     /** Tipo: Reversión por anulación de préstamo */
     const TIPO_ANULACION_PRESTAMO = 'ANULACION_PRESTAMO';
 
+    /** Tipo: Entrada por ajuste de inventario (conteo físico > stock sistema) */
+    const TIPO_AJUSTE_ENTRADA = 'AJUSTE_ENTRADA';
+
+    /** Tipo: Salida por ajuste de inventario (conteo físico < stock sistema) */
+    const TIPO_AJUSTE_SALIDA = 'AJUSTE_SALIDA';
+
+    // ─── Constantes de tipos de transacción ────────────────
+
+    const TRANSACCION_AJUSTES = 'ajustes';
+
     // ─── Métodos públicos ───────────────────────────────────
 
     /**
@@ -120,6 +130,10 @@ class MovimientoService
             $costoNuevo = round($valorNuevo / $stockNuevo, 4);
         }
 
+        // Costo unitario del movimiento: precio real de compra (por unidad base)
+        // cpp del movimiento = costoUnitario, no costoNuevo (que es el CPP resultante)
+        $costoUnitarioBase = $cantidadStock > 0 ? $costoTotal / $cantidadStock : $costoUnitario;
+
         // Crear registro de movimiento
         $movimiento = Movimiento::create([
             'fecha' => $params['fecha'],
@@ -135,7 +149,7 @@ class MovimientoService
             'cantidad_kg' => $cantidadKg,
             'entrada' => $cantidadStock,
             'salida' => 0,
-            'costo_unitario' => round($costoNuevo, 4),
+            'costo_unitario' => round($costoUnitarioBase, 4),
             'costo_total' => round($costoTotal, 4),
             'stock_anterior' => round($stockAnterior, 4),
             'costo_actual' => round($costoActual, 4),

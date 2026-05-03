@@ -106,6 +106,13 @@
                             </a>
                         </li>
                         @endcan
+                        @can('gasto_tipos_list')
+                        <li class="nav-item">
+                            <a href="{{route('gasto-tipos.index')}}" class="nav-link" id="itemGastoTipo">
+                                <p>Tipos de Gastos</p>
+                            </a>
+                        </li>
+                        @endcan
                         @can('configuraciones_list')
                         <li class="nav-item">
                             <a href="{{route('configuraciones.index')}}" class="nav-link" id="itemCostoServicioPreparada">
@@ -456,7 +463,7 @@
                     </ul>
                 </li>
                 @endcanany
-                @canany(['kardex_report'])
+                @canany(['kardex_report', 'cuadre_stock_list'])
                 <li class="nav-item" id="mnuKardex">
                     <a href="#" class="nav-link">                        
                         <x-icon name="kardex" />
@@ -472,7 +479,14 @@
                                 <p>Reporte Kardex</p>
                             </a>
                         </li>
-                        @endcan                       
+                        @endcan
+                        @can('cuadre_stock_list')
+                        <li class="nav-item">
+                            <a href="{{route('cuadre-stock.index')}}" class="nav-link" id="itemCuadreStock">
+                                <p>Cuadre de Stock</p>
+                            </a>
+                        </li>
+                        @endcan
                     </ul>
                 </li>
                 @endcanany

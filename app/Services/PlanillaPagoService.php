@@ -330,6 +330,22 @@ class PlanillaPagoService
         ];
     }
 
+    public function recalcularPagosDelEmpleado(int $empleadoId): int
+    {
+        $pagos = PlanillaPago::where('empleado_id', $empleadoId)
+            ->pendientes()
+            ->get();
+
+        $contador = 0;
+        foreach ($pagos as $pago) {
+            if ($this->recalcularPago($pago)) {
+                $contador++;
+            }
+        }
+
+        return $contador;
+    }
+
     private function getUltimoDiaDelMes(int $mes, int $anio): int
     {
         return (int) date('t', strtotime("{$anio}-{$mes}-01"));
