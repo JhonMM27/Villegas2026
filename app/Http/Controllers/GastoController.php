@@ -216,6 +216,10 @@ class GastoController extends Controller
         $query = \App\Models\GastoTipo::select('id', 'nombre')
             ->where('activo', true);
 
+        if ($request->has('q') && $request->q !== '') {
+            $query->where('nombre', 'like', '%' . $request->q . '%');
+        }
+
         return response()->json($query->get());
     }
 

@@ -233,6 +233,70 @@
                         </div>
                     </div>
                     @endcan
+                    @if($productosNegativos->count() > 0)
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <div class="card card-danger card-outline mb-4">
+                                <!--begin::Header-->
+                                <div class="card-header"><div class="card-title" style="font-size:14px;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Productos con Stock Negativo (Activos)</div></div>
+                                <!--end::Header-->
+                                <!--begin::Body-->
+                                <div class="card-body p-0">
+                                    <div class="row">
+                                        @php
+                                            $mitadNeg = ceil($productosNegativos->count() / 2);
+                                            $col1Neg = $productosNegativos->take($mitadNeg);
+                                            $col2Neg = $productosNegativos->skip($mitadNeg);
+                                        @endphp
+                                        <div class="col-lg-6 border-end">
+                                            @foreach($col1Neg as $producto)
+                                                <div class="progress-group px-3 py-2 border-bottom">
+                                                    {{ $producto->nombre }}
+                                                    <small class="text-muted">
+                                                        ({{ $producto->empaque }} {{ $producto->unidad_codigo }}
+                                                        | {{ $producto->linea->nombre ?? '-' }})
+                                                    </small>
+
+                                                    <span class="float-end">
+                                                        <b class="text-danger">{{ $producto->stock_almacen }}</b> / {{ $producto->stock_minimo }}
+                                                    </span>
+
+                                                    <div class="progress progress-sm">
+                                                        <div class="progress-bar text-bg-danger"
+                                                            style="width: {{ $producto->porcentaje_stock }}%">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                        <div class="col-lg-6">
+                                            @foreach($col2Neg as $producto)
+                                                <div class="progress-group px-3 py-2 border-bottom">
+                                                    {{ $producto->nombre }}
+                                                    <small class="text-muted">
+                                                        ({{ $producto->empaque }} {{ $producto->unidad_codigo }}
+                                                        | {{ $producto->linea->nombre ?? '-' }})
+                                                    </small>
+
+                                                    <span class="float-end">
+                                                        <b class="text-danger">{{ $producto->stock_almacen }}</b> / {{ $producto->stock_minimo }}
+                                                    </span>
+
+                                                    <div class="progress progress-sm">
+                                                        <div class="progress-bar text-bg-danger"
+                                                            style="width: {{ $producto->porcentaje_stock }}%">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                                <!--end::Body-->
+                            </div>
+                        </div>
+                    </div>
+                    @endif
                 </div>
                 <!-- /.card-body -->
                 <div class="card-footer clearfix">

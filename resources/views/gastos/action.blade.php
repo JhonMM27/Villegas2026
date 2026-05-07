@@ -41,10 +41,16 @@
                                 </div>
                                 <div class="col-lg-6">
                                     <div class="form-group mb-3">
-                                        <label for="gasto_tipo_id" class="form-label">Tipo</label>
-                                        <select id="gasto_tipo_id" name="gasto_tipo_id" class="form-select form-select-sm">
-                                            <option value="">Cargando...</option>
-                                        </select>
+                                        <label for="gasto_tipo_nombre" class="form-label">Tipo</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" id="gasto_tipo_nombre" class="form-control"
+                                                placeholder="Escriba para buscar..." autocomplete="off">
+                                            <input type="hidden" id="gasto_tipo_id" name="gasto_tipo_id">
+                                            {{-- <button type="button" class="btn btn-outline-secondary" id="btnClearTipo"
+                                                title="Limpiar">
+                                                <i class="bi bi-x"></i>
+                                            </button> --}}
+                                        </div>
                                         <div class="invalid-feedback"></div>
                                     </div>
                                 </div>
@@ -59,15 +65,15 @@
                                 </div>
                             </div>
                         </div>
-                        <divv class="col-lg-6">
+                        <div class="col-lg-6">
                             @include('gastos.partials.cobranza')
-                        </divv>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     Usuario: <span class="me-auto fw-bold" id="usuario_nombre"></span>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" id="btnSubmit" class="btn btn-primary">Enviar</button>
+                    <button type="submit" id="btnSubmit" class="btn btn-primary">Guardar</button>
                 </div>
             </form>
         </div>

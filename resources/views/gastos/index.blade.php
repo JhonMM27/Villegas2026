@@ -128,9 +128,18 @@ data: 'fecha_gasto',
 
             this.form.action = `${this.baseUrl}/${id}`;
 
-            await this.loadTiposGasto();
+            await this.setupLiveSearchSelect({
+                inputId: 'gasto_tipo_nombre',
+                hiddenId: 'gasto_tipo_id',
+                url: '{{ route('gastos.tipos.select') }}',
+                template: item => item.nombre,
+                getId: item => item.id,
+                minLength: 1,
+                delay: 300,
+            });
             if (response.gasto_tipo_id) {
                 document.getElementById('gasto_tipo_id').value = response.gasto_tipo_id;
+                document.getElementById('gasto_tipo_nombre').value = response.gasto_tipo?.nombre || '';
             }
 
             this.modal.show();
@@ -155,29 +164,24 @@ data: 'fecha_gasto',
         super.showCreateModal();
         this.elements.modalTitle.textContent = 'Nuevo Gasto';
         document.getElementById('fecha_gasto').value = this.obtenerFechaHoraActual();
-        this.loadTiposGasto();
+        this.initLiveSearchTipo();
     }
 
-    async loadTiposGasto() {
-        try {
-            const response = await fetch('{{ route('gastos.tipos.select') }}');
-            const tipos = await response.json();
+    initLiveSearchTipo() {
+        this.setupLiveSearchSelect({
+            inputId: 'gasto_tipo_nombre',
+            hiddenId: 'gasto_tipo_id',
+            url: '{{ route('gastos.tipos.select') }}',
+            template: item => item.nombre,
+            getId: item => item.id,
+            minLength: 1,
+            delay: 300,
+        });
 
-            const select = document.getElementById('gasto_tipo_id');
-            select.innerHTML = '<option value="">Seleccione tipo</option>';
-            tipos.forEach(tipo => {
-                const option = document.createElement('option');
-                option.value = tipo.id;
-                option.textContent = tipo.nombre;
-                select.appendChild(option);
-            });
-
-            if (tipos.length === 1) {
-                select.value = tipos[0].id;
-            }
-        } catch (error) {
-            console.error('Error cargando tipos de gasto:', error);
-        }
+        document.getElementById('btnClearTipo')?.addEventListener('click', () => {
+            document.getElementById('gasto_tipo_id').value = '';
+            document.getElementById('gasto_tipo_nombre').value = '';
+        });
     }
 
     obtenerFechaHoraActual() {
@@ -230,6 +234,7 @@ data: 'fecha_gasto',
 }
 document.addEventListener('DOMContentLoaded', () => {
     new GastoManager();
+
     document.body.addEventListener('click', function(e) {
         if (e.target && (e.target.matches('.btn-view-gasto') || e.target.closest('.btn-view-gasto'))) {
             const button = e.target.closest('.btn-view-gasto');

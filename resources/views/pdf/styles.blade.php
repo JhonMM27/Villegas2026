@@ -27,7 +27,10 @@
 
         .linea2 { border-bottom: 0.5px dashed #000; }
 
+        table.reporte tbody tr { border-bottom: 0.5px solid #aaa; }
+        table.reporte tbody tr:last-of-type { border-bottom: none; }
+
         .subtotal-row { font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000; }
-        .total-row { font-weight: bold; border-top: 2px solid #000; }
+        .total-row { font-weight: bold; border-top: 2px solid #000; border-bottom: 1px solid #000; }
     </style>
 </head>
