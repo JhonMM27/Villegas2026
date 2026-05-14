@@ -85,6 +85,20 @@ class CompraService
                 ]);
             }
 
+            // 3.1) Recalcular en cascada si la fecha de compra es anterior a hoy
+            $fechaCompra = $compra->fecha_compra instanceof \Carbon\Carbon
+                ? $compra->fecha_compra
+                : \Carbon\Carbon::parse($compra->fecha_compra);
+
+            if ($fechaCompra->lt(today())) {
+                foreach ($detallesCreados as $detalle) {
+                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                        $detalle->producto_id,
+                        $fechaCompra->format('Y-m-d')
+                    );
+                }
+            }
+
             // 4) Incrementar correlativo solo para Notas de Compra (NC)
             if ($comprobanteTipoCodigo === 'NC') {
                 ComprobanteSerie::where('comprobante_tipo_codigo', $comprobanteTipoCodigo)
@@ -213,18 +227,30 @@ class CompraService
             }
 
             // Recalcular Kardex para productos afectados
-            foreach (array_unique($productosAfectados) as $productoId) {
-                // Buscamos el primer movimiento de esta compra para empezar el recálculo desde ahí
-                $primerMov = Movimiento::where('transaccion_id', $compraAnulada->id)
-                    ->where('producto_id', $productoId)
-                    ->orderBy('id', 'asc')
-                    ->first();
+            $fechaCompra = $compraAnulada->fecha_compra instanceof \Carbon\Carbon
+                ? $compraAnulada->fecha_compra
+                : \Carbon\Carbon::parse($compraAnulada->fecha_compra);
 
-                if ($primerMov) {
-                    $this->movimientoService->recalcularKardexProducto(
+            foreach (array_unique($productosAfectados) as $productoId) {
+                if ($fechaCompra->lt(today())) {
+                    // Fecha pasada: recalcular en cascada desde la fecha de la compra
+                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
                         $productoId,
-                        $primerMov->id
+                        $fechaCompra->format('Y-m-d')
                     );
+                } else {
+                    // Fecha actual o futura: recalcular desde el primer movimiento
+                    $primerMov = Movimiento::where('transaccion_id', $compraAnulada->id)
+                        ->where('producto_id', $productoId)
+                        ->orderBy('id', 'asc')
+                        ->first();
+
+                    if ($primerMov) {
+                        $this->movimientoService->recalcularKardexProducto(
+                            $productoId,
+                            $primerMov->id
+                        );
+                    }
                 }
             }
 

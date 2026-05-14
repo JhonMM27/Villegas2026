@@ -147,6 +147,98 @@
                 this.checkPendienteCotizacion();
             }
 
+            async checkStockAlerts() {
+                const tbody = document.querySelector('#tablaDetalles tbody');
+                if (!tbody || tbody.querySelectorAll('tr').length === 0) return [];
+
+                const alertas = [];
+
+                [...tbody.querySelectorAll('tr')].forEach(row => {
+                    const cantidad = parseFloat(row.querySelector('.inputCantidad').value) || 0;
+                    const empaque = parseFloat(row.dataset.empaque || 1);
+                    const empaqueBase = parseFloat(row.dataset.empaqueBase || empaque || 1);
+                    const unidadCodigo = row.dataset.unidadCodigo || 'UND';
+                    const stockCell = row.querySelector('td:nth-child(5)');
+                    const nombreCell = row.querySelector('td:nth-child(3)');
+                    const stockAlmacen = stockCell ? (parseFloat(stockCell.textContent.replace(/[^\d.\-]/g, '')) || 0) : 0;
+                    const nombreProducto = nombreCell ? nombreCell.textContent.replace(/^\(\d+\)\s*/, '').trim() : 'Producto';
+
+                    // Saltar servicios (ZZ) del check de stock
+                    if (unidadCodigo === 'ZZ') return;
+
+                    // Stock total en KG del producto
+                    const stockTotalKg = stockAlmacen * empaqueBase;
+
+                    // Cantidad solicitada en KG
+                    const cantidadSolicitadaKg = cantidad * empaque;
+
+                    // Stock disponible en la unidad de venta seleccionada
+                    const stockDisponible = empaque > 0 ? stockTotalKg / empaque : 0;
+
+                    if (stockAlmacen < 0) {
+                        alertas.push(`Stock sin disponibilidad: ${nombreProducto} (stock: ${stockAlmacen.toFixed(2)} ${unidadCodigo})`);
+                    } else if (cantidadSolicitadaKg > stockTotalKg) {
+                        alertas.push(`Stock sobrepasado: ${nombreProducto} (solicitado: ${cantidad.toFixed(2)} ${unidadCodigo}, disponible: ${stockDisponible.toFixed(2)} ${unidadCodigo})`);
+                    }
+                });
+
+                return alertas;
+            }
+
+            async handleSubmit(e) {
+                e.preventDefault();
+
+                const alertas = await this.checkStockAlerts();
+
+                if (alertas.length > 0) {
+                    const hasError = alertas.some(a => a.includes('sobrepasado') || a.includes('sin disponibilidad'));
+                    const result = await Swal.fire({
+                        title: hasError ? '⚠️ Alertas de Stock' : '⚠️ Stock Bajo',
+                        html: alertas.join('<br>') + '<br><br>¿Deseas continuar con el registro de todas formas?',
+                        icon: hasError ? 'warning' : 'info',
+                        showCancelButton: true,
+                        confirmButtonText: 'Continuar',
+                        cancelButtonText: 'Cancelar',
+                        reverseButtons: true
+                    });
+
+                    if (!result.isConfirmed) return;
+                }
+
+                const formData = new FormData(this.form);
+                this.setSubmitButtonState(true);
+                this.clearFormErrors();
+
+                try {
+                    const response = await this.submitForm(formData);
+
+                    const focusedElement = this.elements.modal.querySelector(':focus');
+                    if (focusedElement) focusedElement.blur();
+
+                    this.modal.hide();
+                    this.tabla.ajax.reload(null, false);
+
+                    const isSuccess = response.success === true || response.status === true;
+                    if (isSuccess) {
+                        const message = this.isEditing
+                            ? (response.message || 'Registro actualizado correctamente')
+                            : (response.message || 'Registro creado correctamente');
+                        this.showNotification('success', message);
+
+                        if (this.afterSuccess) {
+                            await this.afterSuccess(response, this.isEditing);
+                        }
+                    } else {
+                        this.showNotification('error', response.message || 'Error en la operación');
+                    }
+                } catch (error) {
+                    console.error('Error en submit:', error);
+                    this.handleFormErrors(error);
+                } finally {
+                    this.setSubmitButtonState(false);
+                }
+            }
+
             async handleVentaSuccess(response, isEditing) {
                 // Limpiar parámetro de URL si venía de una cotización
                 const urlParams = new URLSearchParams(window.location.search);
@@ -262,6 +354,8 @@
                     tr.dataset.afectacionCodigo = item.afectacion_tipo_codigo || '10';
                     tr.dataset.fracciones = JSON.stringify(item.fracciones || []);
                     tr.dataset.empaque = item.empaque || 1;
+                    tr.dataset.empaqueBase = item.empaqueBase || item.empaque || 1;
+                    tr.dataset.unidadCodigo = item.unidad_codigo || '';
                     tr.dataset.totalManual = (item.total_manual === "1") ? "1" : "0";
 
                     tr.innerHTML = `
@@ -316,8 +410,9 @@
                             if (inputUnidad) inputUnidad.value = option.value;
                             if (inputEmpaque) inputEmpaque.value = nuevoEmpaque;
 
-                            // Actualizar dataset empaque
+                            // Actualizar dataset empaque y unidad
                             tr.dataset.empaque = nuevoEmpaque;
+                            tr.dataset.unidadCodigo = option.value;
 
                             // Actualizar columna EMPAQUE (no stock)
                             const tdEmpaque = tr.querySelector('.tdEmpaque');
@@ -1015,8 +1110,11 @@
                         // ✅ unidad seleccionada en la venta
                         unidad_codigo: detalle.unidad_codigo,
 
-                        // ✅ empaque real usado en la venta
+                        // ✅ empaque real usado en la venta (fracción seleccionada)
                         empaque: detalle.producto_empaque,
+
+                        // ✅ empaque BASE del producto (para conversiones)
+                        empaqueBase: producto.empaque || detalle.producto_empaque || 1,
 
                         // ✅ fracciones COMPLETAS (clave)
                         fracciones: producto.fracciones || [],

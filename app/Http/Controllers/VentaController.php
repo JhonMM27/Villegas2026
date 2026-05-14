@@ -180,7 +180,7 @@ class VentaController extends Controller
         try {
             $registro = Venta::with([
                 'detalles.producto' => function ($query) {
-                    $query->select('id', 'afectacion_tipo_codigo', 'codigo', 'nombre', 'costo_unitario', 'stock_almacen', 'unidad_codigo');
+                    $query->select('id', 'afectacion_tipo_codigo', 'codigo', 'nombre', 'costo_unitario', 'stock_almacen', 'empaque', 'unidad_codigo');
                 },
                 'detalles.producto.afectacionTipo' => function ($query) {
                     $query->select('codigo', 'descripcion', 'porcentaje');

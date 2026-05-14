@@ -363,6 +363,113 @@ class MovimientoService
     }
 
     /**
+     * Recalcula el kardex completo de un producto desde una fecha específica.
+     *
+     * A diferencia de recalcularKardexProducto() que ordena por id, este método
+     * ordena por fecha para manejar correctamente compras con fecha pasada.
+     *
+     * Algoritmo:
+     * 1. Obtiene saldos del movimiento ANTERIOR a la fecha dada
+     * 2. Recorre todos los movimientos desde esa fecha en orden CRONOLÓGICO (fecha ASC, id ASC)
+     * 3. Recalcula cada uno con las fórmulas CPP correctas
+     * 4. Si es VENTA, actualiza rentabilidad en venta_detalles
+     * 5. Si es insumo de PREPARADA, actualiza costos en cascada
+     * 6. Al final, actualiza el producto con los saldos del último movimiento
+     *
+     * @param  int  $productoId  ID del producto a recalcular
+     * @param  string  $fechaDesde  Fecha desde la cual recalcular (formato Y-m-d)
+     */
+    public function recalcularKardexProductoDesdeFecha(int $productoId, string $fechaDesde): void
+    {
+        // Obtener saldos del movimiento anterior a la fecha de inicio
+        $movimientoAnterior = Movimiento::where('producto_id', $productoId)
+            ->where('fecha', '<', $fechaDesde)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        // Si no hay movimiento anterior, partimos de cero
+        $stockActual = $movimientoAnterior ? (float) $movimientoAnterior->stock_nuevo : 0;
+        $costoActual = $movimientoAnterior ? (float) $movimientoAnterior->costo_nuevo : 0;
+
+        // Traer TODOS los movimientos desde la fecha dada en orden cronológico
+        $movimientos = Movimiento::where('producto_id', $productoId)
+            ->where('fecha', '>=', $fechaDesde)
+            ->orderBy('fecha', 'asc')
+            ->orderBy('id', 'asc')
+            ->get();
+
+        foreach ($movimientos as $mov) {
+            $valorAnterior = $stockActual * $costoActual;
+
+            if ($mov->entrada > 0) {
+                // === ENTRADA (Compra / Preparada Ingreso) ===
+                $cantidadKg = (float) $mov->entrada;
+                $costoMov = (float) $mov->costo_unitario;
+                $costoTotal = $cantidadKg * $costoMov;
+
+                $stockNuevo = $stockActual + $cantidadKg;
+                $valorNuevo = $valorAnterior + $costoTotal;
+                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
+                    $costoNuevo = $costoMov;
+                } else {
+                    $costoNuevo = $stockNuevo > 0 ? round($valorNuevo / $stockNuevo, 4) : $costoMov;
+                }
+            } else {
+                // === SALIDA (Venta / Preparada Salida / Préstamo) ===
+                $cantidadKg = (float) $mov->salida;
+
+                // Verificar si es una salida con costo exacto forzado (ej. Devolución de préstamo)
+                $esSalidaForzada = false;
+                if ($mov->tipo === self::TIPO_PRESTAMO_SALIDA) {
+                    $prestamo = \App\Models\Prestamo::find($mov->transaccion_id);
+                    if ($prestamo && $prestamo->prestamo_referencia_id) {
+                        $esSalidaForzada = true;
+                    }
+                }
+
+                $costoMov = $esSalidaForzada ? (float) $mov->costo_unitario : $costoActual;
+                $costoTotal = $cantidadKg * $costoMov;
+
+                $stockNuevo = $stockActual - $cantidadKg;
+                $valorNuevo = $valorAnterior - $costoTotal;
+                $costoNuevo = ($esSalidaForzada && $stockNuevo > 0) ? round($valorNuevo / $stockNuevo, 4) : $costoActual;
+            }
+
+            // Actualizar el movimiento con saldos recalculados
+            $mov->update([
+                'stock_anterior' => round($stockActual, 4),
+                'costo_actual' => round($costoActual, 4),
+                'valor_anterior' => round($valorAnterior, 4),
+                'costo_unitario' => round($costoMov, 4),
+                'costo_total' => round($costoTotal, 4),
+                'stock_nuevo' => round($stockNuevo, 4),
+                'costo_nuevo' => round($costoNuevo, 4),
+                'valor_nuevo' => round($valorNuevo, 4),
+            ]);
+
+            // Si es VENTA, actualizar rentabilidad en venta_detalles
+            if ($mov->tipo === self::TIPO_VENTA && $mov->detalle_id) {
+                $this->actualizarRentabilidadVenta($mov);
+            }
+
+            // Si es insumo de PREPARADA, actualizar costos del insumo y del producto final (en cascada)
+            if ($mov->tipo === self::TIPO_PREPARADA_SALIDA && $mov->detalle_id) {
+                $this->actualizarCostoPreparada($mov);
+            }
+
+            // Avanzar saldos para el siguiente movimiento
+            $stockActual = $stockNuevo;
+            $costoActual = $costoNuevo;
+        }
+
+        // Actualizar producto con saldos del último movimiento
+        Producto::where('id', $productoId)->update([
+            'stock_almacen' => round($stockActual, 4),
+            'costo_unitario' => round($costoActual, 4),
+        ]);
+    }
+
+    /**
      * Recalcula el kardex de un producto excluyendo movimientos de transacciones anuladas.
      *
      * A diferencia de recalcularKardexProducto(), este método:

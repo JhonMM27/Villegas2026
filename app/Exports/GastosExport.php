@@ -65,7 +65,7 @@ class GastosExport implements FromCollection, ShouldAutoSize, WithHeadings, With
         $totalConsorc = 0;
 
         foreach ($reportes as $r) {
-            $tipo = $r->tipo ?? 'SIN TIPO';
+            $tipo = $r->gastoTipo?->nombre ?? 'SIN TIPO';
             $principal = (float) ($r->importe_p ?? 0);
             $deposito = (float) ($r->importe_d ?? 0);
             $consorc = (float) ($r->importe_c ?? 0);

@@ -217,7 +217,7 @@ class GastoController extends Controller
             ->where('activo', true);
 
         if ($request->has('q') && $request->q !== '') {
-            $query->where('nombre', 'like', '%' . $request->q . '%');
+            $query->where('nombre', 'like', '%'.$request->q.'%');
         }
 
         return response()->json($query->get());
@@ -242,9 +242,10 @@ class GastoController extends Controller
         $fechaFin = \Carbon\Carbon::parse($request->fecha_fin)->endOfDay();
         $tipo = $request->tipo;
 
-        $query = Gasto::whereBetween('fecha_gasto', [$fechaInicio, $fechaFin])
-            ->when($tipo && $tipo !== 'Todos', fn ($q) => $q->where('tipo', $tipo))
-            ->orderBy('tipo')
+        $query = Gasto::with('gastoTipo')
+            ->whereBetween('fecha_gasto', [$fechaInicio, $fechaFin])
+            ->when($tipo && $tipo !== 'Todos', fn ($q) => $q->where('gasto_tipo_id', $tipo))
+            ->orderBy('gasto_tipo_id')
             ->orderBy('fecha_gasto', 'desc');
 
         $reportes = $query->get();
@@ -264,9 +265,10 @@ class GastoController extends Controller
         $fechaFin = \Carbon\Carbon::parse($request->fecha_fin)->endOfDay();
         $tipo = $request->tipo;
 
-        $query = Gasto::whereBetween('fecha_gasto', [$fechaInicio, $fechaFin])
-            ->when($tipo && $tipo !== 'Todos', fn ($q) => $q->where('tipo', $tipo))
-            ->orderBy('tipo')
+        $query = Gasto::with('gastoTipo')
+            ->whereBetween('fecha_gasto', [$fechaInicio, $fechaFin])
+            ->when($tipo && $tipo !== 'Todos', fn ($q) => $q->where('gasto_tipo_id', $tipo))
+            ->orderBy('gasto_tipo_id')
             ->orderBy('fecha_gasto', 'desc');
 
         $reportes = $query->get();
@@ -288,9 +290,10 @@ class GastoController extends Controller
         $fechaFin = \Carbon\Carbon::parse($request->fecha_fin)->endOfDay();
         $tipo = $request->tipo;
 
-        $query = Gasto::whereBetween('fecha_gasto', [$fechaInicio, $fechaFin])
-            ->when($tipo && $tipo !== 'Todos', fn ($q) => $q->where('tipo', $tipo))
-            ->orderBy('tipo')
+        $query = Gasto::with('gastoTipo')
+            ->whereBetween('fecha_gasto', [$fechaInicio, $fechaFin])
+            ->when($tipo && $tipo !== 'Todos', fn ($q) => $q->where('gasto_tipo_id', $tipo))
+            ->orderBy('gasto_tipo_id')
             ->orderBy('fecha_gasto', 'desc');
 
         $reportes = $query->get();
