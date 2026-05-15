@@ -16,6 +16,8 @@ return new class extends Migration
             $table->decimal('sueldo_base', 10, 2)->default(0);
             $table->decimal('horas_extras', 10, 2)->default(0);
             $table->decimal('adelantos', 10, 2)->default(0);
+            $table->decimal('cts_planilla', 10, 2)->nullable();
+            $table->decimal('cts_sueldo_real', 10, 2)->nullable();
             $table->decimal('total_pagar', 10, 2);
             $table->date('fecha_pago')->nullable();
             $table->enum('estado', ['pendiente', 'pagado'])->default('pendiente');

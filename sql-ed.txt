@@ -224,25 +224,7 @@ WHERE p.name IN ('empleado_vacaciones_list', 'empleado_vacaciones_create', 'empl
 ON DUPLICATE KEY UPDATE permission_id = permission_id;
 
 
-
-
-
-
--- 1. Eliminar columna periodo_anio
-ALTER TABLE empleado_vacaciones DROP COLUMN periodo_anio;
--- 2. Eliminar columna anio_a_tomar
-ALTER TABLE empleado_vacaciones DROP COLUMN anio_a_tomar;
--- 3. Eliminar columna estado
-ALTER TABLE empleado_vacaciones DROP COLUMN estado;
--- 4. Eliminar columna dias_totales
-ALTER TABLE empleado_vacaciones DROP COLUMN dias_totales;
--- 5. Agregar nuevas columnas
-ALTER TABLE empleado_vacaciones 
-ADD COLUMN anio_generado INT NOT NULL COMMENT 'Año en que se generaron los días' AFTER empleado_id,
-ADD COLUMN dias_generados INT NOT NULL DEFAULT 7 COMMENT 'Días generados este año' AFTER anio_generado,
-ADD COLUMN dias_tomados INT NOT NULL DEFAULT 0 COMMENT 'Días ya usados' AFTER dias_generados;
--- 6. Agregar índice para consultas
-CREATE INDEX idx_empleado_vacaciones_empleado_anio 
-ON empleado_vacaciones(empleado_id, anio_generado);
--- 7. Actualizar comentario de la tabla
-ALTER TABLE empleado_vacaciones COMMENT = 'Control de vacaciones acumulables por empleado';
+-- Agregar columnas CTS a planilla_pagos
+ALTER TABLE planilla_pagos 
+ADD COLUMN cts_planilla DECIMAL(10,2) NULL AFTER adelantos,
+ADD COLUMN cts_sueldo_real DECIMAL(10,2) NULL AFTER cts_planilla;

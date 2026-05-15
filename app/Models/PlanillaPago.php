@@ -21,6 +21,8 @@ class PlanillaPago extends Model
         'adelantos',
         'dias_faltados',
         'descuento_faltas',
+        'cts_planilla',
+        'cts_sueldo_real',
         'total_pagar',
         'fecha_pago',
         'estado',

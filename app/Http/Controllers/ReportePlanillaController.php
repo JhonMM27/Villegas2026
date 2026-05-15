@@ -72,6 +72,8 @@ class ReportePlanillaController extends Controller
             'total_adelantos' => $adelantos->sum('monto'),
             'total_dias_faltas' => $pagos->sum('dias_faltados'),
             'total_descuento_faltas' => $pagos->sum('descuento_faltas'),
+            'total_cts_planilla' => $pagos->sum('cts_planilla') ?? 0,
+            'total_cts_sueldo_real' => $pagos->sum('cts_sueldo_real') ?? 0,
             'total_pagado' => $pagos->where('estado', 'pagado')->sum('total_pagar'),
             'total_pendiente' => $pagos->where('estado', 'pendiente')->sum('total_pagar'),
             'total_general' => $pagos->sum('total_pagar'),
@@ -203,18 +205,20 @@ class ReportePlanillaController extends Controller
             if (! $empleado) {
                 return redirect()->back()->with('error', 'Empleado no encontrado');
             }
-            $resumen = [
-                'total_sueldo_planilla' => (float) $empleado->sueldo_planilla,
-                'total_sueldo_real' => (float) $empleado->sueldo_real,
-                'total_sueldo_base' => $pagos->sum('sueldo_base'),
-                'total_horas_extras' => $pagos->sum('horas_extras'),
-                'total_adelantos' => $adelantos->sum('monto'),
-                'total_dias_faltas' => $pagos->sum('dias_faltados'),
-                'total_descuento_faltas' => $pagos->sum('descuento_faltas'),
-                'total_pagado' => $pagos->where('estado', 'pagado')->sum('total_pagar'),
-                'total_pendiente' => $pagos->where('estado', 'pendiente')->sum('total_pagar'),
-                'total_general' => $pagos->sum('total_pagar'),
-            ];
+$resumen = [
+            'total_sueldo_planilla' => (float) $empleado->sueldo_planilla,
+            'total_sueldo_real' => (float) $empleado->sueldo_real,
+            'total_sueldo_base' => $pagos->sum('sueldo_base'),
+            'total_horas_extras' => $pagos->sum('horas_extras'),
+            'total_adelantos' => $adelantos->sum('monto'),
+            'total_dias_faltas' => $pagos->sum('dias_faltados'),
+            'total_descuento_faltas' => $pagos->sum('descuento_faltas'),
+            'total_cts_planilla' => $pagos->sum('cts_planilla') ?? 0,
+            'total_cts_sueldo_real' => $pagos->sum('cts_sueldo_real') ?? 0,
+            'total_pagado' => $pagos->where('estado', 'pagado')->sum('total_pagar'),
+            'total_pendiente' => $pagos->where('estado', 'pendiente')->sum('total_pagar'),
+            'total_general' => $pagos->sum('total_pagar'),
+        ];
             $pdf = PDF::loadView('planilla.reportes.empleados_pdf', compact('empleado', 'pagos', 'adelantos', 'empresa', 'totalRegistros', 'resumen'));
 
             return $pdf->stream('reporte_empleado_'.$empleadoId.'.pdf');
@@ -354,6 +358,8 @@ class ReportePlanillaController extends Controller
             'total_adelantos' => $adelantos->sum('monto'),
             'total_dias_faltas' => $pagos->sum('dias_faltados'),
             'total_descuento_faltas' => $pagos->sum('descuento_faltas'),
+            'total_cts_planilla' => $pagos->sum('cts_planilla') ?? 0,
+            'total_cts_sueldo_real' => $pagos->sum('cts_sueldo_real') ?? 0,
             'total_pagado' => $pagos->where('estado', 'pagado')->sum('total_pagar'),
             'total_pendiente' => $pagos->where('estado', 'pendiente')->sum('total_pagar'),
             'total_general' => $pagos->sum('total_pagar'),
@@ -412,6 +418,8 @@ class ReportePlanillaController extends Controller
             'total_adelantos' => $adelantos->sum('monto'),
             'total_dias_faltas' => $pagos->sum('dias_faltados'),
             'total_descuento_faltas' => $pagos->sum('descuento_faltas'),
+            'total_cts_planilla' => $pagos->sum('cts_planilla') ?? 0,
+            'total_cts_sueldo_real' => $pagos->sum('cts_sueldo_real') ?? 0,
             'total_pagado' => $pagos->where('estado', 'pagado')->sum('total_pagar'),
             'total_pendiente' => $pagos->where('estado', 'pendiente')->sum('total_pagar'),
             'total_general' => $pagos->sum('total_pagar'),

@@ -82,7 +82,8 @@ class PlanillaPagoService
             );
             $diasFaltados = $asistencia ? (float) $asistencia->dias_faltados : 0.0;
             $descuentoFaltas = $this->calcularDescuentoFaltas($sueldoReal, $diasFaltados);
-            $totalPagar = $disponible + $horasExtras - $descuentoFaltas;
+            $ctsSueldoReal = (float) ($data['cts_sueldo_real'] ?? 0);
+            $totalPagar = $disponible + $horasExtras - $descuentoFaltas + $ctsSueldoReal;
 
             $pago = PlanillaPago::create([
                 'empleado_id' => (int) $data['empleado_id'],
@@ -92,6 +93,8 @@ class PlanillaPagoService
                 'horas_extras' => $horasExtras,
                 'dias_faltados' => $diasFaltados,
                 'descuento_faltas' => $descuentoFaltas,
+                'cts_planilla' => (float) ($data['cts_planilla'] ?? 0) ?: null,
+                'cts_sueldo_real' => $ctsSueldoReal ?: null,
                 'adelantos' => 0,
                 'total_pagar' => $totalPagar,
                 'estado' => 'pendiente',
@@ -147,8 +150,9 @@ class PlanillaPagoService
 
             $horasExtras = (float) ($data['horas_extras'] ?? 0);
             $diasFaltados = (float) ($data['dias_faltados'] ?? 0);
+            $ctsSueldoReal = (float) ($data['cts_sueldo_real'] ?? 0);
             $descuentoFaltas = $this->calcularDescuentoFaltas($sueldoReal, $diasFaltados);
-            $newTotal = (float) $pago->sueldo_base + $horasExtras - $descuentoFaltas;
+            $newTotal = (float) $pago->sueldo_base + $horasExtras - $descuentoFaltas + $ctsSueldoReal;
 
             $oldTotal = (float) $pago->total_pagar;
 
@@ -157,6 +161,8 @@ class PlanillaPagoService
             $pago->horas_extras = $horasExtras;
             $pago->dias_faltados = $diasFaltados;
             $pago->descuento_faltas = $descuentoFaltas;
+            $pago->cts_planilla = isset($data['cts_planilla']) ? ((float) $data['cts_planilla'] ?: null) : $pago->cts_planilla;
+            $pago->cts_sueldo_real = $ctsSueldoReal ?: null;
             $pago->total_pagar = $newTotal;
             $pago->observaciones = $data['observaciones'] ?? $pago->observaciones;
 

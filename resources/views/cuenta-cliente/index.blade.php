@@ -251,6 +251,13 @@
                                             data-url="{{ route('cuenta.corriente.cliente.saldos_acumuladosfechas_cliente_pdf') }}">
                                             Saldos acumulados por cliente
                                         </button>
+
+                                        <button type="button" class="btn btn-secondary btn-sm btn-report"
+                                            data-tab="2" data-target="#reporteTab2" data-cliente="no"
+                                            data-fecha="range" data-dia="no"
+                                            data-url="{{ route('cuenta.corriente.cliente.rentabilidad_todos_fechas_pdf') }}">
+                                            Rentabilidad General (Fechas)
+                                        </button>
                                     </div>
                                 </div>
                             </div>

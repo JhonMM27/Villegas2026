@@ -344,6 +344,77 @@ class CuentaCorrienteClienteController extends Controller
         return $pdf->stream('reporte_rentabilidad_cliente.pdf');
     }
 
+    public function rentabilidadTodosClientesFechas(Request $request)
+    {
+        $data = $request->validate([
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
+        ]);
+
+        $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
+        $fin = Carbon::parse($data['fecha_fin'])->endOfDay();
+
+        $reportes = VentaDetalle::query()
+            ->join('ventas as v', 'v.id', '=', 'venta_detalles.venta_id')
+            ->select([
+                'v.cliente_id',
+                'v.cliente_nombre',
+                DB::raw('SUM(venta_detalles.total) as total_importe'),
+                DB::raw('SUM(venta_detalles.costo_total) as total_costo'),
+                DB::raw('SUM(venta_detalles.total - venta_detalles.costo_total) as total_rentabilidad'),
+            ])
+            ->whereBetween('v.fecha_venta', [$ini, $fin])
+            ->where('v.estado', '!=', 'anulada')
+            ->groupBy('v.cliente_id')
+            ->groupBy('v.cliente_nombre')
+            ->orderBy('v.cliente_nombre')
+            ->get();
+
+        $totImporte = $reportes->sum('total_importe');
+        $totCosto = $reportes->sum('total_costo');
+        $totRentabilidad = $reportes->sum('total_rentabilidad');
+
+        return view('cuenta-cliente.reportes-general.rentabilidad_todos_clientes_fechas_view', compact('reportes', 'ini', 'fin', 'totImporte', 'totCosto', 'totRentabilidad'));
+    }
+
+    public function rentabilidadTodosClientesFechasPdf(Request $request)
+    {
+        $data = $request->validate([
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
+        ]);
+
+        $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
+        $fin = Carbon::parse($data['fecha_fin'])->endOfDay();
+
+        $reportes = VentaDetalle::query()
+            ->join('ventas as v', 'v.id', '=', 'venta_detalles.venta_id')
+            ->select([
+                'v.cliente_id',
+                'v.cliente_nombre',
+                DB::raw('SUM(venta_detalles.total) as total_importe'),
+                DB::raw('SUM(venta_detalles.costo_total) as total_costo'),
+                DB::raw('SUM(venta_detalles.total - venta_detalles.costo_total) as total_rentabilidad'),
+            ])
+            ->whereBetween('v.fecha_venta', [$ini, $fin])
+            ->where('v.estado', '!=', 'anulada')
+            ->groupBy('v.cliente_id')
+            ->groupBy('v.cliente_nombre')
+            ->orderBy('v.cliente_nombre')
+            ->get();
+
+        $totImporte = $reportes->sum('total_importe');
+        $totCosto = $reportes->sum('total_costo');
+        $totRentabilidad = $reportes->sum('total_rentabilidad');
+
+        $pdf = Pdf::loadView(
+            'cuenta-cliente.reportes-general.rentabilidad_todos_clientes_fechas',
+            compact('reportes', 'ini', 'fin', 'totImporte', 'totCosto', 'totRentabilidad')
+        )->setPaper('letter', 'landscape');
+
+        return $pdf->stream('reporte_rentabilidad_todos_clientes.pdf');
+    }
+
     public function detalleCreditosPorCobrarPdf(Request $request)
     {
         $data = $request->validate([

@@ -338,6 +338,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('cuenta.corriente.cliente.rentabilidad_pdf');
     Route::post('/cuenta-corriente/cliente/rentabilidad', [CuentaCorrienteClienteController::class, 'rentabilidadClienteFechas'])
         ->name('cuenta.corriente.cliente.rentabilidad');
+    Route::get('/cuenta-corriente/cliente/rentabilidad-todos/pdf', [CuentaCorrienteClienteController::class, 'rentabilidadTodosClientesFechasPdf'])
+        ->name('cuenta.corriente.cliente.rentabilidad_todos_fechas_pdf');
+    Route::post('/cuenta-corriente/cliente/rentabilidad-todos', [CuentaCorrienteClienteController::class, 'rentabilidadTodosClientesFechas'])
+        ->name('cuenta.corriente.cliente.rentabilidad_todos_fechas');
     Route::get('/cuenta-corriente/cliente/creditos_cobrar_detalles/pdf', [CuentaCorrienteClienteController::class, 'detalleCreditosPorCobrarPdf'])
         ->name('cuenta.corriente.cliente.creditos_cobrar_detalles_pdf');
     Route::get('/cuenta-corriente/cliente/creditos_cobrar_cliente_todos/pdf', [CuentaCorrienteClienteController::class, 'creditosPorCobrarClienteTodosPdf'])

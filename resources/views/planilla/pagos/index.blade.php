@@ -264,6 +264,8 @@ class PagoPlanillaManager extends CrudManager {
 
         document.getElementById('horas_extras')?.addEventListener('input', () => this.calcularTotal());
         document.getElementById('dias_faltados')?.addEventListener('input', () => this.calcularDescuentoFaltas());
+        document.getElementById('cts_planilla')?.addEventListener('input', () => this.calcularTotal());
+        document.getElementById('cts_sueldo_real')?.addEventListener('input', () => this.calcularTotal());
         
         document.getElementById('mes')?.addEventListener('change', () => this.cargarDisponible());
         document.getElementById('anio')?.addEventListener('change', () => this.cargarDisponible());
@@ -363,7 +365,14 @@ class PagoPlanillaManager extends CrudManager {
     onEmpleadoSelected(empleado) {
         document.getElementById('sueldo_planilla').value = parseFloat(empleado.sueldo_planilla).toFixed(2);
         document.getElementById('sueldo_real').value = parseFloat(empleado.sueldo_real).toFixed(2);
-        
+
+        const ctsSection = document.getElementById('cts_section');
+        if (parseFloat(empleado.sueldo_planilla) > 0) {
+            ctsSection.classList.remove('d-none');
+        } else {
+            ctsSection.classList.add('d-none');
+        }
+
         this.cargarDisponible();
     }
 
@@ -371,7 +380,8 @@ class PagoPlanillaManager extends CrudManager {
         const disponible = parseFloat(document.getElementById('disponible_label').textContent) || 0;
         const horasExtras = parseFloat(document.getElementById('horas_extras').value) || 0;
         const descuentoFaltas = parseFloat(document.getElementById('descuento_faltas').value) || 0;
-        const total = disponible + horasExtras - descuentoFaltas;
+        const ctsSueldoReal = parseFloat(document.getElementById('cts_sueldo_real').value) || 0;
+        const total = disponible + horasExtras - descuentoFaltas + ctsSueldoReal;
         document.getElementById('total_pagar_label').textContent = total.toFixed(2);
         document.getElementById('total_pagar').value = total.toFixed(2);
         document.getElementById('principal').value = total.toFixed(2);
@@ -442,6 +452,10 @@ class PagoPlanillaManager extends CrudManager {
         
         document.getElementById('mes').disabled = false;
         document.getElementById('anio').disabled = false;
+
+        document.getElementById('cts_planilla').value = '';
+        document.getElementById('cts_sueldo_real').value = '';
+        document.getElementById('cts_section').classList.add('d-none');
     }
 
     async showEditModal(id) {
@@ -475,7 +489,19 @@ class PagoPlanillaManager extends CrudManager {
                 parseFloat(response.importe_c || 0)
             ).toFixed(2);
             document.getElementById('total_caja').classList.remove('is-invalid');
-            
+
+            const ctsPlanilla = parseFloat(response.cts_planilla ?? null) || '';
+            const ctsSueldoReal = parseFloat(response.cts_sueldo_real ?? null) || '';
+            document.getElementById('cts_planilla').value = ctsPlanilla;
+            document.getElementById('cts_sueldo_real').value = ctsSueldoReal;
+
+            const ctsSection = document.getElementById('cts_section');
+            if (parseFloat(response.empleado.sueldo_planilla) > 0) {
+                ctsSection.classList.remove('d-none');
+            } else {
+                ctsSection.classList.add('d-none');
+            }
+
             document.getElementById('horas_extras').disabled = false;
             document.getElementById('dias_faltados').disabled = false;
             document.getElementById('empleado_nombre').disabled = true;

@@ -92,6 +92,8 @@ class PlanillaPagoController extends Controller
             $data = $request->validate([
                 'horas_extras' => 'nullable|numeric|min:0',
                 'dias_faltados' => 'nullable|numeric|min:0|max:30',
+                'cts_planilla' => 'nullable|numeric|min:0',
+                'cts_sueldo_real' => 'nullable|numeric|min:0',
                 'observaciones' => 'nullable|string',
                 'principal' => 'nullable|numeric|min:0',
                 'deposito' => 'nullable|numeric|min:0',
@@ -130,6 +132,8 @@ class PlanillaPagoController extends Controller
                 'anio' => 'required|integer|min:2020',
                 'horas_extras' => 'nullable|numeric|min:0',
                 'dias_faltados' => 'nullable|numeric|min:0|max:30',
+                'cts_planilla' => 'nullable|numeric|min:0',
+                'cts_sueldo_real' => 'nullable|numeric|min:0',
                 'observaciones' => 'nullable|string',
                 'principal' => 'nullable|numeric|min:0',
                 'deposito' => 'nullable|numeric|min:0',

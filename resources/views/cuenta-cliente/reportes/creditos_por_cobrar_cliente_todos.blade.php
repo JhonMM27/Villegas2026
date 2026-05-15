@@ -43,8 +43,8 @@
                 <th class="text-right">Abonos</th>
                 <th class="text-right">Saldo</th>
                 <th class="text-right">Ítems</th>
-                <th>Cliente</th>
-                <th>Usuario</th>
+                {{-- <th>Cliente</th>
+                <th>Usuario</th> --}}
             </tr>
         </thead>
 
@@ -62,8 +62,8 @@
                     <td class="text-right">{{ number_format((float) $r->saldo, 2) }}</td>
 
                     <td class="text-right">{{ (int) $r->items }}</td>
-                    <td>{{ $r->cliente_nombre }}</td>
-                    <td>{{ $r->user_nombre }}</td>
+                    {{-- <td>{{ $r->cliente_nombre }}</td>
+                    <td>{{ $r->user_nombre }}</td> --}}
                 </tr>
             @empty
                 <tr>
@@ -84,7 +84,7 @@
                     <td colspan="2"></td>
                 </tr>
 
-                <tr style="border-top: 3px solid #2c3e50; background: #fff3cd;">
+                <tr style="border-top: 3px solid #2c3e50;">
                     <td colspan="7" style="text-align:right; font-weight:700; font-size:14px; padding:8px;">
                         SALDO:
                     </td>
