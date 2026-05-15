@@ -460,6 +460,13 @@
                             </a>
                         </li>
                         @endcan
+                        @can('empleado_vacaciones_list')
+                        <li class="nav-item">
+                            <a href="{{route('empleado-vacaciones.index')}}" class="nav-link" id="itemVacaciones">
+                                <p>Vacaciones</p>
+                            </a>
+                        </li>
+                        @endcan
                     </ul>
                 </li>
                 @endcanany

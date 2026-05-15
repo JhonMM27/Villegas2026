@@ -7,7 +7,7 @@
         'inputCantidad': 'inputPrecioUnitario',
         'inputPrecioUnitario': 'producto_nombre'
     };
-    const ENTER_SEQUENCE = {
+    const ENTER_SEQUENCE = window.ENTER_SEQUENCE || {
         'cliente_razon_social': 'comprobante_tipo_codigo',
         'comprobante_tipo_codigo': 'serie',
         'serie': 'correlativo',
@@ -223,6 +223,9 @@
                 e.preventDefault();
                 if (nextField === 'cantidad') {
                     focusFirstCantidadInTable();
+                } else if (nextField === 'btnProcesar') {
+                    focusField(nextField);
+                    setTimeout(() => document.getElementById('btnProcesar')?.click(), 50);
                 } else {
                     focusField(nextField);
                 }

@@ -16,19 +16,46 @@
             padding: 0;
         }
 
+        .watermark {
+            position: fixed;
+            top: 20%;
+            left: 5%;
+            width: 600px;
+            opacity: 0.08;
+            z-index: -1000;
+        }
+
+        .contenido {
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 120px;
+        }
+
         .header {
             text-align: center;
             margin-bottom: 15px;
+            padding-top: 10px;
         }
 
         .header h2 {
             margin: 0;
+            font-size: 18px;
+        }
+
+        .header h3 {
+            margin: 15px 0 10px 0;
             font-size: 14px;
         }
 
         .header p {
             margin: 2px 0;
-            font-size: 10px;
+            font-size: 12px;
         }
 
         .info {
@@ -137,6 +164,9 @@
 </head>
 
 <body>
+    @include('planilla.reportes.partials.logo')
+    @include('planilla.reportes.partials.watermark')
+    <div class="contenido">
     <div class="header">
         <h2>{{ $empresa->razon_social ?? 'EMPRESA' }}</h2>
         <p>{{ $empresa->direccion ?? '' }}</p>
@@ -432,6 +462,7 @@
 
     <div class="footer">
         Generado el {{ date('d/m/Y H:i:s') }}
+    </div>
     </div>
 </body>
 

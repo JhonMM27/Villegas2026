@@ -45,6 +45,12 @@
                                         class="form-control form-control-sm">
                                     <div class="invalid-feedback"></div>
                                 </div>
+                                <div class="mb-3">
+                                    <label for="fecha_ingreso" class="form-label">Fecha de Ingreso</label>
+                                    <input type="date" id="fecha_ingreso" name="fecha_ingreso"
+                                        class="form-control form-control-sm">
+                                    <div class="invalid-feedback"></div>
+                                </div>
                             </div>
                         </div>
                         <div class="col-lg-6">

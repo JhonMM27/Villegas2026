@@ -79,6 +79,9 @@ class EmpleadoManager extends CrudManager {
             document.getElementById('sueldo_planilla').value = data.empleado.sueldo_planilla;
             document.getElementById('sueldo_real').value = data.empleado.sueldo_real;
             document.getElementById('estado').value = data.empleado.estado;
+            if (data.empleado.fecha_ingreso) {
+                document.getElementById('fecha_ingreso').value = data.empleado.fecha_ingreso;
+            }
         });
         this.isEditing = true;
         this.elements.methodField.value = 'PUT';
@@ -125,6 +128,14 @@ class EmpleadoManager extends CrudManager {
                                             <div class="col-md-6">
                                                 <label class="form-label text-muted small mb-1">Correo</label>
                                                 <p class="fw-bold mb-0">${data.empleado.correo || '-'}</p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label text-muted small mb-1">Fecha de Ingreso</label>
+                                                <p class="fw-bold mb-0">${data.empleado.fecha_ingreso ? new Date(data.empleado.fecha_ingreso).toLocaleDateString('es-PE') : '-'}</p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label text-muted small mb-1">Años de Servicio</label>
+                                                <p class="fw-bold mb-0">${data.empleado.fecha_ingreso ? Math.floor((new Date() - new Date(data.empleado.fecha_ingreso)) / (365.25 * 24 * 60 * 60 * 1000)) + ' años' : '-'}</p>
                                             </div>
                                         </div>
                                     </div>

@@ -53,6 +53,7 @@ use App\Http\Controllers\VentaController;
 use App\Http\Controllers\VentaEntregaController;
 use App\Http\Controllers\VentaProvisionalController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\EmpleadoVacacionController;
 
 Route::middleware('guest')->group(function () {
     Route::get('/', function () {
@@ -462,6 +463,13 @@ Route::middleware(['auth'])->group(function () {
 
     // Planilla - Inasistencias
     Route::resource('planilla-inasistencias', PlanillaInasistenciaController::class)->except(['create']);
+
+    // Planilla - Vacaciones
+    Route::get('/empleado-vacaciones/elegibles', [EmpleadoVacacionController::class, 'getEmpleadosElegibles'])->name('empleado-vacaciones.elegibles');
+    Route::get('/empleado-vacaciones/empleado/{id}/resumen', [EmpleadoVacacionController::class, 'getResumenEmpleado'])->name('empleado-vacaciones.resumen');
+    Route::get('/empleado-vacaciones/dataTable', [EmpleadoVacacionController::class, 'dataTable'])->name('empleado-vacaciones.dataTable');
+    Route::get('/empleado-vacaciones/{id}/edit', [EmpleadoVacacionController::class, 'edit'])->name('empleado-vacaciones.edit');
+    Route::resource('empleado-vacaciones', EmpleadoVacacionController::class)->except(['create', 'show']);
 
     // Planilla - Reportes
     Route::get('/reportes/planilla', [ReportePlanillaController::class, 'index'])->name('reportes.planilla');

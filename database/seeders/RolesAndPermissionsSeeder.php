@@ -48,6 +48,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'venta_entregas',
             'gastos',
             'empleados',
+            'empleado_vacaciones',
             'planilla_adelantos',
             'planilla_prestamos',
             'planilla_pagos'

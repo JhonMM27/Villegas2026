@@ -90,7 +90,20 @@ class EmpleadoController extends Controller
             return response()->json(['success' => false, 'message' => 'Empleado no encontrado'], 404);
         }
 
-        return response()->json(['empleado' => $empleado]);
+        return response()->json([
+            'empleado' => [
+                'id' => $empleado->id,
+                'nombre' => $empleado->nombre,
+                'dni' => $empleado->dni,
+                'telefono' => $empleado->telefono,
+                'correo' => $empleado->correo,
+                'sueldo_planilla' => $empleado->sueldo_planilla,
+                'sueldo_real' => $empleado->sueldo_real,
+                'estado' => $empleado->estado,
+                'fecha_ingreso' => $empleado->fecha_ingreso?->format('Y-m-d'),
+                'observaciones' => $empleado->observaciones,
+            ]
+        ]);
     }
 
     public function show($id)
@@ -137,6 +150,7 @@ class EmpleadoController extends Controller
             'sueldo_real' => 'required|numeric|min:0',
             'observaciones' => 'nullable|string',
             'estado' => 'required|in:activo,inactivo',
+            'fecha_ingreso' => 'nullable|date|before_or_equal:today',
         ];
 
         return $request->validate($rules);

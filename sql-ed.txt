@@ -171,3 +171,78 @@ SELECT 'Verificación:' AS mensaje;
 SELECT * FROM gasto_tipos;
 SELECT id, tipo, gasto_tipo_id FROM gastos WHERE gasto_tipo_id IS NOT NULL LIMIT 5;
 SELECT * FROM permissions WHERE name LIKE 'gasto_tipos_%';
+
+
+
+
+-- ============================================
+-- PASO 1: Agregar fecha_ingreso a empleados
+-- ============================================
+ALTER TABLE empleados 
+ADD COLUMN fecha_ingreso DATE NULL COMMENT 'Fecha de ingreso del empleado' AFTER observaciones;
+-- ============================================
+-- PASO 2: Crear tabla empleado_vacaciones
+-- ============================================
+CREATE TABLE IF NOT EXISTS empleado_vacaciones (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    empleado_id BIGINT UNSIGNED NOT NULL,
+    anio_generado INT NOT NULL COMMENT 'Año en que se generaron los días',
+    dias_generados INT NOT NULL DEFAULT 15 COMMENT 'Días generados (15 laborables por año)',
+    dias_tomados INT NOT NULL DEFAULT 0 COMMENT 'Días ya usados',
+    fecha_inicio DATE NULL COMMENT 'Fecha inicio de vacaciones',
+    fecha_fin DATE NULL COMMENT 'Fecha fin de vacaciones',
+    observaciones TEXT NULL COMMENT 'Notas adicionales',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_empleado_vacaciones_empleado 
+        FOREIGN KEY (empleado_id) 
+        REFERENCES empleados(id) 
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT = 'Control de vacaciones acumulables - 15 días laborables por año';
+-- ============================================
+-- PASO 3: Índices
+-- ============================================
+CREATE INDEX idx_empleado_vacaciones_empleado_id ON empleado_vacaciones(empleado_id);
+CREATE INDEX idx_empleado_vacaciones_empleado_anio ON empleado_vacaciones(empleado_id, anio_generado);
+-- ============================================
+-- PASO 4: Permisos de Spatie
+-- ============================================
+INSERT INTO permissions (name, guard_name, created_at, updated_at)
+VALUES 
+    ('empleado_vacaciones_list', 'web', NOW(), NOW()),
+    ('empleado_vacaciones_create', 'web', NOW(), NOW()),
+    ('empleado_vacaciones_edit', 'web', NOW(), NOW()),
+    ('empleado_vacaciones_delete', 'web', NOW(), NOW())
+ON DUPLICATE KEY UPDATE name = name;
+-- Asignar permisos al rol admin (asumiendo id=1, ajustar si es diferente)
+INSERT INTO role_has_permissions (permission_id, role_id)
+SELECT p.id, 1
+FROM permissions p
+WHERE p.name IN ('empleado_vacaciones_list', 'empleado_vacaciones_create', 'empleado_vacaciones_edit', 'empleado_vacaciones_delete')
+ON DUPLICATE KEY UPDATE permission_id = permission_id;
+
+
+
+
+
+
+-- 1. Eliminar columna periodo_anio
+ALTER TABLE empleado_vacaciones DROP COLUMN periodo_anio;
+-- 2. Eliminar columna anio_a_tomar
+ALTER TABLE empleado_vacaciones DROP COLUMN anio_a_tomar;
+-- 3. Eliminar columna estado
+ALTER TABLE empleado_vacaciones DROP COLUMN estado;
+-- 4. Eliminar columna dias_totales
+ALTER TABLE empleado_vacaciones DROP COLUMN dias_totales;
+-- 5. Agregar nuevas columnas
+ALTER TABLE empleado_vacaciones 
+ADD COLUMN anio_generado INT NOT NULL COMMENT 'Año en que se generaron los días' AFTER empleado_id,
+ADD COLUMN dias_generados INT NOT NULL DEFAULT 7 COMMENT 'Días generados este año' AFTER anio_generado,
+ADD COLUMN dias_tomados INT NOT NULL DEFAULT 0 COMMENT 'Días ya usados' AFTER dias_generados;
+-- 6. Agregar índice para consultas
+CREATE INDEX idx_empleado_vacaciones_empleado_anio 
+ON empleado_vacaciones(empleado_id, anio_generado);
+-- 7. Actualizar comentario de la tabla
+ALTER TABLE empleado_vacaciones COMMENT = 'Control de vacaciones acumulables por empleado';

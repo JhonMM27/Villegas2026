@@ -20,11 +20,13 @@ class Empleado extends Model
         'sueldo_real',
         'observaciones',
         'estado',
+        'fecha_ingreso',
     ];
 
     protected $casts = [
         'sueldo_planilla' => 'decimal:2',
         'sueldo_real' => 'decimal:2',
+        'fecha_ingreso' => 'date',
     ];
 
     public function adelantos(): HasMany
@@ -40,6 +42,24 @@ class Empleado extends Model
     public function pagos(): HasMany
     {
         return $this->hasMany(PlanillaPago::class);
+    }
+
+    public function vacaciones(): HasMany
+    {
+        return $this->hasMany(\App\Models\EmpleadoVacacion::class);
+    }
+
+    public function getAnosServicioAttribute(): int
+    {
+        if (!$this->fecha_ingreso) {
+            return 0;
+        }
+        return (int) $this->fecha_ingreso->diffInYears(now());
+    }
+
+    public function getEsElegibleVacacionesAttribute(): bool
+    {
+        return $this->anos_servicio >= 1;
     }
 
     public function getDisponibleAdelantoAttribute(): float

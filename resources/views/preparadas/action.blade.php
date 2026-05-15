@@ -76,11 +76,11 @@
                                 </button>
                               </div>
                             </div>
-                          </div>                          
+                          </div>
                         </div>
                     </div>
                     <div class="row mt-4">
-                        @include('preparadas.partials.tabla-detalles')                        
+                        @include('preparadas.partials.tabla-detalles')
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -92,3 +92,11 @@
         </div>
     </div>
 </div>
+<script>
+window.ENTER_SEQUENCE = {
+    'formulacion_nombre': 'numero_interno',
+    'numero_interno': 'proporcion',
+    'proporcion': 'btnProcesar'
+};
+</script>
+<script src="{{ asset('js/detallesFlecha.js') }}"></script>

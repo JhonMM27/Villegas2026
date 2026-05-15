@@ -6,9 +6,25 @@
     <style>
         @page { margin: 10mm; }
         body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 0; }
-        .header { text-align: center; margin-bottom: 20px; }
-        .header h2 { margin: 0; }
-        .header p { margin: 2px 0; }
+        .watermark {
+            position: fixed;
+            top: 20%;
+            left: 5%;
+            width: 600px;
+            opacity: 0.08;
+            z-index: -1000;
+        }
+        .contenido { position: relative; z-index: 1; }
+        .logo {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 120px;
+        }
+        .header { text-align: center; margin-bottom: 20px; padding-top: 10px; }
+        .header h2 { margin: 0; font-size: 18px; }
+        .header h3 { margin: 15px 0 10px 0; font-size: 14px; }
+        .header p { margin: 2px 0; font-size: 12px; }
         .info { margin-bottom: 15px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
@@ -25,6 +41,9 @@
     </style>
 </head>
 <body>
+    @include('planilla.reportes.partials.logo')
+    @include('planilla.reportes.partials.watermark')
+    <div class="contenido">
     <div class="header">
         <h2>{{ $empresa->razon_social ?? 'EMPRESA' }}</h2>
         <p>{{ $empresa->direccion ?? '' }}</p>
@@ -86,5 +105,6 @@
             </tr>
         </tfoot>
     </table>
+    </div>
 </body>
 </html>

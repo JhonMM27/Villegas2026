@@ -15,29 +15,30 @@
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-lg-6 mt-2">
-                          <div class="border border-primary rounded p-3">
-                            <div class="row">
-                              <div class="col-lg-12">
-                                <label for="nucleo_nombre" class="form-label">
-                                  Núcleo <span class="text-danger">*</span>
-                                </label>
-                                <div class="input-group input-group-sm">
-                                  <input type="text" id="nucleo_nombre" class="form-control" placeholder="Buscar formulación" autocomplete="off">
-                                  <input type="hidden" id="nucleo_id" name="nucleo_id">
+                            <div class="border border-primary rounded p-3">
+                                <div class="row">
+                                    <div class="col-lg-12">
+                                        <label for="nucleo_nombre" class="form-label">
+                                            Núcleo <span class="text-danger">*</span>
+                                        </label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" id="nucleo_nombre" class="form-control"
+                                                placeholder="Buscar formulación" autocomplete="off">
+                                            <input type="hidden" id="nucleo_id" name="nucleo_id">
+                                        </div>
+                                    </div>
                                 </div>
-                              </div>
+                                <div class="row mt-2 d-none" id="info_nucleo">
+                                    <div class="col-md-4">
+                                        <label for="nucleo_empaque" class="form-label">Empaque</label><br>
+                                        <span id="nucleo_empaque_text"></span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="nucle_unidad" class="form-label">Unidad</label><br>
+                                        <span id="nucleo_unidad_text"></span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="row mt-2 d-none" id="info_nucleo">
-                              <div class="col-md-4">
-                                  <label for="nucleo_empaque" class="form-label">Empaque</label><br>
-                                  <span id="nucleo_empaque_text"></span>
-                              </div>
-                              <div class="col-md-4">
-                                  <label for="nucle_unidad" class="form-label">Unidad</label><br>
-                                  <span id="nucleo_unidad_text"></span>
-                              </div>  
-                            </div>
-                          </div>
                         </div>
                         <!--
                         <div class="col-lg-6 mt-2">
@@ -62,46 +63,51 @@
                                 </button>
                               </div>
                             </div>
-                          </div>                          
+                          </div>
                         </div>
                         -->
-                         <div class="col-lg-6 mt-2">
-                          <div class="row border border-primary rounded p-3">
-                            <div class="col-lg-3">
-                                <label for="fecha" class="form-label">Fecha Servicio<span class="text-danger">*</span></label>
-                                <input type="datetime-local" id="fecha" name="fecha" class="form-control form-control-sm">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                            <div class="col-lg-3">
-                              <label for="costo_servicio" class="form-label">Servicio<span class="text-danger">*</span></label>
-                              <input type="number" id="costo_servicio" value="70" name="costo_servicio" class="form-control form-control-sm">
-                              <div class="invalid-feedback"></div>
-                            </div>
-                            <div class="col-lg-3">
-                              <label for="numero_interno" class="form-label">Interno<span class="text-danger">*</span></label>
-                              <input type="text" id="numero_interno" name="numero_interno" class="form-control form-control-sm">
-                              <div class="invalid-feedback"></div>
-                            </div>
-                            <div class="col-lg-3">
-                              <label for="proporcion" class="form-label">
-                                Proporción <span class="text-danger">*</span>
-                              </label>
+                        <div class="col-lg-6 mt-2">
+                            <div class="row border border-primary rounded p-3">
+                                <div class="col-lg-3">
+                                    <label for="fecha" class="form-label">Fecha Servicio<span
+                                            class="text-danger">*</span></label>
+                                    <input type="datetime-local" id="fecha" name="fecha"
+                                        class="form-control form-control-sm">
+                                    <div class="invalid-feedback"></div>
+                                </div>
+                                <div class="col-lg-3">
+                                    <label for="costo_servicio" class="form-label">Servicio<span
+                                            class="text-danger">*</span></label>
+                                    <input type="number" id="costo_servicio" value="0.00" name="costo_servicio"
+                                        class="form-control form-control-sm">
+                                    <div class="invalid-feedback"></div>
+                                </div>
+                                <div class="col-lg-3">
+                                    <label for="numero_interno" class="form-label">Interno<span
+                                            class="text-danger">*</span></label>
+                                    <input type="text" id="numero_interno" name="numero_interno"
+                                        class="form-control form-control-sm">
+                                    <div class="invalid-feedback"></div>
+                                </div>
+                                <div class="col-lg-3">
+                                    <label for="proporcion" class="form-label">
+                                        Proporción <span class="text-danger">*</span>
+                                    </label>
 
-                              <div class="input-group input-group-sm">
-                                <input type="text" id="proporcion" name="proporcion"
-                                      class="form-control">
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" id="proporcion" name="proporcion"
+                                            class="form-control">
 
-                                <button type="button" id="btnProcesar"
-                                        class="btn btn-primary">
-                                  Procesar
-                                </button>
-                              </div>
+                                        <button type="button" id="btnProcesar" class="btn btn-primary">
+                                            Procesar
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                          </div>                          
                         </div>
                     </div>
                     <div class="row mt-4">
-                        @include('nucleo-preparadas.partials.tabla-detalles')                        
+                        @include('nucleo-preparadas.partials.tabla-detalles')
                     </div>
                 </div>
                 <div class="modal-footer">
