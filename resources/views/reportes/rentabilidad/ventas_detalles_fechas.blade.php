@@ -50,57 +50,74 @@
                             'precio'     => $precio,
                             'importe'    => $cantidad * $precio,
 
-                            // Tus reglas reales:
-                            'costo'      => (float)($d->costo_unitario ?? 0), // costo unitario
-                            'valor'      => (float)($d->costo_total ?? 0),    // valor = costo_total
-                            'rentab'     => (float)($d->rentabilidad ?? 0),   // rentabilidad del detalle
+                            'costo'      => (float)($d->costo_unitario ?? 0),
+                            'valor'      => (float)($d->costo_total ?? 0),
+                            'rentab'     => (float)($d->rentabilidad ?? 0),
                         ]);
                     }
                 }
 
                 // =========================
-                // ORDEN (como lo necesitas)
+                // AGRUPAR POR PRODUCTO Y ORDENAR A-Z
                 // =========================
-                // 1) Producto (A-Z)
-                // 2) Fecha
-                // 3) Documento
-                $rows = $rows->sortBy(function($x){
-                    return mb_strtoupper($x->producto, 'UTF-8').'|'.$x->fecha.'|'.$x->documento;
-                });
+                $grupos = $rows->groupBy('producto')
+                               ->sortBy(function($items) {
+                                   return mb_strtoupper($items->first()->producto, 'UTF-8');
+                               });
 
-                // Totales
-                $totalImporte = 0.0;
-                $totalCosto   = 0.0; // si quieres TOTAL costo unitario solo sumamos costo (unit)
-                $totalValor   = 0.0;
-                $totalRentab  = 0.0;
-
-                // Si quieres mantener tu regla de total final = SUM(ventas.rentabilidad)
-                $totalRentVentas = collect($reportes)->sum(fn($v) => (float)($v->rentabilidad ?? 0));
+                // Totales generales
+                $gImporte = 0.0;
+                $gCosto   = 0.0;
+                $gValor   = 0.0;
+                $gRentDet = 0.0;
+                $gRentVentas = collect($reportes)->sum(fn($v) => (float)($v->rentabilidad ?? 0));
             @endphp
 
-            @forelse($rows as $r)
+            @forelse($grupos as $productoId => $items)
                 @php
-                    $totalImporte += $r->importe;
-                    $totalCosto   += $r->costo;   // (costo unitario sumado)
-                    $totalValor   += $r->valor;
-                    $totalRentab  += $r->rentab;
+                    $p = $items->first();
+
+                    $sumCantidad = $items->sum('cantidad');
+                    $sumImporte  = $items->sum('importe');
+                    $sumCosto    = $items->sum(fn($x) => $x->cantidad * $x->costo);
+                    $sumValor    = $items->sum('valor');
+                    $sumRentDet  = $items->sum('rentab');
+
+                    $gImporte += $sumImporte;
+                    $gCosto   += $sumCosto;
+                    $gValor   += $sumValor;
+                    $gRentDet += $sumRentDet;
                 @endphp
 
-                <tr>
-                    <td>{{ $r->fecha }}</td>
-                    <td>{{ $r->documento }}</td>
+                {{-- DETALLE DE CADA PRODUCTO --}}
+                @foreach($items as $r)
+                    <tr>
+                        <td>{{ $r->fecha }}</td>
+                        <td>{{ $r->documento }}</td>
 
-                    <td>{{ $r->producto }}</td>
-                    <td>{{ $r->linea }}</td>
-                    <td>{{ $r->um }}</td>
+                        <td>{{ $r->producto }}</td>
+                        <td>{{ $r->linea }}</td>
+                        <td>{{ $r->um }}</td>
 
-                    <td class="text-end">{{ number_format($r->cantidad, 2, '.', '') }}</td>
-                    <td class="text-end">{{ number_format($r->precio, 4, '.', '') }}</td>
-                    <td class="text-end">{{ number_format($r->importe, 2, '.', '') }}</td>
+                        <td class="text-end">{{ number_format($r->cantidad, 2, '.', '') }}</td>
+                        <td class="text-end">{{ number_format($r->precio, 4, '.', '') }}</td>
+                        <td class="text-end">{{ number_format($r->importe, 2, '.', '') }}</td>
 
-                    <td class="text-end">{{ number_format($r->costo, 4, '.', '') }}</td>
-                    <td class="text-end">{{ number_format($r->valor, 4, '.', '') }}</td>
-                    <td class="text-end">{{ number_format($r->rentab, 4, '.', '') }}</td>
+                        <td class="text-end">{{ number_format($r->costo, 4, '.', '') }}</td>
+                        <td class="text-end">{{ number_format($r->valor, 4, '.', '') }}</td>
+                        <td class="text-end">{{ number_format($r->rentab, 4, '.', '') }}</td>
+                    </tr>
+                @endforeach
+
+                {{-- TOTAL PRODUCTO --}}
+                <tr class="table-secondary fw-bold">
+                    <td colspan="5" class="text-end">TOTAL {{ $p->producto }}</td>
+                    <td class="text-end">{{ number_format($sumCantidad, 2, '.', '') }}</td>
+                    <td></td>
+                    <td class="text-end">{{ number_format($sumImporte, 2, '.', '') }}</td>
+                    <td class="text-end">{{ number_format($sumCosto, 2, '.', '') }}</td>
+                    <td class="text-end">{{ number_format($sumValor, 2, '.', '') }}</td>
+                    <td class="text-end">{{ number_format($sumRentDet, 2, '.', '') }}</td>
                 </tr>
             @empty
                 <tr>
@@ -109,16 +126,14 @@
             @endforelse
         </tbody>
 
-        @if($rows->count() > 0)
+        @if($grupos->count() > 0)
             <tfoot>
                 <tr class="table-dark fw-bold">
                     <td colspan="7" class="text-end">TOTAL GENERAL</td>
-                    <td class="text-end">{{ number_format($totalImporte, 2, '.', '') }}</td>
+                    <td class="text-end">{{ number_format($gImporte, 2, '.', '') }}</td>
                     <td class="text-end"></td>
-                    <td class="text-end">{{ number_format($totalValor, 2, '.', '') }}</td>
-                    {{-- Si quieres el total de rentabilidad del detalle: usa $totalRentab --}}
-                    {{-- Si quieres tu regla: suma de ventas.rentabilidad: usa $totalRentVentas --}}
-                    <td class="text-end">{{ number_format($totalRentVentas, 2, '.', '') }}</td>
+                    <td class="text-end">{{ number_format($gValor, 2, '.', '') }}</td>
+                    <td class="text-end">{{ number_format($gRentVentas, 2, '.', '') }}</td>
                 </tr>
             </tfoot>
         @endif
@@ -167,7 +182,7 @@
                 alert('Ocurrió un error al cargar el reporte');
             })
             .finally(() => {
-                loader.classList.add('d-none'); // ✅ OCULTAR
+                loader.classList.add('d-none');
             });
         });
 

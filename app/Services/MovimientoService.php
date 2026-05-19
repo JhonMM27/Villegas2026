@@ -121,10 +121,15 @@ class MovimientoService
         $stockNuevo = round($stockAnterior + $cantidadStock, 4);
         $valorNuevo = $valorAnterior + $costoTotal;
 
-        // UMBRAL CPP: Si aplicarUmbral=true Y stock_nuevo < 20, usar costo_unitario de la entrada
-        // Para Compras/Préstamos (aplicarUmbral=false): siempre calcular CPP normal
-        // Para Preparadas/Núcleos (aplicarUmbral=true): aplicar umbral de 20
-        if ($aplicarUmbral && $stockNuevo < 20) {
+        // UMBRAL CPP: Si stockAnterior <= 0 Y hay costo_saco, forzar CPP al costo de la preparada
+        // Para Preparadas: si el stock era negativo o cero, usar costo_saco en lugar de promedio
+        $stockNegativoAnterior = $stockAnterior <= 0;
+        $costoSaco = (float) ($params['costo_saco'] ?? 0);
+
+        if ($stockNegativoAnterior && $costoSaco > 0) {
+            $costoNuevo = $costoSaco;
+            $valorNuevo = $stockNuevo * $costoSaco;
+        } elseif ($aplicarUmbral && $stockNuevo < 20) {
             $costoNuevo = $costoUnitario;
         } else {
             $costoNuevo = round($valorNuevo / $stockNuevo, 4);
@@ -302,10 +307,14 @@ class MovimientoService
 
                 $stockNuevo = $stockActual + $cantidadKg;
                 $valorNuevo = $valorAnterior + $costoTotal;
-                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
+                
+                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockActual <= 0) {
+                    $costoNuevo = $costoMov;
+                    $valorNuevo = $stockNuevo * $costoMov;
+                } elseif ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
                     $costoNuevo = $costoMov;
                 } else {
-                    $costoNuevo = $valorNuevo / $stockNuevo;
+                    $costoNuevo = round($valorNuevo / $stockNuevo, 4);
                 }
             } else {
                 // === SALIDA (Venta / Preparada Salida / Préstamo) ===
@@ -409,10 +418,14 @@ class MovimientoService
 
                 $stockNuevo = $stockActual + $cantidadKg;
                 $valorNuevo = $valorAnterior + $costoTotal;
-                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
+                
+                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockActual <= 0) {
+                    $costoNuevo = $costoMov;
+                    $valorNuevo = $stockNuevo * $costoMov;
+                } elseif ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
                     $costoNuevo = $costoMov;
                 } else {
-                    $costoNuevo = $stockNuevo > 0 ? round($valorNuevo / $stockNuevo, 4) : $costoMov;
+                    $costoNuevo = round($valorNuevo / $stockNuevo, 4);
                 }
             } else {
                 // === SALIDA (Venta / Preparada Salida / Préstamo) ===
@@ -548,10 +561,14 @@ class MovimientoService
 
                 $stockNuevo = $stockActual + $cantidadKg;
                 $valorNuevo = $valorAnterior + $costoTotal;
-                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
+                
+                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockActual <= 0) {
+                    $costoNuevo = $costoMov;
+                    $valorNuevo = $stockNuevo * $costoMov;
+                } elseif ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
                     $costoNuevo = $costoMov;
                 } else {
-                    $costoNuevo = $valorNuevo / $stockNuevo;
+                    $costoNuevo = round($valorNuevo / $stockNuevo, 4);
                 }
             } else {
                 // === SALIDA (Venta / Preparada Salida / Anulación Compra) ===

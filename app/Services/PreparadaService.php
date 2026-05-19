@@ -94,6 +94,7 @@ class PreparadaService
                 'cantidad' => $preparada->ingreso_saco,
                 'cantidad_kg' => $preparada->ingreso_kg,
                 'costo_unitario' => $preparada->costo_unitario,
+                'costo_saco' => $preparada->costo_unitario,
             ], true);
 
             return $preparada;
@@ -282,6 +283,7 @@ class PreparadaService
 
             if ($movNeutralizadoProd) {
                 $productoFinal = Producto::find($preparada->producto_id);
+                $stockAnteriorProd = (float) $productoFinal->stock_almacen;
                 $empaqueBase = (float) ($productoFinal->empaque ?? 1);
                 $empaqueFinal = (float) ($preparada->producto_empaque ?? 1);
                 $cantidad = (float) $preparada->ingreso_saco;
@@ -293,11 +295,19 @@ class PreparadaService
                 $costoTotalPrep = (float) ($cantidad * $preparada->costo_unitario);
                 $costoUnitarioBase = $cantidadStock > 0 ? $costoTotalPrep / $cantidadStock : (float) $preparada->costo_unitario;
 
+                $stockNuevoProd = round($stockAnteriorProd + $cantidadStock, 4);
+                $costoSacoPrep = (float) $preparada->costo_unitario;
+
+                if ($stockAnteriorProd <= 0 && $costoSacoPrep > 0) {
+                    $costoUnitarioBase = $costoSacoPrep;
+                    $costoTotalPrep = $stockNuevoProd * $costoSacoPrep;
+                }
+
                 $movNeutralizadoProd->update([
                     'fecha' => $preparada->fecha,
                     'producto_nombre' => $preparada->producto_nombre,
                     'empaque' => $empaqueFinal,
-                    'unidad_codigo' => null,
+                    'unidad_codigo' => $productoFinal->unidad_codigo ?? null,
                     'cantidad' => $cantidad,
                     'cantidad_kg' => $preparada->ingreso_kg,
                     'entrada' => $cantidadStock,
@@ -321,6 +331,7 @@ class PreparadaService
                     'cantidad' => $preparada->ingreso_saco,
                     'cantidad_kg' => $preparada->ingreso_kg,
                     'costo_unitario' => $preparada->costo_unitario,
+                    'costo_saco' => $preparada->costo_unitario,
                     'comentario' => 'Rectificación de preparada',
                 ], true);
                 $productosAfectados[] = $preparada->producto_id;
