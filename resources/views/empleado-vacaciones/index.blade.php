@@ -143,6 +143,20 @@ class VacacionManager extends CrudManager {
         document.getElementById('dias_generados')?.addEventListener('input', () => this.actualizarDiasFaltantes());
     }
 
+    handleSubmit(e) {
+        const diasFaltantes = parseInt(document.getElementById('dias_faltantes').value) || 0;
+        if (diasFaltantes <= 0) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'error',
+                title: 'No puede crear vacación',
+                text: 'El empleado ha agotado sus días de vacaciones para este año (15/15 días tomados)',
+            });
+            return false;
+        }
+        super.handleSubmit(e);
+    }
+
     onEmpleadoSelected(empleado) {
         console.log('Empleado seleccionado:', empleado);
         const anio = document.getElementById('anio_generado').value;

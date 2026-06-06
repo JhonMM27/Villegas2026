@@ -23,9 +23,11 @@
                                     <th>Opciones</th>
                                     <th>Fecha</th>
                                     <th>Tipo</th>
+                                    <th>Categoría</th>
                                     <th>Usuario</th>
                                     <th>Descripción</th>
                                     <th>Responsable</th>
+                                    <th>DNI</th>
                                     <th>Recibo</th>
                                     <th>Monto</th>
                                 </tr>
@@ -70,35 +72,39 @@ class GastoManager extends CrudManager {
             columns: [
                  { data: 'action', name: 'action', orderable: false, searchable: false},
                  { 
-data: 'fecha_gasto',
-                      name: 'fecha_gasto',
-                      render: function(data) {
-                          if (!data) return '';
-                          const fecha = new Date(data);
-                          const day = String(fecha.getDate()).padStart(2, '0');
-                          const month = String(fecha.getMonth() + 1).padStart(2, '0');
-                          const year = fecha.getFullYear();
-                          const hours = String(fecha.getHours()).padStart(2, '0');
-                          const minutes = String(fecha.getMinutes()).padStart(2, '0');
-                          return `${day}/${month}/${year} ${hours}:${minutes}`;
-                      }
-                  },
+                    data: 'fecha_gasto',
+                    name: 'fecha_gasto',
+                    render: function(data) {
+                        if (!data) return '';
+                        const fecha = new Date(data);
+                        const day = String(fecha.getDate()).padStart(2, '0');
+                        const month = String(fecha.getMonth() + 1).padStart(2, '0');
+                        const year = fecha.getFullYear();
+                        const hours = String(fecha.getHours()).padStart(2, '0');
+                        const minutes = String(fecha.getMinutes()).padStart(2, '0');
+                        return `${day}/${month}/${year} ${hours}:${minutes}`;
+                    }
+                },
                  { data: 'gasto_tipo.nombre', name: 'gasto_tipo.nombre' },
+                 { data: 'categoria_gasto.nombre', name: 'categoria_gasto.nombre' },
                  { data: 'user_nombre', name: 'user_nombre'},
                 { data: 'descripcion', name: 'descripcion' },
                 { data: 'responsable', name: 'responsable' },
+                { data: 'responsable_dni', name: 'responsable_dni' },
                 { data: 'numero_recibo', name: 'numero_recibo' },
                 { data: 'monto', name: 'monto' }
             ],
             columnDefs: [
-                { targets: 0, width: '12%', className: 'text-center' },
-                { targets: 1, width: '13%' },
+                { targets: 0, width: '10%', className: 'text-center' },
+                { targets: 1, width: '12%' },
                 { targets: 2, width: '10%' },
-                { targets: 3, width: '12%' },
-                { targets: 4, width: '18%' },
-                { targets: 5, width: '12%' },
-                { targets: 6, width: '8%' },
-                { targets: 7, width: '10%' },
+                { targets: 3, width: '10%' },
+                { targets: 4, width: '10%' },
+                { targets: 5, width: '15%' },
+                { targets: 6, width: '10%' },
+                { targets: 7, width: '8%' },
+                { targets: 8, width: '8%' },
+                { targets: 9, width: '10%' },
             ],
             responsive: true,
             order: [[1, 'desc']]
@@ -115,7 +121,6 @@ data: 'fecha_gasto',
             this.elements.modalTitle.textContent = 'Editar Gasto: '+ response.numero_recibo;
             this.elements.methodField.value = 'PUT';
 
-            // Llenar campos específicos
             document.getElementById('fecha_gasto').value = (response.fecha_gasto || '').replace(' ', 'T').slice(0,16);
             document.getElementById('numero_interno').value = response.numero_interno || '';
             document.getElementById('total_cobranza').value = response.monto || 0;
@@ -124,22 +129,16 @@ data: 'fecha_gasto',
             document.getElementById('consorcio').value = response.importe_c || 0;
             document.getElementById('usuario_nombre').textContent = response.user_nombre|| '';
             document.getElementById('responsable').value = response.responsable || '';
+            document.getElementById('responsable_dni').value = response.responsable_dni || '';
             document.getElementById('descripcion').value = response.descripcion || '';
 
             this.form.action = `${this.baseUrl}/${id}`;
 
-            await this.setupLiveSearchSelect({
-                inputId: 'gasto_tipo_nombre',
-                hiddenId: 'gasto_tipo_id',
-                url: '{{ route('gastos.tipos.select') }}',
-                template: item => item.nombre,
-                getId: item => item.id,
-                minLength: 1,
-                delay: 300,
-            });
-            if (response.gasto_tipo_id) {
-                document.getElementById('gasto_tipo_id').value = response.gasto_tipo_id;
-                document.getElementById('gasto_tipo_nombre').value = response.gasto_tipo?.nombre || '';
+            if (response.categoria_gasto_id) {
+                await this.cargarCategoriasSelect(response.categoria_gasto_id);
+                await this.cargarTiposPorCategoria(response.categoria_gasto_id, response.gasto_tipo_id);
+            } else {
+                await this.cargarCategoriasSelect();
             }
 
             this.modal.show();
@@ -150,38 +149,71 @@ data: 'fecha_gasto',
         }
     }
 
-    focusFirstField() {
-        document.getElementById('principal').focus();
-        const modalEl = this.modal._element;
+    async cargarTiposPorCategoria(categoriaId, tipoId = null) {
+        try {
+            const response = await fetch(`{{ url('gastos/select/tipos') }}?categoria_id=${categoriaId}`);
+            const tipos = await response.json();
 
-        modalEl.addEventListener('shown.bs.modal', () => {
-            const input = document.getElementById('principal');
-            if (input) input.focus();
-        }, { once: true });
+            const selectTipo = document.getElementById('gasto_tipo_id');
+
+            selectTipo.innerHTML = '<option value="">Seleccione...</option>';
+            tipos.forEach(tipo => {
+                const option = document.createElement('option');
+                option.value = tipo.id;
+                option.textContent = tipo.nombre;
+                selectTipo.appendChild(option);
+            });
+
+            if (tipoId) {
+                selectTipo.value = tipoId;
+            }
+        } catch (error) {
+            console.error('Error cargando tipos:', error);
+        }
+    }
+
+    focusFirstField() {
+        // No enfocar ningún campo automáticamente
     }
 
     showCreateModal() {
         super.showCreateModal();
         this.elements.modalTitle.textContent = 'Nuevo Gasto';
         document.getElementById('fecha_gasto').value = this.obtenerFechaHoraActual();
-        this.initLiveSearchTipo();
+        this.cargarCategoriasSelect();
     }
 
-    initLiveSearchTipo() {
-        this.setupLiveSearchSelect({
-            inputId: 'gasto_tipo_nombre',
-            hiddenId: 'gasto_tipo_id',
-            url: '{{ route('gastos.tipos.select') }}',
-            template: item => item.nombre,
-            getId: item => item.id,
-            minLength: 1,
-            delay: 300,
-        });
+    async cargarCategoriasSelect(categoriaId = null) {
+        try {
+            const response = await fetch("{{ route('gastos.select.categorias') }}");
+            const categorias = await response.json();
 
-        document.getElementById('btnClearTipo')?.addEventListener('click', () => {
-            document.getElementById('gasto_tipo_id').value = '';
-            document.getElementById('gasto_tipo_nombre').value = '';
-        });
+            const select = document.getElementById('categoria_gasto_id');
+            select.innerHTML = '<option value="">Seleccione...</option>';
+
+            categorias.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.nombre;
+                select.appendChild(option);
+            });
+
+            if (categoriaId) {
+                select.value = categoriaId;
+            }
+
+            select.addEventListener('change', () => {
+                const catId = select.value;
+                if (catId) {
+                    this.cargarTiposPorCategoria(catId);
+                } else {
+                    const selectTipo = document.getElementById('gasto_tipo_id');
+                    selectTipo.innerHTML = '<option value="">Seleccione...</option>';
+                }
+            });
+        } catch (error) {
+            console.error('Error cargando categorías:', error);
+        }
     }
 
     obtenerFechaHoraActual() {
@@ -197,7 +229,6 @@ data: 'fecha_gasto',
 
     toNumber(val) {
         if (val === null || val === undefined) return 0;
-        // Por si entra con comas
         const n = parseFloat(String(val).replace(/,/g, '').trim());
         return isNaN(n) ? 0 : n;
     }
@@ -205,9 +236,9 @@ data: 'fecha_gasto',
     calcCobranza() {
         const principal = this.toNumber(document.getElementById('principal')?.value);
         const deposito  = this.toNumber(document.getElementById('deposito')?.value);
-        const consorcio = this.toNumber(document.getElementById('consorcio')?.value);
+        const consortium = this.toNumber(document.getElementById('consorcio')?.value);
 
-        const total = principal + deposito + consorcio;
+        const total = principal + deposito + consortium;
 
         const totalInput = document.getElementById('total_cobranza');
         if (totalInput) totalInput.value = total.toFixed(2);
@@ -220,7 +251,6 @@ data: 'fecha_gasto',
             const el = document.getElementById(id);
             if (!el) return;
 
-            // Evitar duplicar listeners cada vez que abras el modal
             if (el.dataset.boundCobranza === '1') return;
             el.dataset.boundCobranza = '1';
 
@@ -228,7 +258,6 @@ data: 'fecha_gasto',
             el.addEventListener('change', () => this.calcCobranza());
         });
 
-        // calcula una vez al inicio (por si ya viene con valores cargados)
         this.calcCobranza();
     }
 }
@@ -263,7 +292,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 .catch(err => {
                     console.error(err);
-                    //this.showNotification('error', 'Error al cargar el detalle');
                 });
         }
     });

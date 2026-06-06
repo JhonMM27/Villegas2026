@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Gasto extends Model
 {
@@ -16,6 +17,9 @@ class Gasto extends Model
         'fecha_gasto',
         'descripcion',
         'responsable',
+        'responsable_dni',
+        'empleado_id',
+        'categoria_gasto_id',
         'numero_recibo',
         'numero_interno',
         'gasto_tipo_id',
@@ -23,6 +27,8 @@ class Gasto extends Model
         'importe_p',
         'importe_d',
         'importe_c',
+        'planilla_mes',
+        'planilla_anio',
     ];
 
     protected $casts = [
@@ -31,15 +37,28 @@ class Gasto extends Model
         'importe_p'   => 'decimal:2',
         'importe_d'   => 'decimal:2',
         'importe_c'   => 'decimal:2',
+        'planilla_mes' => 'integer',
+        'planilla_anio' => 'integer',
+        'empleado_id' => 'integer',
     ];
 
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function gastoTipo()
+    public function gastoTipo(): BelongsTo
     {
         return $this->belongsTo(GastoTipo::class, 'gasto_tipo_id');
+    }
+
+    public function categoriaGasto(): BelongsTo
+    {
+        return $this->belongsTo(GastoCategoria::class, 'categoria_gasto_id');
+    }
+
+    public function empleado(): BelongsTo
+    {
+        return $this->belongsTo(Empleado::class);
     }
 }

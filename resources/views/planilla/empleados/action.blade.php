@@ -51,6 +51,12 @@
                                         class="form-control form-control-sm">
                                     <div class="invalid-feedback"></div>
                                 </div>
+                                <div class="mb-3">
+                                    <label for="fecha_salida" class="form-label">Fecha de Salida</label>
+                                    <input type="date" id="fecha_salida" name="fecha_salida"
+                                        class="form-control form-control-sm">
+                                    <div class="invalid-feedback"></div>
+                                </div>
                             </div>
                         </div>
                         <div class="col-lg-6">
@@ -89,15 +95,6 @@
                             </div>
                         </div>
                     </div>
-                    {{-- <div class="row">
-                        <div class="col-lg-12">
-                            <div class="border border-warning rounded p-3">
-                                <h6 class="text-warning mb-3"><i class="bi bi-card-text me-2"></i>Observaciones</h6>
-                                <textarea id="observaciones" name="observaciones" class="form-control form-control-sm" rows="2" placeholder="Observaciones adicionales..."></textarea>
-                                <div class="invalid-feedback"></div>
-                            </div>
-                        </div>
-                    </div> --}}
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>

@@ -1,84 +1,139 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
-    <title>Núcleo Preparada {{ $nucleoPreparada->id }}</title>
+    <title>NUCLEO PREPARADA {{ $nucleoPreparada->id }}</title>
     <style>
-        @page { margin: 4mm; size: 80mm auto; }
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10.5px; margin: 0; padding: 0; }
-        .ticket { width: 72mm; margin: 0; padding: 0; }
+        @page {
+            margin: 2mm 0mm 2mm 0mm;
+            size: 76mm auto;
+        }
+
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 10px;
+            margin: 0;
+            padding: 0;
+            line-height: 1.2;
+        }
+
+        .ticket {
+            width: 72mm;
+            margin: 0 auto;
+            text-align: left;
+        }
+
         .center { text-align: center; }
         .bold { font-weight: bold; }
-        h3 { margin: 0 0 2px 0; }
-        p { margin: 1px 0; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 1px 0; vertical-align: top; }
-        .line { border-top: 1px dashed #000; margin: 3px 0; }
-        .totales td { padding: 1px 0; }
+        .right { text-align: right; }
+
+        h3 { margin: 0; padding: 0; font-size: 12px; }
+        p { margin: 0; padding: 0; font-size: 9px; }
+
+        .line {
+            border-top: 1px dashed #000;
+            margin: 2px 0;
+        }
+
+        .spacer { height: 3px; }
     </style>
 </head>
+
 <body>
-<div class="ticket">
+    <div class="ticket">
 
-    {{-- ENCABEZADO EMPRESA --}}
-    <div class="center">
-        <h3 class="bold">{{ $empresa->razon_social }}</h3>
-        <p>RUC: {{ $empresa->ruc }}</p>
-        <p class="bold">Núcleo Preparada ID: {{ $nucleoPreparada->id }}</p>
-    </div>
-    <div class="line"></div>
+        {{-- ENCABEZADO EMPRESA --}}
+        <div class="center">
+            <h3>CONSORCIOS VILLEGAS E.I.R.L.</h3>
+        </div>
 
-    {{-- DATOS CLIENTE --}}
-    <p><strong>Cliente:</strong> {{ $nucleoPreparada->cliente_id }} - {{ $nucleoPreparada->cliente_nombre }}</p>
-    <p><strong>Dirección:</strong> {{ $nucleoPreparada->cliente_direccion ?? '-' }}</p>
-    <p><strong>Fecha:</strong> {{ \Carbon\Carbon::parse($nucleoPreparada->fecha)->format('d/m/Y H:i') }}</p>
-    <p><strong>Preparada:</strong> {{ $nucleoPreparada->producto_nombre }} | Empaque: {{ $nucleoPreparada->producto_empaque }}</p>
-    <p><strong>Total (Sacos / KG / Soles):</strong> {{ $nucleoPreparada->ingreso_saco }} / {{ $nucleoPreparada->ingreso_kg }} / {{ $nucleoPreparada->ingreso_soles }}</p>
-    <div class="line"></div>
+        <div class="center">
+            <p>CEL: 967984895 / 978431737</p>
+            <p>NUCLEO PREPARADA: {{ $nucleoPreparada->id }}</p>
+        </div>
 
-    {{-- DETALLE PRODUCTOS --}}
-    <table>
-        <tr class="bold">
-            <td style="width:40%;">Producto</td>
-            <td style="width:15%; text-align:center;">Empaque</td>
-            <td style="width:15%; text-align:right; padding-right:3px;">Salida (KG)</td>
-            <td style="width:10%; text-align:right;">P.Unit.</td>
-        </tr>
-        <tr><td colspan="4" style="border-top:1px solid #000;"></td></tr>
+        <div class="line"></div>
 
-        @foreach($nucleoPreparada->detalles as $detalle)
-        <tr style="{{ trim($nucleoPreparada->producto_nombre) == trim($detalle->producto_nombre) ? 'background-color:#d3d3d3;' : '' }}">
-            <td>{{ $detalle->producto_nombre }}</td>
-            <td style="text-align:center;">{{ $detalle->producto_empaque }}</td>
-            <td style="text-align:right; padding-right:3px;">{{ number_format($detalle->salida_kg,2) }}</td>
-            <td style="text-align:right;">{{ number_format($detalle->costo_unitario,2) }}</td>
-        </tr>
+        {{-- FECHA Y HORA --}}
+        <table style="width: 100%;">
+            <tr>
+                <td></td>
+                <td class="right">FECHA: {{ \Carbon\Carbon::parse($nucleoPreparada->fecha)->format('d/m/Y') }}</td>
+                <td class="right">HORA: {{ \Carbon\Carbon::parse($nucleoPreparada->fecha)->format('H:i:s') }}</td>
+            </tr>
+        </table>
+
+        <div class="spacer"></div>
+
+        {{-- DATOS CLIENTE --}}
+        <p><strong>CLIENTE:</strong> {{ $nucleoPreparada->cliente_nombre }}</p>
+        <p><strong>DIRECCION:</strong> {{ $nucleoPreparada->cliente_direccion ?? '-' }}</p>
+
+        <div class="spacer"></div>
+
+        <p><strong>NUCLEO:</strong> {{ $nucleoPreparada->nucleo_nombre }} ({{ $nucleoPreparada->producto_empaque }}KG)</p>
+
+        <div class="line"></div>
+        <div class="spacer"></div>
+
+        {{-- ENCABEZADO TABLA --}}
+        <div class="bold">
+            <span style="display: inline-block; width: 30%;">Cant</span>
+            <span style="display: inline-block; width: 25%; text-align: right;">P.Unit</span>
+            <span style="display: inline-block; width: 35%; text-align: right;">Importe</span>
+        </div>
+        <div class="line"></div>
+
+        {{-- DETALLE INSUMOS --}}
+        @foreach ($nucleoPreparada->detalles as $detalle)
+            <p class="bold">{{ $detalle->producto_nombre }}</p>
+
+            @php
+                $cantidad = number_format((float) $detalle->salida_kg, 2);
+                $precio = number_format((float) $detalle->costo_unitario, 2);
+                $importe = number_format((float) ($detalle->salida_kg * $detalle->costo_unitario), 2);
+            @endphp
+
+            <p>
+                <span style="display: inline-block; width: 30%;">{{ $cantidad }} KG</span>
+                <span style="display: inline-block; width: 25%; text-align: right;">S/ {{ $precio }}</span>
+                <span style="display: inline-block; width: 35%; text-align: right;">S/ {{ $importe }}</span>
+            </p>
         @endforeach
 
-        <tr><td colspan="4" style="border-top:1px solid #000;"></td></tr>
-    </table>
+        <div class="line"></div>
+        <div class="spacer"></div>
 
-    {{-- TOTALES --}}
-    <table class="totales">
-        <tr class="bold">
-            <td>Kilos por saco:</td>
-            <td style="text-align:right;">{{ number_format($nucleoPreparada->producto_empaque,2) }}</td>
-        </tr>
-        <tr class="bold">
-            <td>Costo por saco:</td>
-            <td style="text-align:right;">{{ number_format($nucleoPreparada->costo_unitario,2) }}</td>
-        </tr>
-        <tr class="bold">
-            <td>Cantidad sacos:</td>
-            <td style="text-align:right;">{{ number_format($nucleoPreparada->ingreso_saco,2) }}</td>
-        </tr>
-        <tr class="bold">
-            <td>Costo Total:</td>
-            <td style="text-align:right;">{{ number_format($nucleoPreparada->ingreso_soles,2) }}</td>
-        </tr>
-    </table>
+        {{-- TOTALES --}}
+        <p style="text-align: right;">
+            SACOS: {{ number_format($nucleoPreparada->ingreso_saco, 2) }}
+        </p>
+        <p style="text-align: right;">
+            KG TOTALES: {{ number_format($nucleoPreparada->ingreso_kg, 2) }}
+        </p>
 
-    <div class="line"></div>
-</div>
+        <div class="spacer"></div>
+
+        <p class="bold" style="text-align: right; font-size: 11px;">
+            TOTAL: S/ {{ number_format($nucleoPreparada->ingreso_soles, 2) }}
+        </p>
+
+        <div class="line"></div>
+        <div class="spacer"></div>
+
+        {{-- USUARIO --}}
+        <p><strong>USUARIO:</strong> {{ $nucleoPreparada->user_nombre }}</p>
+
+        <div class="line"></div>
+
+        <div class="center">
+            <p class="bold">GRACIAS POR SU PREFERENCIA</p>
+        </div>
+
+        <div style="height: 4mm;"></div>
+
+    </div>
 </body>
+
 </html>

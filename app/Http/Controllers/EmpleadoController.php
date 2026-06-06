@@ -75,6 +75,11 @@ class EmpleadoController extends Controller
         }
 
         $data = $this->validateData($request, $id);
+
+        if (isset($data['estado']) && $data['estado'] === 'inactivo' && !$empleado->fecha_salida) {
+            $data['fecha_salida'] = now()->toDateString();
+        }
+
         $this->empleadoService->update($empleado, $data);
 
         return response()->json([
@@ -101,6 +106,7 @@ class EmpleadoController extends Controller
                 'sueldo_real' => $empleado->sueldo_real,
                 'estado' => $empleado->estado,
                 'fecha_ingreso' => $empleado->fecha_ingreso?->format('Y-m-d'),
+                'fecha_salida' => $empleado->fecha_salida?->format('Y-m-d'),
                 'observaciones' => $empleado->observaciones,
             ]
         ]);
@@ -151,6 +157,7 @@ class EmpleadoController extends Controller
             'observaciones' => 'nullable|string',
             'estado' => 'required|in:activo,inactivo',
             'fecha_ingreso' => 'nullable|date|before_or_equal:today',
+            'fecha_salida' => 'nullable|date|after_or_equal:fecha_ingreso|before_or_equal:today',
         ];
 
         return $request->validate($rules);

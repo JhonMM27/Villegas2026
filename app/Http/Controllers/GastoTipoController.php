@@ -22,7 +22,7 @@ class GastoTipoController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $data = GastoTipo::select(['id', 'nombre', 'activo']);
+            $data = GastoTipo::with('categoriaGasto')->select(['id', 'nombre', 'activo', 'categoria_gasto_id']);
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
@@ -64,7 +64,7 @@ class GastoTipoController extends Controller
     public function show($id)
     {
         try {
-            $registro = GastoTipo::where('id', $id)->firstOrFail();
+            $registro = GastoTipo::with('categoriaGasto')->where('id', $id)->firstOrFail();
 
             return response()->json($registro);
         } catch (\Exception $e) {
@@ -108,7 +108,8 @@ class GastoTipoController extends Controller
     {
         $rules = [
             'nombre' => ['required', 'string', 'max:50', Rule::unique('gasto_tipos', 'nombre')->ignore($id)],
-            'activo' => 'sometimes|boolean'
+            'activo' => 'sometimes|boolean',
+            'categoria_gasto_id' => 'nullable|exists:categoria_gastos,id',
         ];
 
         return $request->validate($rules);
@@ -116,8 +117,16 @@ class GastoTipoController extends Controller
 
     public function select(Request $request)
     {
-        $query = GastoTipo::select('id', 'nombre')
+        $query = GastoTipo::select('id', 'nombre', 'categoria_gasto_id')
             ->where('activo', true);
+
+        if ($request->has('categoria_id') && $request->categoria_id !== '' && $request->categoria_id !== null) {
+            $query->where('categoria_gasto_id', $request->categoria_id);
+        }
+
+        if ($request->has('q') && $request->q !== '') {
+            $query->where('nombre', 'like', '%'.$request->q.'%');
+        }
 
         return response()->json($query->get());
     }

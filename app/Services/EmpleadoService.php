@@ -33,14 +33,18 @@ class EmpleadoService
     {
         $oldSueldoReal = (float) $empleado->sueldo_real;
         $oldSueldoPlanilla = (float) $empleado->sueldo_planilla;
+        $oldFechaIngreso = $empleado->fecha_ingreso?->format('Y-m-d');
+        $oldFechaSalida = $empleado->fecha_salida?->format('Y-m-d');
 
         $result = $empleado->update($data);
 
         if ($result) {
             $sueldoRealChanged = isset($data['sueldo_real']) && (float) $data['sueldo_real'] !== $oldSueldoReal;
             $sueldoPlanillaChanged = isset($data['sueldo_planilla']) && (float) $data['sueldo_planilla'] !== $oldSueldoPlanilla;
+            $fechaIngresoChanged = array_key_exists('fecha_ingreso', $data) && $oldFechaIngreso !== $data['fecha_ingreso'];
+            $fechaSalidaChanged = array_key_exists('fecha_salida', $data) && $oldFechaSalida !== $data['fecha_salida'];
 
-            if ($sueldoRealChanged || $sueldoPlanillaChanged) {
+            if ($sueldoRealChanged || $sueldoPlanillaChanged || $fechaIngresoChanged || $fechaSalidaChanged) {
                 $pagoService = app(\App\Services\PlanillaPagoService::class);
                 $pagoService->recalcularPagosDelEmpleado($empleado->id);
             }
@@ -73,8 +77,30 @@ class EmpleadoService
         $sueldoPlanilla = (float) $empleado->sueldo_planilla;
         $baseDisponible = $sueldoReal - $sueldoPlanilla;
 
+        if ($mes && $anio) {
+            $fechaIngreso = $empleado->fecha_ingreso;
+            $fechaSalida = $empleado->fecha_salida;
+
+            $ingresoEnMes = $fechaIngreso && $fechaIngreso->year === $anio && $fechaIngreso->month === $mes;
+            $salidaEnMes = $fechaSalida && $fechaSalida->year === $anio && $fechaSalida->month === $mes;
+
+            if ($salidaEnMes) {
+                if ($ingresoEnMes) {
+                    $diasTrabajados = $fechaSalida->day - $fechaIngreso->day + 1;
+                } else {
+                    $diasTrabajados = $fechaSalida->day;
+                }
+                $factor = $diasTrabajados / 30;
+                $baseDisponible = $sueldoReal * $factor;
+            } elseif ($ingresoEnMes && $fechaIngreso->day > 1) {
+                $diasTrabajados = 30 - $fechaIngreso->day + 1;
+                $factor = $diasTrabajados / 30;
+                $baseDisponible = $sueldoReal * $factor;
+            }
+        }
+
         $query = $empleado->adelantos();
-        
+
         if ($mes && $anio) {
             $query->delMes($mes, $anio);
         } else {

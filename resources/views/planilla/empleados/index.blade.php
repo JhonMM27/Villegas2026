@@ -82,6 +82,9 @@ class EmpleadoManager extends CrudManager {
             if (data.empleado.fecha_ingreso) {
                 document.getElementById('fecha_ingreso').value = data.empleado.fecha_ingreso;
             }
+            if (data.empleado.fecha_salida) {
+                document.getElementById('fecha_salida').value = data.empleado.fecha_salida;
+            }
         });
         this.isEditing = true;
         this.elements.methodField.value = 'PUT';
@@ -132,6 +135,10 @@ class EmpleadoManager extends CrudManager {
                                             <div class="col-md-6">
                                                 <label class="form-label text-muted small mb-1">Fecha de Ingreso</label>
                                                 <p class="fw-bold mb-0">${data.empleado.fecha_ingreso ? new Date(data.empleado.fecha_ingreso).toLocaleDateString('es-PE') : '-'}</p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label text-muted small mb-1">Fecha de Salida</label>
+                                                <p class="fw-bold mb-0">${data.empleado.fecha_salida ? new Date(data.empleado.fecha_salida).toLocaleDateString('es-PE') : '-'}</p>
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label text-muted small mb-1">Años de Servicio</label>

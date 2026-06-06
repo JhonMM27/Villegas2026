@@ -78,7 +78,7 @@
     <div class="line"></div>
     <div class="spacer"></div>
 
-    <p><strong>Vendedor:</strong> {{ $provisional->user_nombre }}</p>
+    <p><strong>Usuario:</strong> {{ $provisional->user_nombre }}</p>
     <p class="bold">COBRANZA</p>
 
     <table>

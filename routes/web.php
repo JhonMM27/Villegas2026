@@ -18,8 +18,11 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentoTipoController;
 use App\Http\Controllers\EmpleadoController;
 use App\Http\Controllers\FormulacionController;
+use App\Http\Controllers\CostoController;
+use App\Http\Controllers\CostoTipoController;
 use App\Http\Controllers\GastoController;
 use App\Http\Controllers\GastoTipoController;
+use App\Http\Controllers\GastoCategoriaController;
 use App\Http\Controllers\KardexController;
 use App\Http\Controllers\LineaController;
 use App\Http\Controllers\NucleoController;
@@ -54,6 +57,8 @@ use App\Http\Controllers\VentaEntregaController;
 use App\Http\Controllers\VentaProvisionalController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmpleadoVacacionController;
+use App\Http\Controllers\RationFormulationApiController;
+use App\Http\Controllers\RationFormulationController;
 
 Route::middleware('guest')->group(function () {
     Route::get('/', function () {
@@ -125,6 +130,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/formulaciones/buscar-formulacion', [FormulacionController::class, 'buscar'])->name('formulaciones.buscar');
     Route::resource('formulaciones', FormulacionController::class)->except(['create', 'edit']);
 
+    Route::get('/ration-formulation', [RationFormulationController::class, 'index'])->name('ration-formulation.index');
+    Route::get('/ration-formulation/data', [RationFormulationApiController::class, 'getData'])->name('ration-formulation.data');
+    Route::post('/ration-formulation/calculate/{tipoRacionId}', [RationFormulationApiController::class, 'calculate'])->name('ration-formulation.calculate');
+    Route::post('/ration-formulation/save', [RationFormulationApiController::class, 'save'])->name('ration-formulation.save');
+    Route::patch('/ration-formulation/ingredients/{id}/price', [RationFormulationApiController::class, 'updatePrice'])->name('ration-formulation.ingredients.price');
+
     Route::get('/preparadas/{id}/imprimir', [PreparadaController::class, 'printTicket'])->name('preparadas.imprimir');
     Route::get('/preparadas/{id}/ver', [PreparadaController::class, 'view'])->name('preparadas.ver');
     Route::post('/preparadas/{id}/anular', [PreparadaController::class, 'anular'])->name('preparadas.anular');
@@ -185,14 +196,42 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/gastos/{id}/imprimir', [GastoController::class, 'printTicket'])->name('gastos.imprimir');
     Route::resource('gastos', GastoController::class)->except(['create', 'edit']);
 
+    // Gasto Categorias
+    Route::resource('gasto-categorias', GastoCategoriaController::class)->except(['create', 'edit']);
+    Route::get('gastos/select/categorias', [GastoController::class, 'selectCategorias'])->name('gastos.select.categorias');
+
     // Gasto Tipos
-    Route::get('gastos/tipos/select', [GastoController::class, 'selectTipos'])->name('gastos.tipos.select');
+    Route::get('gastos/select/tipos', [GastoController::class, 'selectTipos'])->name('gastos.select.tipos');
     Route::resource('gasto-tipos', GastoTipoController::class)->except(['create', 'edit']);
 
-    // Reporte Gastos
-    Route::get('reportes/gastos/resumen', [GastoController::class, 'reporteResumen'])->name('reportes.gastos.resumen');
-    Route::get('reportes/gastos/resumen/export', [GastoController::class, 'exportarResumen'])->name('reportes.gastos.resumen.export');
-    Route::get('reportes/gastos/resumen/imprimir', [GastoController::class, 'imprimirResumen'])->name('reportes.gastos.resumen.imprimir');
+    // Reporte Gastos - General (agrupado por Categoria → Tipo)
+    Route::get('reportes/gastos/general', [GastoController::class, 'reporteGeneral'])->name('reportes.gastos.general');
+    Route::get('reportes/gastos/general/export', [GastoController::class, 'exportarGeneral'])->name('reportes.gastos.general.export');
+    Route::get('reportes/gastos/general/imprimir', [GastoController::class, 'imprimirGeneral'])->name('reportes.gastos.general.imprimir');
+
+    // Alias para compatibilidad con menu/vistas antiguas
+    Route::get('reportes/gastos/resumen', [GastoController::class, 'reporteGeneral'])->name('reportes.gastos.resumen');
+    Route::get('reportes/gastos/resumen/export', [GastoController::class, 'exportarGeneral'])->name('reportes.gastos.resumen.export');
+    Route::get('reportes/gastos/resumen/imprimir', [GastoController::class, 'imprimirGeneral'])->name('reportes.gastos.resumen.imprimir');
+
+    // Reporte Gastos - Detallado (línea por línea)
+    Route::get('reportes/gastos/detallado', [GastoController::class, 'reporteDetallado'])->name('reportes.gastos.detallado');
+    Route::get('reportes/gastos/detallado/export', [GastoController::class, 'exportarDetallado'])->name('reportes.gastos.detallado.export');
+    Route::get('reportes/gastos/detallado/imprimir', [GastoController::class, 'imprimirDetallado'])->name('reportes.gastos.detallado.imprimir');
+
+    // Costos
+    Route::get('/costos/{id}/ver', [CostoController::class, 'view'])->name('costos.ver');
+    Route::get('/costos/{id}/imprimir', [CostoController::class, 'printTicket'])->name('costos.imprimir');
+    Route::resource('costos', CostoController::class)->except(['create', 'edit']);
+
+    // Costo Tipos
+    Route::get('costos/tipos/select', [CostoController::class, 'selectTipos'])->name('costos.tipos.select');
+    Route::resource('costo-tipos', CostoTipoController::class)->except(['create', 'edit']);
+
+    // Reporte Costos
+    Route::get('reportes/costos/resumen', [CostoController::class, 'reporteResumen'])->name('reportes.costos.resumen');
+    Route::get('reportes/costos/resumen/export', [CostoController::class, 'exportarResumen'])->name('reportes.costos.resumen.export');
+    Route::get('reportes/costos/resumen/imprimir', [CostoController::class, 'imprimirResumen'])->name('reportes.costos.resumen.imprimir');
 
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -460,8 +499,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/planilla-pagos/guardar-faltas', [PlanillaPagoController::class, 'guardarFaltas'])->name('planilla-pagos.guardar-faltas');
     Route::post('/planilla-pagos/generar', [PlanillaPagoController::class, 'generarPagosMes'])->name('planilla-pagos.generar');
     Route::post('/planilla-pagos/confirmar-todos', [PlanillaPagoController::class, 'confirmarPagosMes'])->name('planilla-pagos.confirmar-todos');
+    Route::post('/planilla-pagos/revertir-todos', [PlanillaPagoController::class, 'revertirPagosMes'])->name('planilla-pagos.revertir-todos');
     Route::get('/planilla-pagos/estado-mes', [PlanillaPagoController::class, 'estadoPagosMes'])->name('planilla-pagos.estado-mes');
     Route::post('/planilla-pagos/{id}/marcar-pagado', [PlanillaPagoController::class, 'marcarPagado'])->name('planilla-pagos.marcar-pagado');
+    Route::post('/planilla-pagos/{id}/revertir', [PlanillaPagoController::class, 'revertirPago'])->name('planilla-pagos.revertir');
     Route::put('/planilla-pagos/{id}', [PlanillaPagoController::class, 'update'])->name('planilla-pagos.update');
     Route::resource('planilla-pagos', PlanillaPagoController::class)->except(['create', 'edit', 'update', 'destroy']);
 

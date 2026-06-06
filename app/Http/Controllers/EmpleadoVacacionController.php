@@ -85,31 +85,51 @@ class EmpleadoVacacionController extends Controller
 
     public function store(Request $request)
     {
-        $data = $this->validateData($request);
-        EmpleadoVacacion::create($data);
+        try {
+            $data = $this->validateData($request);
+            EmpleadoVacacion::create($data);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Vacación registrada correctamente',
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Vacación registrada correctamente',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $errors = $e->errors();
+            $firstError = collect($errors)->flatten()->first();
+            return response()->json([
+                'success' => false,
+                'message' => $firstError,
+                'errors' => $errors,
+            ], 422);
+        }
     }
 
     public function update(Request $request, $id)
     {
-        $vacacion = EmpleadoVacacion::findOrFail($id);
-        $data = $this->validateData($request, $id);
+        try {
+            $vacacion = EmpleadoVacacion::findOrFail($id);
+            $data = $this->validateData($request, $id);
 
-        if (isset($data['fecha_inicio']) && isset($data['fecha_fin'])) {
-            $diasTomados = Carbon::parse($data['fecha_inicio'])->diffInDays(Carbon::parse($data['fecha_fin'])) + 1;
-            $data['dias_tomados'] = min($diasTomados, $vacacion->dias_generados);
+            if (isset($data['fecha_inicio']) && isset($data['fecha_fin'])) {
+                $diasTomados = Carbon::parse($data['fecha_inicio'])->diffInDays(Carbon::parse($data['fecha_fin'])) + 1;
+                $data['dias_tomados'] = min($diasTomados, 15);
+            }
+
+            $vacacion->update($data);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Vacación actualizada correctamente',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $errors = $e->errors();
+            $firstError = collect($errors)->flatten()->first();
+            return response()->json([
+                'success' => false,
+                'message' => $firstError,
+                'errors' => $errors,
+            ], 422);
         }
-
-        $vacacion->update($data);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Vacación actualizada correctamente',
-        ]);
     }
 
     public function destroy($id)
@@ -204,10 +224,33 @@ class EmpleadoVacacionController extends Controller
             'observaciones' => 'nullable|string',
         ];
 
+        $data = $request->validate($rules);
+
+        $anioGenerado = $data['anio_generado'];
+        $empleadoId = $data['empleado_id'];
+        $diasTomadosPropuestos = (int) ($data['dias_tomados'] ?? 0);
+
+        $queryExistentes = EmpleadoVacacion::where('empleado_id', $empleadoId)
+            ->where('anio_generado', $anioGenerado);
+
         if ($id) {
-            $rules['dias_tomados'] = 'nullable|integer|min:0|max:'.EmpleadoVacacion::find($id)->dias_generados;
+            $queryExistentes->where('id', '!=', $id);
         }
 
-        return $request->validate($rules);
+        $diasTomadosExistentes = (int) $queryExistentes->sum('dias_tomados');
+
+        $maxDiasAnuales = 15;
+        $diasTomadosTotal = $diasTomadosExistentes + $diasTomadosPropuestos;
+
+        if ($diasTomadosTotal > $maxDiasAnuales) {
+            $diasRestantes = $maxDiasAnuales - $diasTomadosExistentes;
+            throw new \Illuminate\Validation\ValidationException(
+                \Illuminate\Validation\ValidationException::withMessages([
+                    'dias_tomados' => ["El empleado ya tiene {$diasTomadosExistentes} días tomados en {$anioGenerado}. Días restantes: {$diasRestantes}"],
+                ])
+            );
+        }
+
+        return $data;
     }
 }

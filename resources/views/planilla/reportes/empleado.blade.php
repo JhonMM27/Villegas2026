@@ -21,6 +21,11 @@
                                 <p class="text-muted mb-1">Estado: <span
                                         class="badge bg-{{ $empleado->estado === 'activo' ? 'success' : 'secondary' }}">{{ ucfirst($empleado->estado) }}</span>
                                 </p>
+                                @if($empleado->fecha_salida)
+                                    <p class="text-muted mb-1">Fecha de Salida: <span
+                                            class="badge bg-warning">{{ $empleado->fecha_salida->format('d/m/Y') }}</span>
+                                    </p>
+                                @endif
                             </div>
                         </div>
 
@@ -201,16 +206,21 @@
                                         <tbody>
                                             @forelse($pagos as $pago)
                                                 @php
-                                                    $pagado = (float) $pago->total_pagar;
+                                                    $pagado = (float) $pago->total_pagar_mostrar;
                                                     $pendiente =
-                                                        $pago->estado === 'pendiente' ? (float) $pago->total_pagar : 0;
+                                                        $pago->estado === 'pendiente' ? (float) $pago->total_pagar_mostrar : 0;
+                                                    $badgeClass = $pago->prorrateo_ingreso ? 'bg-info' : ($pago->estado === 'pagado' ? 'bg-success' : 'bg-warning');
                                                 @endphp
                                                 <tr>
                                                     <td>{{ $pago->id }}</td>
-                                                    <td>{{ str_pad($pago->mes, 2, '0', STR_PAD_LEFT) }}/{{ $pago->anio }}
+                                                    <td>
+                                                        {{ str_pad($pago->mes, 2, '0', STR_PAD_LEFT) }}/{{ $pago->anio }}
+                                                        @if($pago->prorrateo_ingreso)
+                                                            <span class="badge bg-secondary ms-1" title="Prorrateo por fecha de ingreso">Ing.</span>
+                                                        @endif
                                                     </td>
                                                     <td class="text-end">S/
-                                                        {{ number_format((float) $pago->sueldo_base, 2) }}</td>
+                                                        {{ number_format((float) $pago->sueldo_base_mostrar, 2) }}</td>
                                                     <td class="text-end">S/
                                                         {{ number_format((float) $pago->horas_extras, 2) }}</td>
                                                     <td class="text-end">
@@ -219,19 +229,15 @@
                                                     <td class="text-end text-danger">S/
                                                         {{ number_format((float) ($pago->descuento_faltas ?? 0), 2) }}</td>
                                                     <td class="text-end">S/
-                                                        {{ number_format((float) $pago->total_pagar, 2) }}</td>
+                                                        {{ number_format((float) $pago->total_pagar_mostrar, 2) }}</td>
                                                     <td class="text-end">
-                                                        {{ $pago->estado === 'pagado' ? 'S/ ' . number_format((float) $pago->total_pagar, 2) : '-' }}
+                                                        {{ $pago->estado === 'pagado' ? 'S/ ' . number_format((float) $pago->total_pagar_mostrar, 2) : '-' }}
                                                     </td>
                                                     <td class="text-end">
                                                         {{ $pendiente > 0 ? 'S/ ' . number_format($pendiente, 2) : '-' }}
                                                     </td>
                                                     <td>
-                                                        @if ($pago->estado === 'pagado')
-                                                            <span class="badge bg-success">Pagado</span>
-                                                        @else
-                                                            <span class="badge bg-warning">Pendiente</span>
-                                                        @endif
+                                                        <span class="badge {{ $badgeClass }}">{{ ucfirst($pago->estado) }}</span>
                                                     </td>
                                                     <td>{{ $pago->fecha_pago ? \Carbon\Carbon::parse($pago->fecha_pago)->format('d/m/Y') : '-' }}
                                                     </td>

@@ -50,7 +50,9 @@
     <div class="line"></div>
 
     {{-- DATOS GASTO --}}
-    <p><strong>Responsable:</strong> {{ $gasto->responsable }}</p>
+    <p><strong>Categoría:</strong> {{ $gasto->categoriaGasto?->nombre ?? '-' }}</p>
+    <p><strong>Tipo:</strong> {{ $gasto->gastoTipo?->nombre ?? '-' }}</p>
+    <p><strong>Responsable:</strong> {{ $gasto->responsable }} @if($gasto->responsable_dni) (DNI: {{ $gasto->responsable_dni }}) @endif</p>
     <p><strong>Descripción:</strong> {{ $gasto->descripcion }}</p>
     <p><strong>Fecha:</strong> {{ \Carbon\Carbon::parse($gasto->fecha_gasto)->format('d/m/Y H:i') }}</p>
 

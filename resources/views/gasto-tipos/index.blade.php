@@ -19,7 +19,8 @@
                                 <tr>
                                     <th>Opciones</th>
                                     <th>Código</th>
-                                    <th>Descripción</th>
+                                    <th>Nombre</th>
+                                    <th>Categoría</th>
                                     <th>Activo</th>
                                 </tr>
                             </thead>
@@ -58,13 +59,15 @@ class GastoTipoManager extends CrudManager {
                 { data: 'action', name: 'action', orderable: false, searchable: false},
                 { data: 'id', name: 'id'},
                 { data: 'nombre', name: 'nombre' },
+                { data: 'categoria_gasto', name: '', searchable: false, orderable: false, render: function(data) { return data ? data.nombre : ''; } },
                 { data: 'activo', name: 'activo' }
             ],
             columnDefs: [
                 { targets: 0, width: '15%', className: 'text-center' },
                 { targets: 1, width: '10%' },
-                { targets: 2, width: '65%' },
-                { targets: 3, width: '10%', className: 'text-center' }
+                { targets: 2, width: '40%' },
+                { targets: 3, width: '20%' },
+                { targets: 4, width: '15%', className: 'text-center' }
             ],
             responsive: true,
             order: [[1, 'asc']]
@@ -86,11 +89,33 @@ class GastoTipoManager extends CrudManager {
 
             this.form.action = `${this.baseUrl}/${id}`;
 
+            await this.cargarCategoriasSelect(response.categoria_gasto_id);
+
             this.modal.show();
 
         } catch (error) {
             this.showNotification('error', 'Error al cargar los datos');
             console.error('Error al cargar datos:', error);
+        }
+    }
+
+    async cargarCategoriasSelect(categoriaId = null) {
+        try {
+            const response = await fetch('{{ url('gastos/select/categorias') }}');
+            const categorias = await response.json();
+            const select = document.getElementById('categoria_gasto_id');
+            select.innerHTML = '<option value="">Sin categoría</option>';
+            categorias.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.nombre;
+                select.appendChild(option);
+            });
+            if (categoriaId) {
+                select.value = categoriaId;
+            }
+        } catch (error) {
+            console.error('Error cargando categorías:', error);
         }
     }
 

@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Empleado;
+use App\Models\Gasto;
+use App\Models\GastoCategoria;
+use App\Models\GastoTipo;
 use App\Models\PlanillaAdelanto;
 use App\Models\PlanillaPago;
 use App\Models\PlanillaPagoDetalle;
@@ -138,6 +141,8 @@ class PlanillaPagoService
         return DB::transaction(function () use ($pago) {
             $pago->marcarComoPagado();
 
+            $this->registrarGastoIndividualPago($pago);
+
             return true;
         });
     }
@@ -177,7 +182,13 @@ class PlanillaPagoService
                 $pago->importe_c = (float) ($data['consorcio'] ?? 0);
             }
 
-            return $pago->save();
+            $result = $pago->save();
+
+            if ($pago->estado === 'pagado') {
+                $this->sincronizarGastoPlanilla($pago->mes, $pago->anio);
+            }
+
+            return $result;
         });
     }
 
@@ -257,7 +268,14 @@ class PlanillaPagoService
         $fechaLimite = "{$anio}-{$mes}-{$diaLimite} 23:59:59";
 
         $empleados = Empleado::where('estado', 'activo')
-            ->where('created_at', '<=', $fechaLimite)
+            ->where('fecha_ingreso', '<=', $fechaLimite)
+            ->where(function($q) use ($mes, $anio) {
+                $q->whereNull('fecha_salida')
+                  ->orWhere(function($q2) use ($mes, $anio) {
+                      $q2->whereYear('fecha_salida', $anio)
+                         ->whereMonth('fecha_salida', $mes);
+                  });
+            })
             ->get();
 
         $contador = 0;
@@ -303,13 +321,32 @@ class PlanillaPagoService
 
     public function confirmarPagosDelMes(int $mes, int $anio): int
     {
-        return PlanillaPago::where('mes', $mes)
+        $result = PlanillaPago::where('mes', $mes)
             ->where('anio', $anio)
             ->where('estado', 'pendiente')
             ->update([
                 'estado' => 'pagado',
                 'fecha_pago' => now()->toDateString(),
             ]);
+
+        $this->sincronizarGastoPlanilla($mes, $anio);
+
+        return $result;
+    }
+
+    public function revertirPagosDelMes(int $mes, int $anio): int
+    {
+        $result = PlanillaPago::where('mes', $mes)
+            ->where('anio', $anio)
+            ->where('estado', 'pagado')
+            ->update([
+                'estado' => 'pendiente',
+                'fecha_pago' => null,
+            ]);
+
+        $this->sincronizarGastoPlanilla($mes, $anio);
+
+        return $result;
     }
 
     public function existenPagosDelMes(int $mes, int $anio): bool
@@ -330,10 +367,123 @@ class PlanillaPagoService
             ->where('estado', 'pendiente')
             ->count();
 
+        $pagados = PlanillaPago::where('mes', $mes)
+            ->where('anio', $anio)
+            ->where('estado', 'pagado')
+            ->count();
+
         return [
             'total' => $total,
             'pendientes' => $pendientes,
+            'pagados' => $pagados,
         ];
+    }
+
+    public function revertirPago(PlanillaPago $pago): bool
+    {
+        if ($pago->estado !== 'pagado') {
+            return false;
+        }
+
+        $pago->estado = 'pendiente';
+        $pago->fecha_pago = null;
+        $pago->save();
+
+        $this->eliminarGastoIndividualPago($pago);
+
+        return true;
+    }
+
+    public function registrarGastoIndividualPago(PlanillaPago $pago): void
+    {
+        $empleado = $this->empleadoService->findById($pago->empleado_id);
+        if (!$empleado) {
+            return;
+        }
+
+        $sueldoPlanilla = (float) $empleado->sueldo_planilla;
+        $totalPagar = (float) $pago->total_pagar;
+        $montoGasto = $sueldoPlanilla + $totalPagar;
+
+        $categoria = GastoCategoria::where('nombre', 'Gastos_Personal')->first();
+        if (!$categoria) {
+            $categoria = GastoCategoria::create([
+                'nombre' => 'Gastos_Personal',
+                'activo' => true,
+            ]);
+        }
+
+        $tipo = GastoTipo::where('nombre', 'Sueldos')
+            ->where('categoria_gasto_id', $categoria->id)
+            ->first();
+        if (!$tipo) {
+            $tipo = GastoTipo::create([
+                'nombre' => 'Sueldos',
+                'activo' => true,
+                'categoria_gasto_id' => $categoria->id,
+            ]);
+        }
+
+        $gastoExistente = Gasto::where('empleado_id', $pago->empleado_id)
+            ->where('planilla_mes', $pago->mes)
+            ->where('planilla_anio', $pago->anio)
+            ->first();
+
+        $userId = auth()->id() ?? 1;
+        $userNombre = auth()->user()->name ?? 'Sistema';
+        $nombreMes = $this->getNombreMes($pago->mes);
+
+        $ultimoRecibo = Gasto::whereRaw("numero_recibo REGEXP '^[0-9]+$'")
+            ->selectRaw('MAX(CAST(numero_recibo AS UNSIGNED)) as max_recibo')
+            ->value('max_recibo');
+        $siguienteRecibo = $ultimoRecibo ? ((int) $ultimoRecibo + 1) : 1;
+
+        $ultimoInterno = Gasto::whereNotNull('numero_interno')
+            ->where('numero_interno', '!=', '')
+            ->selectRaw('MAX(CAST(numero_interno AS UNSIGNED)) as max_interno')
+            ->value('max_interno');
+        $siguienteInterno = $ultimoInterno ? ((int) $ultimoInterno + 1) : 1;
+
+        if (!$gastoExistente) {
+            Gasto::create([
+                'user_id' => $userId,
+                'user_nombre' => $userNombre,
+                'fecha_gasto' => $pago->fecha_pago ?? now(),
+                'descripcion' => "Pago {$empleado->nombre} - {$nombreMes}/{$pago->anio}",
+                'responsable' => $empleado->nombre,
+                'responsable_dni' => $empleado->dni,
+                'empleado_id' => $empleado->id,
+                'categoria_gasto_id' => $categoria->id,
+                'gasto_tipo_id' => $tipo->id,
+                'numero_recibo' => $siguienteRecibo,
+                'numero_interno' => (string) $siguienteInterno,
+                'monto' => $montoGasto,
+                'importe_p' => $montoGasto,
+                'importe_d' => 0,
+                'importe_c' => 0,
+                'planilla_mes' => $pago->mes,
+                'planilla_anio' => $pago->anio,
+            ]);
+        } else {
+            $gastoExistente->update([
+                'fecha_gasto' => $pago->fecha_pago ?? now(),
+                'descripcion' => "Pago {$empleado->nombre} - {$nombreMes}/{$pago->anio}",
+                'responsable' => $empleado->nombre,
+                'responsable_dni' => $empleado->dni,
+                'monto' => $montoGasto,
+                'importe_p' => $montoGasto,
+                'importe_d' => 0,
+                'importe_c' => 0,
+            ]);
+        }
+    }
+
+    public function eliminarGastoIndividualPago(PlanillaPago $pago): void
+    {
+        Gasto::where('empleado_id', $pago->empleado_id)
+            ->where('planilla_mes', $pago->mes)
+            ->where('planilla_anio', $pago->anio)
+            ->delete();
     }
 
     public function recalcularPagosDelEmpleado(int $empleadoId): int
@@ -355,5 +505,102 @@ class PlanillaPagoService
     private function getUltimoDiaDelMes(int $mes, int $anio): int
     {
         return (int) date('t', strtotime("{$anio}-{$mes}-01"));
+    }
+
+    public function sincronizarGastoPlanilla(int $mes, int $anio): void
+    {
+        $totalSueldos = PlanillaPago::where('planilla_pagos.mes', $mes)
+            ->where('planilla_pagos.anio', $anio)
+            ->where('planilla_pagos.estado', 'pagado')
+            ->join('empleados', 'empleados.id', '=', 'planilla_pagos.empleado_id')
+            ->sum('empleados.sueldo_real');
+
+        if ($totalSueldos <= 0) {
+            Gasto::where('planilla_mes', $mes)
+                ->where('planilla_anio', $anio)
+                ->delete();
+
+            return;
+        }
+
+        $categoria = GastoCategoria::where('nombre', 'Gastos_Personal')->first();
+        if (! $categoria) {
+            $categoria = GastoCategoria::create([
+                'nombre' => 'Gastos_Personal',
+                'activo' => true,
+            ]);
+        }
+
+        $tipo = GastoTipo::where('nombre', 'Sueldos')
+            ->where('categoria_gasto_id', $categoria->id)
+            ->first();
+        if (! $tipo) {
+            $tipo = GastoTipo::create([
+                'nombre' => 'Sueldos',
+                'activo' => true,
+                'categoria_gasto_id' => $categoria->id,
+            ]);
+        }
+
+        $gasto = Gasto::where('planilla_mes', $mes)
+            ->where('planilla_anio', $anio)
+            ->first();
+
+        $userId = auth()->id() ?? 1;
+        $userNombre = auth()->user()->name ?? 'Sistema';
+
+        $ultimoRecibo = Gasto::whereRaw("numero_recibo REGEXP '^[0-9]+$'")
+            ->selectRaw('MAX(CAST(numero_recibo AS UNSIGNED)) as max_recibo')
+            ->value('max_recibo');
+        $siguienteRecibo = $ultimoRecibo ? ((int) $ultimoRecibo + 1) : 1;
+
+        $ultimoInterno = Gasto::whereNotNull('numero_interno')
+            ->where('numero_interno', '!=', '')
+            ->selectRaw('MAX(CAST(numero_interno AS UNSIGNED)) as max_interno')
+            ->value('max_interno');
+        $siguienteInterno = $ultimoInterno ? ((int) $ultimoInterno + 1) : 1;
+
+        $nombreMes = $this->getNombreMes($mes);
+
+        if (! $gasto) {
+            Gasto::create([
+                'user_id' => $userId,
+                'user_nombre' => $userNombre,
+                'fecha_gasto' => now(),
+                'descripcion' => "Pago Empleados mes {$nombreMes}/{$anio}",
+                'responsable' => 'Consorcios Villegas',
+                'responsable_dni' => null,
+                'categoria_gasto_id' => $categoria->id,
+                'gasto_tipo_id' => $tipo->id,
+                'numero_recibo' => $siguienteRecibo,
+                'numero_interno' => (string) $siguienteInterno,
+                'monto' => $totalSueldos,
+                'importe_p' => $totalSueldos,
+                'importe_d' => 0,
+                'importe_c' => 0,
+                'planilla_mes' => $mes,
+                'planilla_anio' => $anio,
+            ]);
+        } else {
+            $gasto->update([
+                'importe_p' => $totalSueldos,
+                'importe_d' => 0,
+                'importe_c' => 0,
+                'monto' => $totalSueldos,
+                'descripcion' => "Pago Empleados mes {$nombreMes}/{$anio}",
+            ]);
+        }
+    }
+
+    private function getNombreMes(int $mes): string
+    {
+        $meses = [
+            1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo',
+            4 => 'Abril', 5 => 'Mayo', 6 => 'Junio',
+            7 => 'Julio', 8 => 'Agosto', 9 => 'Setiembre',
+            10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
+        ];
+
+        return $meses[$mes] ?? $mes;
     }
 }

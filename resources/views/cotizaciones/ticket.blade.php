@@ -46,8 +46,8 @@
         <tr><td colspan="4" style="border-top: 1px solid #000;"></td></tr>
         @foreach($cotizacion->detalles as $detalle)
         <tr>
-            <td style="text-align: center;">{{ $detalle->cantidad }}</td>
-            <td>{{ $detalle->producto_nombre }} ({{ $detalle->producto_empaque }})</td>            
+            <td style="text-align: center;">{{ $detalle->cantidad }} {{ $detalle->unidad_codigo }}</td>
+            <td>{{ $detalle->producto_nombre }}</td>            
             <td style="text-align: right; padding-right: 3px;">{{ number_format($detalle->precio_unitario,2) }}</td>
             <td style="text-align: right;">{{ number_format($detalle->total,2) }}</td>
         </tr>
@@ -64,7 +64,7 @@
     {{ $total_letras }}
     <div class="line"></div>
     <br>
-    <p><strong>Vendedor: </strong>{{ $cotizacion->user_nombre }}</p>
+    <p><strong>Usuario: </strong>{{ $cotizacion->user_nombre }}</p>
 </div>
 </body>
 </html>

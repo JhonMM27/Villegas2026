@@ -14,21 +14,30 @@
                 </div>
                 <div class="card-body">
                     <div class="row mb-3 align-items-center">
-                        <div class="col-md-3">
-                            <label class="form-label">Mes / Año</label>
-                            <select id="filtro_mes_anio" class="form-select form-select-sm">
+                        <div class="col-md-2">
+                            <label class="form-label">Mes</label>
+                            <select id="filtro_mes" class="form-select form-select-sm">
+                                <!-- Opciones generadas por JS -->
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Año</label>
+                            <select id="filtro_anio" class="form-select form-select-sm">
                                 <!-- Opciones generadas por JS -->
                             </select>
                         </div>
                         <div class="col-md-4">
                             <div id="estado_pagos_mes" class="small mt-2"></div>
                         </div>
-                        <div class="col-md-5 text-end">
+                        <div class="col-md-4 text-end">
                             <button type="button" id="btnGenerarPagos" class="btn btn-success btn-sm d-none me-2">
                                 <i class="bi bi-magic"></i> Generar Pagos del Mes
                             </button>
                             <button type="button" id="btnConfirmarTodos" class="btn btn-primary btn-sm d-none">
                                 <i class="bi bi-check-all"></i> Confirmar Pagos del Mes
+                            </button>
+                            <button type="button" id="btnRevertirTodos" class="btn btn-danger btn-sm d-none">
+                                <i class="bi bi-arrow-counterclockwise"></i> Revertir Pagos
                             </button>
                         </div>
                     </div>
@@ -79,9 +88,9 @@ class PagoPlanillaManager extends CrudManager {
                 url: this.baseUrl,
                 type: 'GET',
                 data: (d) => {
-                    const mesAnio = document.getElementById('filtro_mes_anio')?.value;
-                    if (mesAnio) {
-                        const [mes, anio] = mesAnio.split('-');
+                    const mes = document.getElementById('filtro_mes')?.value;
+                    const anio = document.getElementById('filtro_anio')?.value;
+                    if (mes && anio) {
                         d.mes = mes;
                         d.anio = anio;
                     }
@@ -102,8 +111,9 @@ class PagoPlanillaManager extends CrudManager {
     }
 
     inicializarFiltroMes() {
-        const select = document.getElementById('filtro_mes_anio');
-        if (!select) return;
+        const selectMes = document.getElementById('filtro_mes');
+        const selectAnio = document.getElementById('filtro_anio');
+        if (!selectMes || !selectAnio) return;
 
         const fechaActual = new Date();
         const anioActual = fechaActual.getFullYear();
@@ -111,40 +121,46 @@ class PagoPlanillaManager extends CrudManager {
 
         const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-        select.innerHTML = '<option value="">-- Todos los meses --</option>';
-
+        selectMes.innerHTML = '';
         for (let m = 4; m <= mesActual; m++) {
-            const value = `${m}-${anioActual}`;
-            const texto = `${meses[m]} ${anioActual}`;
-            select.innerHTML += `<option value="${value}">${texto}</option>`;
+            const selected = m === mesActual ? ' selected' : '';
+            selectMes.innerHTML += `<option value="${m}"${selected}>${meses[m]}</option>`;
         }
 
-        select.addEventListener('change', () => this.onCambioMesAnio());
+        selectAnio.innerHTML = `<option value="${anioActual}">${anioActual}</option>`;
+
+        selectMes.addEventListener('change', () => this.onCambioFiltro());
+        selectAnio.addEventListener('change', () => this.onCambioFiltro());
+
+        this.onCambioFiltro();
     }
 
-    async onCambioMesAnio() {
-        const select = document.getElementById('filtro_mes_anio');
+    async onCambioFiltro() {
         const estadoDiv = document.getElementById('estado_pagos_mes');
         const btnGenerar = document.getElementById('btnGenerarPagos');
         const btnConfirmar = document.getElementById('btnConfirmarTodos');
-        const valor = select.value;
+        const btnRevertir = document.getElementById('btnRevertirTodos');
 
-        if (!valor) {
+        const mes = document.getElementById('filtro_mes')?.value;
+        const anio = document.getElementById('filtro_anio')?.value;
+
+        if (!mes || !anio) {
             estadoDiv.innerHTML = '';
             btnGenerar.classList.add('d-none');
             btnConfirmar.classList.add('d-none');
+            btnRevertir.classList.add('d-none');
             this.tabla.ajax.reload();
             return;
         }
 
-        const [mes, anio] = valor.split('-').map(Number);
         const anioActual = new Date().getFullYear();
-        const mesActual = new Date().getMonth() + 1;
+        const mesNum = parseInt(mes);
 
-        if (anio === anioActual && mes < 4) {
+        if (parseInt(anio) === anioActual && mesNum < 4) {
             estadoDiv.innerHTML = '<span class="text-danger">Sistema no iniciado para este período</span>';
             btnGenerar.classList.add('d-none');
             btnConfirmar.classList.add('d-none');
+            btnRevertir.classList.add('d-none');
             return;
         }
 
@@ -156,14 +172,22 @@ class PagoPlanillaManager extends CrudManager {
                 estadoDiv.innerHTML = '<span class="text-warning">Pagos no generados para este mes</span>';
                 btnGenerar.classList.remove('d-none');
                 btnConfirmar.classList.add('d-none');
+                btnRevertir.classList.add('d-none');
+            } else if (data.pendientes > 0) {
+                estadoDiv.innerHTML = data.mensaje;
+                btnGenerar.classList.add('d-none');
+                btnConfirmar.classList.remove('d-none');
+                btnRevertir.classList.add('d-none');
+            } else if (data.pagados > 0) {
+                estadoDiv.innerHTML = data.mensaje;
+                btnGenerar.classList.add('d-none');
+                btnConfirmar.classList.add('d-none');
+                btnRevertir.classList.remove('d-none');
             } else {
                 estadoDiv.innerHTML = data.mensaje;
                 btnGenerar.classList.add('d-none');
-                if (data.pendientes > 0) {
-                    btnConfirmar.classList.remove('d-none');
-                } else {
-                    btnConfirmar.classList.add('d-none');
-                }
+                btnConfirmar.classList.add('d-none');
+                btnRevertir.classList.add('d-none');
             }
 
             this.tabla.ajax.reload();
@@ -173,11 +197,21 @@ class PagoPlanillaManager extends CrudManager {
     }
 
     async generarPagos() {
-        const select = document.getElementById('filtro_mes_anio');
-        const valor = select.value;
-        if (!valor) return;
+        const btn = document.getElementById('btnGenerarPagos');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Generando...';
 
-        const [mes, anio] = valor.split('-');
+        const mes = document.getElementById('filtro_mes')?.value;
+        const anio = document.getElementById('filtro_anio')?.value;
+        if (!mes || !anio) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            return;
+        }
+
+        const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const nombreMes = meses[parseInt(mes)];
 
         try {
             const response = await fetch(`{{ route('planilla-pagos.generar') }}`, {
@@ -194,22 +228,33 @@ class PagoPlanillaManager extends CrudManager {
 
             if (data.success) {
                 this.showNotification('success', data.message);
-                this.onCambioMesAnio();
+                this.onCambioFiltro();
             } else {
                 this.showNotification('error', data.message);
             }
         } catch (error) {
             this.showNotification('error', 'Error al generar pagos');
             console.error(error);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
         }
     }
 
     confirmarPagosDelMes() {
-        const select = document.getElementById('filtro_mes_anio');
-        const valor = select.value;
-        if (!valor) return;
+        const btn = document.getElementById('btnConfirmarTodos');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Confirmando...';
 
-        const [mes, anio] = valor.split('-');
+        const mes = document.getElementById('filtro_mes')?.value;
+        const anio = document.getElementById('filtro_anio')?.value;
+        if (!mes || !anio) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            return;
+        }
+
         const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         const nombreMes = meses[parseInt(mes)];
 
@@ -238,14 +283,80 @@ class PagoPlanillaManager extends CrudManager {
                     if (data.success) {
                         this.showNotification('success', data.message);
                         this.tabla.ajax.reload(null, false);
-                        this.onCambioMesAnio();
+                        this.onCambioFiltro();
                     } else {
                         this.showNotification('error', data.message);
                     }
                 } catch (error) {
                     this.showNotification('error', 'Error al confirmar pagos');
                     console.error(error);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
                 }
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        });
+    }
+
+    revertirPagosDelMes() {
+        const btn = document.getElementById('btnRevertirTodos');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Revirtiendo...';
+
+        const mes = document.getElementById('filtro_mes')?.value;
+        const anio = document.getElementById('filtro_anio')?.value;
+        if (!mes || !anio) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            return;
+        }
+
+        const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const nombreMes = meses[parseInt(mes)];
+
+        Swal.fire({
+            title: '¿Revertir todos los pagos?',
+            text: `Se marcarán como pendientes todos los pagos confirmados de ${nombreMes} ${anio}`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, revertir todos',
+            cancelButtonText: 'Cancelar'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch(`{{ route('planilla-pagos.revertir-todos') }}`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ mes: parseInt(mes), anio: parseInt(anio) })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.showNotification('success', data.message);
+                        this.tabla.ajax.reload(null, false);
+                        this.onCambioFiltro();
+                    } else {
+                        this.showNotification('error', data.message);
+                    }
+                } catch (error) {
+                    this.showNotification('error', 'Error al revertir pagos');
+                    console.error(error);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
             }
         });
     }
@@ -704,6 +815,38 @@ class PagoPlanillaManager extends CrudManager {
             }
         });
     }
+
+    revertirPago(id) {
+        Swal.fire({
+            title: '¿Revertir pago?',
+            text: '¿Desea marcar este pago como pendiente?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, revertir',
+            cancelButtonText: 'Cancelar'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch(`${this.baseUrl}/${id}/revertir`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                            'Accept': 'application/json'
+                        }
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        this.showNotification('success', 'Pago revertido a pendiente');
+                        this.tabla.ajax.reload(null, false);
+                    } else {
+                        this.showNotification('error', data.message);
+                    }
+                } catch (error) {
+                    this.showNotification('error', 'Error al procesar');
+                }
+            }
+        });
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -715,6 +858,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btnConfirmarTodos')?.addEventListener('click', () => {
         window.pagoManager.confirmarPagosDelMes();
+    });
+
+    document.getElementById('btnRevertirTodos')?.addEventListener('click', () => {
+        window.pagoManager.revertirPagosDelMes();
     });
 });
 document.getElementById('mnuPlanilla').classList.add('menu-open');

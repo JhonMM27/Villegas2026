@@ -1,81 +1,152 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
-    <title>{{ $compra->comprobante_tipo_nombre }} - compra {{ $compra->serie }}-{{ $compra->correlativo }}</title>
+    <title>COMPRA {{ $compra->serie }}-{{ str_pad($compra->correlativo, 8, '0', STR_PAD_LEFT) }}</title>
     <style>
-        @page { margin: 4mm; size: 80mm auto; }
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10.5px; margin: 0; padding: 0; }
-        .ticket { width: 72mm; margin: 0; padding: 0; }
+        @page {
+            margin: 2mm 0mm 2mm 0mm;
+            size: 76mm auto;
+        }
+
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 10px;
+            margin: 0;
+            padding: 0;
+            line-height: 1.2;
+        }
+
+        .ticket {
+            width: 72mm;
+            margin: 0 auto;
+            text-align: left;
+        }
+
         .center { text-align: center; }
         .bold { font-weight: bold; }
-        h3 { margin: 0 0 2px 0; }
-        p { margin: 1px 0; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 1px 0; vertical-align: top; }
-        .line { border-top: 1px dashed #000; margin: 3px 0; }
-        .totales td { padding: 1px 0; }
+        .right { text-align: right; }
+
+        h3 { margin: 0; padding: 0; font-size: 12px; }
+        p { margin: 0; padding: 0; font-size: 9px; }
+
+        .line {
+            border-top: 1px dashed #000;
+            margin: 2px 0;
+        }
+
+        .spacer { height: 3px; }
     </style>
 </head>
+
 <body>
-<div class="ticket">
-    {{-- ENCABEZADO EMPRESA --}}
-    <div class="center">
-        <h3 class="bold">{{ $empresa->razon_social }}</h3>
-        <!--<p>{{ $empresa->direccion }}</p>-->
-        <p>RUC: {{ $empresa->ruc }}</p>
-        <p class="bold">{{ $compra->comprobante_tipo_nombre}} {{ $compra->serie }}-{{ str_pad($compra->correlativo,8,'0',STR_PAD_LEFT) }}</p>
-    </div>
-    <div class="line"></div>
-    {{-- DATOS PROVEEDOR --}}
-    <p><strong>Proveedor:</strong> {{ $compra->proveedor_nombre }}</p>
-    <p><strong>Documento:</strong> {{ $compra->proveedor->documentoTipo->descripcion }} {{ $compra->proveedor_documento }}</p>
-    <p><strong>Dirección:</strong> {{ $compra->proveedor_direccion ?? '-' }}</p>
-    <p><strong>Fecha:</strong> {{ \Carbon\Carbon::parse($compra->fecha_compra)->format('d/m/Y H:i') }}</p>
-    <div class="line"></div>
-    {{-- DETALLE PRODUCTOS --}}
-    <table>
-        <tr class="bold">
-            <td style="width: 38%;">Descripción</td>
-            <td style="width: 12%; text-align: center;">Cant.</td>
-            <td style="width: 25%; text-align: right; padding-right: 3px;">P.Unit.</td>
-            <td style="width: 25%; text-align: right;">Total</td>
-        </tr>
-        <tr><td colspan="4" style="border-top: 1px solid #000;"></td></tr>
-        @foreach($compra->detalles as $detalle)
-        <tr>
-            <td>{{ $detalle->producto_nombre }}</td>
-            <td style="text-align: center;">{{ $detalle->cantidad }}</td>
-            <td style="text-align: right; padding-right: 3px;">{{ number_format($detalle->costo_unitario,2) }}</td>
-            <td style="text-align: right;">{{ number_format($detalle->total,2) }}</td>
-        </tr>
+    <div class="ticket">
+
+        {{-- ENCABEZADO EMPRESA --}}
+        <div class="center">
+            <h3>CONSORCIOS VILLEGAS E.I.R.L.</h3>
+        </div>
+
+        <div class="center">
+            <p>CEL: 967984895 / 978431737</p>
+            <p>COMPRA {{ $compra->serie }}-{{ str_pad($compra->correlativo, 8, '0', STR_PAD_LEFT) }}</p>
+        </div>
+
+        <div class="line"></div>
+
+        {{-- FECHA Y HORA --}}
+        <table style="width: 100%;">
+            <tr>
+                <td></td>
+                <td class="right">FECHA: {{ \Carbon\Carbon::parse($compra->fecha_compra)->format('d/m/Y') }}</td>
+                <td class="right">HORA: {{ \Carbon\Carbon::parse($compra->fecha_compra)->format('H:i:s') }}</td>
+            </tr>
+        </table>
+
+        <div class="spacer"></div>
+
+        {{-- DATOS PROVEEDOR --}}
+        <p><strong>RUC/DNI:</strong> {{ $compra->proveedor_documento ?? '-' }}</p>
+        <p><strong>PROVEEDOR:</strong> {{ $compra->proveedor_nombre }}</p>
+        <p><strong>DIRECCION:</strong> {{ $compra->proveedor_direccion ?? '-' }}</p>
+
+        <div class="line"></div>
+        <div class="spacer"></div>
+
+        {{-- ENCABEZADO TABLA --}}
+        <div class="bold">
+            <span style="display: inline-block; width: 30%;">Cant</span>
+            <span style="display: inline-block; width: 25%; text-align: right;">P.Unit</span>
+            <span style="display: inline-block; width: 35%; text-align: right;">Importe</span>
+        </div>
+        <div class="line"></div>
+
+        {{-- DETALLE PRODUCTOS --}}
+        @foreach ($compra->detalles as $detalle)
+            @php
+                // Determinar unidad y cantidad según unidad_codigo
+                $unidadCodigo = $detalle->unidad_codigo ?? 'NIU';
+                
+                if ($unidadCodigo === 'KGM') {
+                    $cantidad = number_format((float) $detalle->cantidad_kgm, 2);
+                    $unidadTexto = 'KG';
+                } elseif ($unidadCodigo === 'SCO' || $unidadCodigo === 'NIU') {
+                    // SCO y NIU son productos empacados (aSACOs)
+                    $cantidad = number_format((float) $detalle->cantidad, 2);
+                    $unidadTexto = 'SACO';
+                } else {
+                    $cantidad = number_format((float) $detalle->cantidad, 2);
+                    $unidadTexto = 'SACO';
+                }
+
+                $precio = number_format((float) $detalle->costo_unitario, 2);
+                $importe = number_format((float) $detalle->total, 2);
+            @endphp
+
+            <p class="bold">{{ $detalle->producto_nombre }}</p>
+            <p>
+                <span style="display: inline-block; width: 30%;">{{ $cantidad }} {{ $unidadTexto }}</span>
+                <span style="display: inline-block; width: 25%; text-align: right;">S/ {{ $precio }}</span>
+                <span style="display: inline-block; width: 35%; text-align: right;">S/ {{ $importe }}</span>
+            </p>
         @endforeach
-        <tr><td colspan="4" style="border-top: 1px solid #000;"></td></tr>
-    </table>
-    {{-- TOTALES --}}
-    <table class="totales">
-        <tr>
-            <td>OP. GRAVADAS:</td>
-            <td style="text-align: right;">S/ {{ number_format($compra->op_gravada,2) }}</td>
-        </tr>
-        <tr>
-            <td>OP. EXONERADAS:</td>
-            <td style="text-align: right;">S/ {{ number_format($compra->op_exonerada,2) }}</td>
-        </tr>
-        <tr>
-            <td>OP. INAFECTAS:</td>
-            <td style="text-align: right;">S/ {{ number_format($compra->op_inafecta,2) }}</td>
-        </tr>
-        <tr>
-            <td>Impuesto (18%):</td>
-            <td style="text-align: right;">S/ {{ number_format($compra->impuesto,2) }}</td>
-        </tr>
-        <tr class="bold">
-            <td>TOTAL:</td>
-            <td style="text-align: right;">S/ {{ number_format($compra->total,2) }}</td>
-        </tr>
-    </table>
-    <div class="line"></div>
-</div>
+
+        <div class="line"></div>
+        <div class="spacer"></div>
+
+        {{-- TOTALES --}}
+        <p style="text-align: right;">
+            OP. GRAVADAS: S/ {{ number_format($compra->op_gravada, 2) }}
+        </p>
+        <p style="text-align: right;">
+            OP. EXONERADAS: S/ {{ number_format($compra->op_exonerada, 2) }}
+        </p>
+        <p style="text-align: right;">
+            IMPUESTO: S/ {{ number_format($compra->impuesto, 2) }}
+        </p>
+
+        <div class="spacer"></div>
+
+        <p class="bold" style="text-align: right; font-size: 11px;">
+            TOTAL: S/ {{ number_format($compra->total, 2) }}
+        </p>
+
+        <div class="line"></div>
+        <div class="spacer"></div>
+
+        {{-- COMPRADOR --}}
+        <p><strong>USUARIO:</strong> {{ $compra->user_nombre }}</p>
+
+        <div class="line"></div>
+
+        <div class="center">
+            <p class="bold">GRACIAS POR SU PREFERENCIA</p>
+        </div>
+
+        <div style="height: 4mm;"></div>
+
+    </div>
 </body>
+
 </html>
