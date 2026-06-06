@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html>
 @include('pdf.styles', [
-  'title' => "Créditos por cobrar ({$ini->format('d/m/Y')} al {$fin->format('d/m/Y')})"
-        . (!empty($clienteNombre) ? " - Cliente: {$clienteNombre}" : '')
+    'title' =>
+        "Créditos por cobrar ({$ini->format('d/m/Y')} al {$fin->format('d/m/Y')})" .
+        (!empty($clienteNombre) ? " - Cliente: {$clienteNombre}" : ''),
 ])
+
 <body>
 
     <!-- ENCABEZADO FIJO -->
@@ -21,7 +23,7 @@
                     <small>Usuario: {{ auth()->user()->name }}</small>
                 </td>
             </tr>
-            @if(!empty($clienteNombre))
+            @if (!empty($clienteNombre))
                 <tr>
                     <td colspan="2">Cliente: <strong>{{ $clienteNombre }}</strong></td>
                 </tr>
@@ -43,8 +45,8 @@
                 <th class="text-right">Abonos</th>
                 <th class="text-right">Saldo</th>
                 <th class="text-right">Ítems</th>
-                <th>Cliente</th>
-                <th>Usuario</th>
+                {{-- <th>Cliente</th> --}}
+                {{-- <th>Usuario</th> --}}
             </tr>
         </thead>
 
@@ -56,14 +58,14 @@
                     <td>{{ $r->documento }}</td>
                     <td>{{ $r->tipo_venta }}</td>
 
-                    <td class="text-right">{{ number_format((float)$r->total, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$r->acuenta, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$r->abonos, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$r->saldo, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $r->total, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $r->acuenta, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $r->abonos, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $r->saldo, 2) }}</td>
 
-                    <td class="text-right">{{ (int)$r->items }}</td>
-                    <td>{{ $r->cliente_nombre }}</td>
-                    <td>{{ $r->user_nombre }}</td>
+                    <td class="text-right">{{ (int) $r->items }}</td>
+                    {{-- <td>{{ $r->cliente_nombre }}</td> --}}
+                    {{-- <td>{{ $r->user_nombre }}</td> --}}
                 </tr>
             @empty
                 <tr>
@@ -71,16 +73,16 @@
                 </tr>
             @endforelse
 
-            @if(count($reportes) > 0)
+            @if (count($reportes) > 0)
                 <tr class="total-row">
                     <td colspan="4" class="text-right">TOTAL GENERAL:</td>
 
-                    <td class="text-right">{{ number_format((float)$totTotal, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$totAcuenta, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$totAbonos, 2) }}</td>
-                    <td class="text-right">{{ number_format((float)$totSaldo, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $totTotal, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $totAcuenta, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $totAbonos, 2) }}</td>
+                    <td class="text-right">{{ number_format((float) $totSaldo, 2) }}</td>
 
-                    <td class="text-right">{{ (int)$totItems }}</td>
+                    <td class="text-right">{{ (int) $totItems }}</td>
                     <td colspan="2"></td>
                 </tr>
             @endif
@@ -88,4 +90,5 @@
     </table>
 
 </body>
+
 </html>
