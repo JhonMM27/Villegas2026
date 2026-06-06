@@ -135,6 +135,14 @@
         <div class="line"></div>
         <div class="spacer"></div>
 
+        {{-- SALDO ANTERIOR --}}
+        @if($saldoAnterior > 0)
+            <p class="bold" style="text-align: right; font-size: 10px;">
+                SALDO ANTERIOR: S/ {{ number_format($saldoAnterior, 2) }}
+            </p>
+            <div class="spacer"></div>
+        @endif
+
         {{-- VENDEDOR --}}
         <p><strong>USUARIO:</strong> {{ $venta->user_nombre }}</p>
 

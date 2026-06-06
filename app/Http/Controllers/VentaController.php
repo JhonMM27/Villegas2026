@@ -343,10 +343,15 @@ class VentaController extends Controller
             'celular' => '967984895 - 978431737 - 915177079',
         ];
 
+        $saldoAnterior = Venta::where('cliente_id', $venta->cliente_id)
+            ->where('id', '!=', $id)
+            ->where('estado', '!=', 'anulada')
+            ->sum('saldo');
+
         $formatter = new NumeroALetras;
         $total_letras = $formatter->convertir($venta->total);
 
-        $pdf = Pdf::loadView('ventas.ticket', compact('venta', 'empresa', 'total_letras'))
+        $pdf = Pdf::loadView('ventas.ticket', compact('venta', 'empresa', 'total_letras', 'saldoAnterior'))
             ->setPaper([0, 0, 226.77, 600], 'portrait')
             ->setOption('isRemoteEnabled', true)
             ->setOption('defaultFont', 'DejaVu Sans');
