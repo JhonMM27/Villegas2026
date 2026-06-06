@@ -169,12 +169,25 @@ class ClienteController extends Controller
     public function buscar(Request $request)
     {
         $q = $request->input('q');
-        return Cliente::where('id', $q)
-                    ->orWhere('razon_social', 'like', "%{$q}%")
-                    ->orWhere('documento_numero', 'like', "%{$q}%")
-                    ->select('id', 'documento_numero', 'razon_social')
-                    ->limit(10)
-                    ->get();
+        $clienteIdsParam = $request->input('cliente_ids');
+
+        $query = Cliente::query()->select('id', 'documento_numero', 'razon_social');
+
+        if (!empty($clienteIdsParam)) {
+            $ids = is_array($clienteIdsParam) ? $clienteIdsParam : explode(',', $clienteIdsParam);
+            $query->whereIn('id', array_map('intval', $ids));
+        } elseif ($q) {
+            if (is_numeric($q)) {
+                $query->where('id', $q);
+            } else {
+                $query->where(function($inner) use ($q) {
+                    $inner->where('razon_social', 'like', "%{$q}%")
+                          ->orWhere('documento_numero', 'like', "%{$q}%");
+                });
+            }
+        }
+
+        return $query->limit(20)->get();
     }
     /*
     public function exportar(Request $request)

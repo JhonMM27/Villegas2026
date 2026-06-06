@@ -136,7 +136,7 @@ class VentaController extends Controller
         // Convertir fechas antes de validar
         if ($request->filled('fecha_venta')) {
             $request->merge([
-                'fecha_venta' => str_replace('T', ' ', $request->fecha_venta).':00',
+                'fecha_venta' => \Carbon\Carbon::parse($request->fecha_venta)->format('Y-m-d H:i:s'),
             ]);
         }
 
@@ -364,7 +364,7 @@ class VentaController extends Controller
         // Convertir fechas antes de validar
         if ($request->filled('fecha_venta')) {
             $request->merge([
-                'fecha_venta' => str_replace('T', ' ', $request->fecha_venta).':00',
+                'fecha_venta' => \Carbon\Carbon::parse($request->fecha_venta)->format('Y-m-d H:i:s'),
             ]);
         }
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GastoTipo extends Model
 {
@@ -13,7 +15,8 @@ class GastoTipo extends Model
 
     protected $fillable = [
         'nombre',
-        'activo'
+        'activo',
+        'categoria_gasto_id',
     ];
 
     protected $casts = [
@@ -25,7 +28,12 @@ class GastoTipo extends Model
         return $query->where('activo', true);
     }
 
-    public function gastos()
+    public function categoriaGasto(): BelongsTo
+    {
+        return $this->belongsTo(GastoCategoria::class, 'categoria_gasto_id');
+    }
+
+    public function gastos(): HasMany
     {
         return $this->hasMany(Gasto::class, 'gasto_tipo_id');
     }

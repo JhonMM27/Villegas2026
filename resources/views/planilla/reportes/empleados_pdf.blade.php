@@ -173,6 +173,13 @@
             <p>RUC: {{ $empresa->ruc ?? '' }}</p>
             <h3>BOLETA DE PAGO</h3>
             <p>Fecha: {{ date('d/m/Y') }}</p>
+            @if (isset($fechaInicio) && isset($fechaFin))
+                <p style="margin: 2px 0;"><strong>Rango de Fechas:</strong>
+                    {{ \Carbon\Carbon::parse($fechaInicio)->format('d/m/Y') }} al
+                    {{ \Carbon\Carbon::parse($fechaFin)->format('d/m/Y') }}
+                    ({{ $resumen['dias_en_rango'] ?? 30 }} días)
+                </p>
+            @endif
         </div>
 
         @if (isset($empleado))
@@ -283,9 +290,9 @@
                                     </tr>
                                 @endif
                                 <tr>
-                                    <td>Total General a Pagar:</td>
+                                    <td>Total General a Pagar ({{ $resumen['dias_en_rango'] ?? 30 }} días):</td>
                                     <td class="text-right fw-bold">S/
-                                        {{ number_format($resumen['total_general'] ?? 0, 2) }}</td>
+                                        {{ number_format($resumen['total_proporcional'] ?? 0, 2) }}</td>
                                 </tr>
                                 <tr>
                                     <td>Total Pagado:</td>
@@ -295,7 +302,7 @@
                                 <tr>
                                     <td>Total Pendiente:</td>
                                     <td class="text-right fw-bold" style="color: orange;">S/
-                                        {{ number_format($resumen['total_pendiente'] ?? 0, 2) }}</td>
+                                        {{ number_format($resumen['total_proporcional'] ?? 0, 2) }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -326,7 +333,7 @@
                             <tr>
                                 <td class="text-center">{{ $pago->id }}</td>
                                 <td>{{ str_pad($pago->mes, 2, '0', STR_PAD_LEFT) }}/{{ $pago->anio }}</td>
-                                <td class="text-right">S/ {{ number_format((float) $empleado->sueldo_planilla, 2) }}
+                                <td class="text-right">S/ {{ number_format((float) ($pago->sueldo_planilla_proporcional ?? 0), 2) }}
                                 </td>
                                 <td class="text-right">S/ {{ number_format((float) $empleado->sueldo_real, 2) }}</td>
                                 <td class="text-right">S/ {{ number_format((float) $pago->sueldo_base, 2) }}</td>
@@ -334,7 +341,7 @@
                                 <td class="text-right">{{ number_format((float) ($pago->dias_faltados ?? 0), 2) }}</td>
                                 <td class="text-right" style="color: red;">S/
                                     {{ number_format((float) ($pago->descuento_faltas ?? 0), 2) }}</td>
-                                <td class="text-right">S/ {{ number_format((float) $pago->total_pagar, 2) }}</td>
+                                <td class="text-right">S/ {{ number_format((float) ($pago->monto_proporcional ?? 0), 2) }}</td>
                                 <td class="text-center">
                                     @if ($pago->estado === 'pagado')
                                         <span class="badge badge-success">Pagado</span>
@@ -357,7 +364,7 @@
                             <th></th>
                             <th class="text-right">S/ {{ number_format($resumen['total_descuento_faltas'] ?? 0, 2) }}
                             </th>
-                            <th class="text-right">S/ {{ number_format($resumen['total_general'] ?? 0, 2) }}</th>
+                            <th class="text-right">S/ {{ number_format($resumen['total_proporcional'] ?? 0, 2) }}</th>
                             <th colspan="2"></th>
                         </tr>
                     </tfoot>
@@ -412,7 +419,7 @@
                                     </td>
                                     <td class="text-right" style="color: red;">S/
                                         {{ number_format((float) ($pago->descuento_faltas ?? 0), 2) }}</td>
-                                    <td class="text-right">S/ {{ number_format((float) $pago->total_pagar, 2) }}</td>
+<td class="text-right">S/ {{ number_format((float) ($pago->monto_proporcional ?? 0), 2) }}</td>
                                     <td class="text-center">
                                         @if ($pago->estado === 'pagado')
                                             <span class="badge badge-success">Pagado</span>
@@ -449,7 +456,8 @@
                         <th class="text-right">S/ {{ number_format($pagos->sum('sueldo_base'), 2) }}</th>
                         <th class="text-right">S/ {{ number_format($pagos->sum('horas_extras'), 2) }}</th>
                         <th class="text-right">S/ {{ number_format($pagos->sum('adelantos'), 2) }}</th>
-                        <th class="text-right">S/ {{ number_format($pagos->sum('total_pagar'), 2) }}</th>
+                        <th class="text-right">S/ {{ number_format($pagos->sum('total_proporcional'), 2) }}
+                        </th>
                         <th colspan="2"></th>
                     </tr>
                 </tfoot>

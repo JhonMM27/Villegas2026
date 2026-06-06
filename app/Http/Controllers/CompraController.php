@@ -145,7 +145,7 @@ class CompraController extends Controller
         // Convertir fechas antes de validar
         if ($request->filled('fecha_compra')) {
             $request->merge([
-                'fecha_compra' => str_replace('T', ' ', $request->fecha_compra).':00',
+                'fecha_compra' => \Carbon\Carbon::parse($request->fecha_compra)->format('Y-m-d H:i:s'),
             ]);
         }
 

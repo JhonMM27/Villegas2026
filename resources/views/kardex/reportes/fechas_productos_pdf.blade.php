@@ -117,35 +117,79 @@
         </thead>
 
         <tbody>
-            @forelse($reportes as $r)
-                <tr class="linea2">
-                    <td>
-                        @php $f = $r->fecha ?? null; @endphp
-                        {{ $f ? \Carbon\Carbon::parse($f)->format('d/m/Y H:i') : '-' }}
-                    </td>
-                    <td>{{ $r->operacion ?? '-' }}</td>
-                    <td>{{ $r->id ?? '-' }}</td>
-                    <td>{{ $r->producto ?? '-' }}</td>
+            @php
+                $operacionesOrden = ['COMPRA', 'VENTA', 'PREPARADA', 'PREPARADA_NUCLEO', 'PRESTAMO'];
+                $agrupado = $reportes->groupBy('operacion');
 
-                    <td class="text-right">{{ number_format((float)($r->empaque ?? 0), 2) }}</td>
-                    <td>{{ $r->linea ?? '-' }}</td>
-                    <td>{{ $r->unidad ?? '-' }}</td>
-                    <td>{{ $r->documento ?? '-' }}</td>
+                $totalEntrada = 0;
+                $totalSalida = 0;
+            @endphp
 
-                    <td class="text-right">{{ number_format((float)($r->entrada_und ?? 0), 2) }}</td>
-                    <td class="text-right">{{ number_format((float)($r->salida_und ?? 0), 2) }}</td>
-                    <td class="text-right">{{ number_format((float)($r->precio_unitario ?? 0), 4) }}</td>
+            @foreach($operacionesOrden as $operacion)
+                @if($agrupado->has($operacion))
+                    @php
+                        $grupo = $agrupado->get($operacion);
+                        $subEntrada = 0;
+                        $subSalida = 0;
+                    @endphp
 
-                    <td class="text-right">{{ number_format((float)($r->stock_und ?? 0), 2) }}</td>
+                    @foreach($grupo as $r)
+                        @php
+                            $entrada = (float)($r->entrada_und ?? 0);
+                            $salida  = (float)($r->salida_und ?? 0);
+                            $subEntrada += $entrada;
+                            $subSalida  += $salida;
+                            $totalEntrada += $entrada;
+                            $totalSalida  += $salida;
+                        @endphp
+                        <tr class="linea2">
+                            <td>
+                                @php $f = $r->fecha ?? null; @endphp
+                                {{ $f ? \Carbon\Carbon::parse($f)->format('d/m/Y H:i') : '-' }}
+                            </td>
+                            <td>{{ $r->operacion ?? '-' }}</td>
+                            <td>{{ $r->id ?? '-' }}</td>
+                            <td>{{ $r->producto ?? '-' }}</td>
 
-                    <td>{{ $r->referencia ?? '-' }}</td>
-                </tr>
-            @empty
+                            <td class="text-right">{{ number_format((float)($r->empaque ?? 0), 2) }}</td>
+                            <td>{{ $r->linea ?? '-' }}</td>
+                            <td>{{ $r->unidad ?? '-' }}</td>
+                            <td>{{ $r->documento ?? '-' }}</td>
+
+                            <td class="text-right">{{ number_format((float)($r->entrada_und ?? 0), 2) }}</td>
+                            <td class="text-right">{{ number_format((float)($r->salida_und ?? 0), 2) }}</td>
+                            <td class="text-right">{{ number_format((float)($r->precio_unitario ?? 0), 4) }}</td>
+
+                            <td class="text-right">{{ number_format((float)($r->stock_und ?? 0), 2) }}</td>
+
+                            <td>{{ $r->referencia ?? '-' }}</td>
+                        </tr>
+                    @endforeach
+
+                    <tr class="linea2 fw-bold" style="background-color: #e9ecef;">
+                        <td colspan="8">{{ $operacion }} - SUBTOTAL</td>
+                        <td class="text-right">{{ number_format($subEntrada, 2) }}</td>
+                        <td class="text-right">{{ number_format($subSalida, 2) }}</td>
+                        <td colspan="3"></td>
+                    </tr>
+                @endif
+            @endforeach
+
+            @if($reportes->isEmpty())
                 <tr>
                     <td colspan="13" class="text-center">No se encontraron registros</td>
                 </tr>
-            @endforelse
+            @endif
         </tbody>
+
+        <tfoot>
+            <tr class="fw-bold">
+                <td colspan="8" class="text-right">TOTALES</td>
+                <td class="text-right">{{ number_format($totalEntrada, 2) }}</td>
+                <td class="text-right">{{ number_format($totalSalida, 2) }}</td>
+                <td colspan="3"></td>
+            </tr>
+        </tfoot>
     </table>
 
 </body>

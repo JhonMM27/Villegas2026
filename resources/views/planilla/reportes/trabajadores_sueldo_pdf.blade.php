@@ -103,46 +103,52 @@
     @include('planilla.reportes.partials.logo')
     @include('planilla.reportes.partials.watermark')
     <div class="contenido">
-    <div class="header">
-        <h2>{{ $empresa->razon_social ?? 'EMPRESA' }}</h2>
-        <p>{{ $empresa->direccion ?? '' }}</p>
-        <p>RUC: {{ $empresa->ruc ?? '' }}</p>
-        <h3>REPORTE DE TRABAJADORES CON SUELDO</h3>
-        <p>Fecha: {{ date('d/m/Y') }}</p>
-    </div>
+        <div class="header">
+            <h2>{{ $empresa->razon_social ?? 'EMPRESA' }}</h2>
+            <p>{{ $empresa->direccion ?? '' }}</p>
+            <p>RUC: {{ $empresa->ruc ?? '' }}</p>
+            <h3>REPORTE DE TRABAJADORES CON SUELDO</h3>
+            <p>Fecha: {{ date('d/m/Y') }}</p>
+        </div>
 
-    <div class="info">
-        <strong>Total de Trabajadores:</strong> {{ $totalRegistros }}
-    </div>
+        <div class="info">
+            <strong>Total de Trabajadores:</strong> {{ $totalRegistros }}
+        </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th class="text-center">#</th>
-                <th>Nombre</th>
-                <th>DNI</th>
-                <th class="text-right">Sueldo Planilla</th>
-                <th class="text-right">Sueldo Real</th>
-                {{-- <th class="text-center">Estado</th> --}}
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($empleados as $index => $emp)
+        <table>
+            <thead>
                 <tr>
-                    <td class="text-center">{{ $index + 1 }}</td>
-                    <td>{{ $emp->nombre }}</td>
-                    <td>{{ $emp->dni }}</td>
-                    <td class="text-right">S/ {{ number_format((float) $emp->sueldo_planilla, 2) }}</td>
-                    <td class="text-right">S/ {{ number_format((float) $emp->sueldo_real, 2) }}</td>
-                    {{-- <td class="text-center">{{ ucfirst($emp->estado) }}</td> --}}
+                    <th class="text-center">#</th>
+                    <th>Nombre</th>
+                    <th>DNI</th>
+                    <th class="text-right">Sueldo Planilla</th>
+                    <th class="text-right">Sueldo Real</th>
+                    {{-- <th class="text-center">Estado</th> --}}
                 </tr>
-            @endforeach
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach ($empleados as $index => $emp)
+                    <tr>
+                        <td class="text-center">{{ $index + 1 }}</td>
+                        <td>{{ $emp->nombre }}</td>
+                        <td>{{ $emp->dni }}</td>
+                        <td class="text-right">S/ {{ number_format((float) $emp->sueldo_planilla, 2) }}</td>
+                        <td class="text-right">S/ {{ number_format((float) $emp->sueldo_real, 2) }}</td>
+                        {{-- <td class="text-center">{{ ucfirst($emp->estado) }}</td> --}}
+                    </tr>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr style="font-weight: bold; background-color: #f0f0f0;">
+                    <td colspan="4" class="text-right">TOTAL SUELDO REAL:</td>
+                    <td class="text-right">S/ {{ number_format($empleados->sum('sueldo_real'), 2) }}</td>
+                </tr>
+            </tfoot>
+        </table>
 
-    <div class="footer">
-        Generado: {{ date('d/m/Y H:i:s') }}
-    </div>
+        <div class="footer">
+            Generado: {{ date('d/m/Y H:i:s') }}
+        </div>
     </div>
 </body>
 

@@ -96,6 +96,8 @@ class ReporteCajaController extends Controller
                 COALESCE(SUM(importe_d),0) as importe_d,
                 COALESCE(SUM(importe_c),0) as importe_c
             ')
+            ->where('planilla_mes', null)
+            ->where('planilla_anio', null)
             // ->where('estado', '!=', 'anulada')
             ->first();
 
@@ -240,6 +242,8 @@ class ReporteCajaController extends Controller
                 COALESCE(SUM(importe_d),0) as importe_d,
                 COALESCE(SUM(importe_c),0) as importe_c
             ')
+            ->where('planilla_mes', null)
+            ->where('planilla_anio', null)  
             // ->where('estado', '!=', 'anulada')
             ->first();
 
@@ -247,6 +251,7 @@ class ReporteCajaController extends Controller
         // PLANILLA - ADELANTOS
         // ======================
         $adelantos = PlanillaAdelanto::whereBetween('fecha', [$ini, $fin])
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->selectRaw('
                 COALESCE(SUM(monto),0) as total,
                 COALESCE(SUM(importe_p),0) as importe_p,
@@ -259,6 +264,7 @@ class ReporteCajaController extends Controller
         // PLANILLA - PRESTAMOS (otorgados)
         // ======================
         $prestamos = PlanillaPrestamo::whereBetween('fecha_prestamo', [$ini, $fin])
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->selectRaw('
                 COALESCE(SUM(monto_original),0) as total,
                 COALESCE(SUM(importe_p),0) as importe_p,
@@ -271,6 +277,7 @@ class ReporteCajaController extends Controller
         // PLANILLA - PAGOS DE PRESTAMOS (pagos de loans - van a consortium)
         // ======================
         $pagosPrestamos = PlanillaPrestamoPago::whereBetween('fecha_pago', [$ini, $fin])
+            ->whereHas('prestamo.empleado', fn ($q) => $q->where('estado', 'activo'))
             ->selectRaw('
                 COALESCE(SUM(monto_pagado),0) as total,
                 COALESCE(SUM(importe_p),0) as importe_p,
@@ -283,6 +290,7 @@ class ReporteCajaController extends Controller
         // PLANILLA - PAGOS (pago de planilla)
         // ======================
         $pagosPlanilla = PlanillaPago::whereBetween('fecha_pago', [$ini, $fin])
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->selectRaw('
                 COALESCE(SUM(total_pagar),0) as total,
                 COALESCE(SUM(importe_p),0) as importe_p,
@@ -396,6 +404,8 @@ class ReporteCajaController extends Controller
                 // si quieres también documento:
                 // 'comprobante_tipo_codigo','serie','correlativo','numero_recibo'
             ])
+            ->where('planilla_mes', null)
+            ->where('planilla_anio', null)
             // ->where('estado', '!=', 'anulada')
             ->orderBy('fecha_gasto')
             ->get();
@@ -547,6 +557,8 @@ class ReporteCajaController extends Controller
                 COALESCE(SUM(importe_d),0) as importe_d,
                 COALESCE(SUM(importe_c),0) as importe_c
             ')
+            ->where('planilla_mes', null)
+            ->where('planilla_anio', null)
             // ->where('estado', '!=', 'anulada')
             ->first();
 

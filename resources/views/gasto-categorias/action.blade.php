@@ -5,22 +5,15 @@
                 @csrf
                 <input type="hidden" id="method_field" name="_method">
                 <div class="modal-header">
-                    <h4 class="modal-title fs-5" id="modalTitle">Nuevo Tipo de Gasto</h4>
+                    <h4 class="modal-title fs-5" id="modalTitle">Nueva Categoría de Gasto</h4>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="border border-primary rounded p-3 mb-3">
-                        <h6 class="text-primary mb-3">Datos del Tipo</h6>
+                        <h6 class="text-primary mb-3">Datos de la Categoría</h6>
                         <div class="mb-3">
                             <label for="nombre" class="form-label">Nombre <span class="text-danger">*</span></label>
-                            <input type="text" id="nombre" name="nombre" class="form-control form-control-sm" required maxlength="50" placeholder="Ej: Combustible">
-                            <div class="invalid-feedback"></div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="categoria_gasto_id" class="form-label">Categoría</label>
-                            <select id="categoria_gasto_id" name="categoria_gasto_id" class="form-select form-select-sm">
-                                <option value="">Sin categoría</option>
-                            </select>
+                            <input type="text" id="nombre" name="nombre" class="form-control form-control-sm" required maxlength="50" placeholder="Ej: Gastos Personal">
                             <div class="invalid-feedback"></div>
                         </div>
                     </div>
@@ -42,27 +35,3 @@
         </div>
     </div>
 </div>
-@push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    cargarCategorias();
-
-    async function cargarCategorias() {
-        try {
-            const response = await fetch('{{ url('gastos/select/categorias') }}');
-            const categorias = await response.json();
-            const select = document.getElementById('categoria_gasto_id');
-            select.innerHTML = '<option value="">Sin categoría</option>';
-            categorias.forEach(cat => {
-                const option = document.createElement('option');
-                option.value = cat.id;
-                option.textContent = cat.nombre;
-                select.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Error cargando categorías:', error);
-        }
-    }
-});
-</script>
-@endpush

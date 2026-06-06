@@ -200,6 +200,12 @@
                 showError('Seleccione un rango de fechas');
                 return null;
             }
+            const diff = new Date(fechaFin).getTime() - new Date(fechaInicio).getTime();
+            const dias = Math.ceil(diff / (1000 * 3600 * 24)) + 1;
+            if (dias > 30) {
+                showError('El rango de fechas no puede exceder 30 días');
+                return null;
+            }
             params.append('fecha_inicio', fechaInicio);
             params.append('fecha_fin', fechaFin);
         } else {

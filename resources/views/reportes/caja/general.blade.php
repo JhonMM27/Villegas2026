@@ -50,7 +50,8 @@
     $pagoPlanillaC = (float)($pagosPlanilla->importe_c ?? 0);
 
     // GASTOS EMPLEADOS = adelantos + prestamos + pagoPrestamos + pagoPlanilla
-    $gastosEmpleadosTotal = $adelantoTotal + $prestamoTotal + $pagoPrestamoTotal + $pagoPlanillaTotal;
+    // Solo P + D (C es ingreso de consorcio, no egreso)
+    $gastosEmpleadosTotal = ($adelantoP + $adelantoD + $prestamoP + $prestamoD + $pagoPrestamoP + $pagoPrestamoD + $pagoPlanillaP + $pagoPlanillaD);
     $gastosEmpleadosP = $adelantoP + $prestamoP + $pagoPrestamoP + $pagoPlanillaP;
     $gastosEmpleadosD = $adelantoD + $prestamoD + $pagoPrestamoD + $pagoPlanillaD;
     $gastosEmpleadosC = $adelantoC + $prestamoC + $pagoPrestamoC + $pagoPlanillaC;

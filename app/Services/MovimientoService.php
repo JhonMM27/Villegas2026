@@ -85,7 +85,7 @@ class MovimientoService
      * @param  array  $params  Datos del ingreso
      * @return Movimiento El movimiento registrado
      */
-    public function registrarIngreso(array $params, bool $aplicarUmbral = false): Movimiento
+    public function registrarIngreso(array $params): Movimiento
     {
         $producto = Producto::findOrFail($params['producto_id']);
 
@@ -121,16 +121,12 @@ class MovimientoService
         $stockNuevo = round($stockAnterior + $cantidadStock, 4);
         $valorNuevo = $valorAnterior + $costoTotal;
 
-        // UMBRAL CPP: Si stockAnterior <= 0 Y hay costo_saco, forzar CPP al costo de la preparada
-        // Para Preparadas: si el stock era negativo o cero, usar costo_saco en lugar de promedio
         $stockNegativoAnterior = $stockAnterior <= 0;
-        $costoSaco = (float) ($params['costo_saco'] ?? 0);
+        $costoUnitario = (float) ($params['costo_unitario'] ?? 0);
 
-        if ($stockNegativoAnterior && $costoSaco > 0) {
-            $costoNuevo = $costoSaco;
-            $valorNuevo = $stockNuevo * $costoSaco;
-        } elseif ($aplicarUmbral && $stockNuevo < 20) {
+        if ($stockNegativoAnterior && $costoUnitario > 0) {
             $costoNuevo = $costoUnitario;
+            $valorNuevo = $stockNuevo * $costoUnitario;
         } else {
             $costoNuevo = round($valorNuevo / $stockNuevo, 4);
         }
@@ -307,12 +303,10 @@ class MovimientoService
 
                 $stockNuevo = $stockActual + $cantidadKg;
                 $valorNuevo = $valorAnterior + $costoTotal;
-                
-                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockActual <= 0) {
+
+                if ($stockActual <= 0) {
                     $costoNuevo = $costoMov;
                     $valorNuevo = $stockNuevo * $costoMov;
-                } elseif ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
-                    $costoNuevo = $costoMov;
                 } else {
                     $costoNuevo = round($valorNuevo / $stockNuevo, 4);
                 }
@@ -418,12 +412,10 @@ class MovimientoService
 
                 $stockNuevo = $stockActual + $cantidadKg;
                 $valorNuevo = $valorAnterior + $costoTotal;
-                
-                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockActual <= 0) {
+
+                if ($stockActual <= 0) {
                     $costoNuevo = $costoMov;
                     $valorNuevo = $stockNuevo * $costoMov;
-                } elseif ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
-                    $costoNuevo = $costoMov;
                 } else {
                     $costoNuevo = round($valorNuevo / $stockNuevo, 4);
                 }
@@ -561,17 +553,15 @@ class MovimientoService
 
                 $stockNuevo = $stockActual + $cantidadKg;
                 $valorNuevo = $valorAnterior + $costoTotal;
-                
-                if ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockActual <= 0) {
+
+                if ($stockActual <= 0) {
                     $costoNuevo = $costoMov;
                     $valorNuevo = $stockNuevo * $costoMov;
-                } elseif ($mov->tipo === self::TIPO_PREPARADA_INGRESO && $stockNuevo < 20) {
-                    $costoNuevo = $costoMov;
                 } else {
                     $costoNuevo = round($valorNuevo / $stockNuevo, 4);
                 }
             } else {
-                // === SALIDA (Venta / Preparada Salida / Anulación Compra) ===
+                // === SALIDA (Venta / Preparada Salida / Préstamo) ===
                 $cantidadKg = (float) $mov->salida;
                 $costoMov = $costoActual; // CPP vigente
                 $costoTotal = $cantidadKg * $costoMov;

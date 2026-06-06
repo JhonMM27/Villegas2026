@@ -47,6 +47,10 @@ class PlanillaPagoController extends Controller
                         $buttons .= '<button class="btn btn-sm btn-success" data-id="'.$row->id.'" onclick="window.pagoManager.marcarPagado('.$row->id.')">
                             <i class="bi bi-check-circle"></i>
                         </button>';
+                    } elseif ($row->estado === 'pagado') {
+                        $buttons .= '<button class="btn btn-sm btn-warning" data-id="'.$row->id.'" onclick="window.pagoManager.revertirPago('.$row->id.')">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>';
                     }
 
                     return '<div class="btn-group">'.$buttons.'</div>';
@@ -175,6 +179,32 @@ class PlanillaPagoController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Pago marcado como pagado',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function revertirPago(Request $request, $id)
+    {
+        try {
+            $pago = $this->pagoService->findById((int) $id);
+            if (! $pago) {
+                return response()->json(['success' => false, 'message' => 'Pago no encontrado'], 404);
+            }
+
+            if ($pago->estado !== 'pagado') {
+                return response()->json(['success' => false, 'message' => 'Solo se pueden revertir pagos confirmados'], 422);
+            }
+
+            $this->pagoService->revertirPago($pago);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pago revertedo a pendiente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -316,6 +346,27 @@ class PlanillaPagoController extends Controller
         }
     }
 
+    public function revertirPagosMes(Request $request)
+    {
+        try {
+            $mes = (int) $request->get('mes');
+            $anio = (int) $request->get('anio');
+
+            $cantidad = $this->pagoService->revertirPagosDelMes($mes, $anio);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Se revirtieron {$cantidad} pagos para {$this->getNombreMes($mes)} {$anio}",
+                'cantidad' => $cantidad,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function estadoPagosMes(Request $request)
     {
         $mes = (int) $request->get('mes');
@@ -336,6 +387,7 @@ class PlanillaPagoController extends Controller
             'existe' => true,
             'total' => $cantidades['total'],
             'pendientes' => $cantidades['pendientes'],
+            'pagados' => $cantidades['pagados'],
             'mensaje' => $cantidades['pendientes'] > 0
                 ? "{$cantidades['pendientes']} pagos pendientes de {$cantidades['total']}"
                 : 'Todos los pagos confirmados',

@@ -34,14 +34,36 @@
                                 </div>
 
                                 <div class="col-md-6">
+                                    <label class="form-label">Categoría:</label>
+                                    <p class="fw-bold">{{ $gasto->categoriaGasto?->nombre ?? '-' }}</p>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Tipo:</label>
+                                    <p class="fw-bold">{{ $gasto->gastoTipo?->nombre ?? '-' }}</p>
+                                </div>
+
+                                <div class="col-md-6">
                                     <label class="form-label">Responsable:</label>
-                                    <p class="fw-bold">{{ $gasto->responsable ?? '' }}</p>
+                                    <p class="fw-bold">{{ $gasto->responsable ?? '-' }}</p>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">DNI:</label>
+                                    <p class="fw-bold">{{ $gasto->responsable_dni ?? '-' }}</p>
                                 </div>
 
                                 <div class="col-md-12">
                                     <label class="form-label">Descripción:</label>
                                     <p class="fw-bold">{{ $gasto->descripcion ?? '' }}</p>
                                 </div>
+
+                                @if($gasto->planilla_mes && $gasto->planilla_anio)
+                                <div class="col-md-6">
+                                    <label class="form-label">Origen Planilla:</label>
+                                    <p class="fw-bold text-success">{{ \Carbon\Carbon::createFromDate($gasto->planilla_anio, $gasto->planilla_mes, 1)->format('F') }}/{{ $gasto->planilla_anio }}</p>
+                                </div>
+                                @endif
 
                                 <div class="col-md-6">
                                     <label class="form-label">Monto total:</label>
@@ -78,11 +100,6 @@
                                     <label class="form-label">Documento:</label>
                                     <p class="fw-bold">—</p>
                                 </div>
-                                {{-- Si quieres mostrar email del user (si pasas relación user) --}}
-                                {{-- <div class="col-md-12">
-                                    <label class="form-label">Email:</label>
-                                    <p class="fw-bold">{{ $gasto->user->email ?? '' }}</p>
-                                </div> --}}
                             </div>
                         </div>
                     </div>
@@ -92,6 +109,9 @@
 
             <div class="modal-footer">
                 Usuario: <span class="me-auto fw-bold">{{ $gasto->user_nombre ?? '' }}</span>
+                <a href="{{ route('gastos.imprimir', $gasto->id) }}" target="_blank" class="btn btn-secondary">
+                    <i class="bi bi-printer"></i> Imprimir
+                </a>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>

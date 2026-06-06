@@ -132,7 +132,7 @@ class NucleoPreparadaController extends Controller
     {
         if ($request->filled('fecha')) {
             $request->merge([
-                'fecha' => str_replace('T', ' ', $request->fecha).':00',
+                'fecha' => \Carbon\Carbon::parse($request->fecha)->format('Y-m-d H:i:s'),
             ]);
         }
 
@@ -312,6 +312,7 @@ class NucleoPreparadaController extends Controller
                     $query->select('id', 'nombre', 'codigo', 'costo_unitario', 'linea_id')
                         ->with('linea:id,nombre');
                 },
+                'nucleo.producto.linea',
             ])->findOrFail($id);
 
             return view('nucleo-preparadas.view', ['nucleoPreparada' => $preparada]);

@@ -350,13 +350,14 @@ class KardexController extends Controller
                 (COALESCE(pr.ingreso_saco,0) * (COALESCE(NULLIF(pr.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0))) as entrada_und,
                 0 as salida_und,
                 COALESCE(pr.costo_unitario, 0) as precio_unitario,
-                pr.cliente_nombre as referencia,
+                CONCAT('PREPARADA-', p.nombre) as referencia,
                 30 as sort
             ");
 
         $prepOut = DB::table('preparada_detalles as pd')
             ->join('preparadas as pr', 'pr.id', '=', 'pd.preparada_id')
             ->join('productos as p', 'p.id', '=', 'pd.producto_id')
+            ->join('productos as pp', 'pp.id', '=', 'pr.producto_id')
             ->leftJoin('lineas as l', 'l.id', '=', 'p.linea_id')
             ->whereBetween('pr.fecha', [$ini, $hasta])
             ->where('pd.salida_kg', '>', 0)
@@ -376,7 +377,7 @@ class KardexController extends Controller
                 0 as entrada_und,
                 (COALESCE(pd.salida_kg,0) / NULLIF(p.empaque,0)) as salida_und,
                 COALESCE(pd.precio_unitario, 0) as precio_unitario,
-                pr.cliente_nombre as referencia,
+                CONCAT('PREPARADA-', pp.nombre) as referencia,
                 31 as sort
             ");
 
@@ -401,13 +402,14 @@ class KardexController extends Controller
                 (COALESCE(np.ingreso_saco,0) * (COALESCE(NULLIF(np.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0))) as entrada_und,
                 0 as salida_und,
                 COALESCE(np.costo_unitario, 0) as precio_unitario,
-                np.nucleo_nombre as referencia,
+                CONCAT('NUCLEO PREPARADA-', p.nombre) as referencia,
                 40 as sort
             ");
 
         $npOut = DB::table('nucleo_preparada_detalles as nd')
             ->join('nucleo_preparadas as np', 'np.id', '=', 'nd.nucleo_preparada_id')
             ->join('productos as p', 'p.id', '=', 'nd.producto_id')
+            ->join('productos as npp', 'npp.id', '=', 'np.nucleo_id')
             ->leftJoin('lineas as l', 'l.id', '=', 'p.linea_id')
             ->whereBetween('np.fecha', [$ini, $hasta])
             ->where('nd.salida_kg', '>', 0)
@@ -427,7 +429,7 @@ class KardexController extends Controller
                 0 as entrada_und,
                 (COALESCE(nd.salida_kg,0) / NULLIF(p.empaque,0)) as salida_und,
                 COALESCE(nd.costo_unitario, 0) as precio_unitario,
-                np.nucleo_nombre as referencia,
+                CONCAT('NUCLEO PREPARADA-', npp.nombre) as referencia,
                 41 as sort
             ");
 

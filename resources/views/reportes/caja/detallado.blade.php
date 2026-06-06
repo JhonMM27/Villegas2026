@@ -49,7 +49,8 @@
     $pagoPlanillaC = (float)($pagosPlanilla->importe_c ?? 0);
 
     // GASTOS EMPLEADOS = adelantos + prestamos + pagoPrestamos + pagoPlanilla
-    $gastosEmpleadosTotal = $adelantoTotal + $prestamoTotal + $pagoPrestamoTotal + $pagoPlanillaTotal;
+    // Solo P + D (C es ingreso de consorcio, no egreso)
+    $gastosEmpleadosTotal = ($adelantoP + $adelantoD + $prestamoP + $prestamoD + $pagoPrestamoP + $pagoPrestamoD + $pagoPlanillaP + $pagoPlanillaD);
     $gastosEmpleadosP = $adelantoP + $prestamoP + $pagoPrestamoP + $pagoPlanillaP;
     $gastosEmpleadosD = $adelantoD + $prestamoD + $pagoPrestamoD + $pagoPlanillaD;
     $gastosEmpleadosC = $adelantoC + $prestamoC + $pagoPrestamoC + $pagoPlanillaC;
@@ -496,7 +497,7 @@
         <div class="accordion-item">
             <h2 class="accordion-header" id="cGasto">
                 <button class="accordion-button collapsed" type="button"
-                    data-bs-toggle="collapse" data-bs-target="#cGasto">
+                    data-bs-toggle="collapse" data-bs-target="#cGastoContent">
 
                     <div class="w-100 d-flex justify-content-between">
                         <div>
@@ -516,7 +517,7 @@
                 </button>
             </h2>
 
-            <div id="cGasto" class="accordion-collapse collapse"
+            <div id="cGastoContent" class="accordion-collapse collapse"
                 data-bs-parent="#accReporteCaja">
                 <div class="accordion-body p-2">
 
@@ -627,9 +628,9 @@
                         <tfoot class="table-secondary fw-bold">
                             <tr>
                                 <td colspan="3" class="text-end">TOTAL:</td>
-                                <td class="text-end">{{ number_format((float)($adelantosList->sum('importe_p')), 2, '.', '') }}</td>
-                                <td class="text-end">{{ number_format((float)($adelantosList->sum('importe_d')), 2, '.', '') }}</td>
-                                <td class="text-end">{{ number_format((float)($adelantosList->sum('importe_c')), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($adelantoP), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($adelantoD), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($adelantoC), 2, '.', '') }}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -664,9 +665,9 @@
                         <tfoot class="table-secondary fw-bold">
                             <tr>
                                 <td colspan="3" class="text-end">TOTAL:</td>
-                                <td class="text-end">{{ number_format((float)($prestamosList->sum('importe_p')), 2, '.', '') }}</td>
-                                <td class="text-end">{{ number_format((float)($prestamosList->sum('importe_d')), 2, '.', '') }}</td>
-                                <td class="text-end">{{ number_format((float)($prestamosList->sum('importe_c')), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($prestamoP), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($prestamoD), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($prestamoC), 2, '.', '') }}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -701,9 +702,9 @@
                         <tfoot class="table-secondary fw-bold">
                             <tr>
                                 <td colspan="3" class="text-end">TOTAL:</td>
-                                <td class="text-end">{{ number_format((float)($pagosPrestamosList->sum('importe_p')), 2, '.', '') }}</td>
-                                <td class="text-end">{{ number_format((float)($pagosPrestamosList->sum('importe_d')), 2, '.', '') }}</td>
-                                <td class="text-end">{{ number_format((float)($pagosPrestamosList->sum('importe_c')), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($pagoPrestamoP), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($pagoPrestamoD), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($pagoPrestamoC), 2, '.', '') }}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -738,9 +739,9 @@
                         <tfoot class="table-secondary fw-bold">
                             <tr>
                                 <td colspan="3" class="text-end">TOTAL:</td>
-                                <td class="text-end">{{ number_format((float)($pagosPlanillaList->sum('importe_p')), 2, '.', '') }}</td>
-                                <td class="text-end">{{ number_format((float)($pagosPlanillaList->sum('importe_d')), 2, '.', '') }}</td>
-                                <td class="text-end">{{ number_format((float)($pagosPlanillaList->sum('importe_c')), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($pagoPlanillaP), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($pagoPlanillaD), 2, '.', '') }}</td>
+                                <td class="text-end">{{ number_format((float)($pagoPlanillaC), 2, '.', '') }}</td>
                             </tr>
                         </tfoot>
                     </table>

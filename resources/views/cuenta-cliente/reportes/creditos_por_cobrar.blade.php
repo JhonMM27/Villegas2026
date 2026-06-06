@@ -27,6 +27,9 @@
                 <div class="card-header p-2">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Créditos por Cobrar</h5>
+                        <a href="{{ route('cuenta.corriente.cliente') }}" class="btn btn-secondary btn-sm">
+                            <i class="bi bi-arrow-left"></i> Volver a Cuenta Clientes
+                        </a>
                     </div>
                 </div>
 
@@ -118,6 +121,29 @@ $(function() {
                 cache: true
             }
         });
+
+        // Pre-seleccionar clientes desde URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const clienteIds = urlParams.getAll('cliente_ids[]');
+        if (clienteIds.length > 0) {
+            $.ajax({
+                url: '{{ route("clientes.buscar") }}',
+                dataType: 'json',
+                data: { cliente_ids: clienteIds }
+            }).then(function(data) {
+                if (data && data.length > 0) {
+                    data.forEach(function(cliente) {
+                        var text = cliente.documento_numero
+                            ? cliente.id + ' - ' + cliente.razon_social + ' (' + cliente.documento_numero + ')'
+                            : cliente.id + ' - ' + cliente.razon_social;
+                        var option = new Option(text, cliente.id, true, true);
+                        $('#filtro_clientes').append(option);
+                    });
+                    $('#filtro_clientes').trigger('change.select2');
+                    setTimeout(() => reloadTable(), 300);
+                }
+            });
+        }
     }
 
     function initDataTable() {

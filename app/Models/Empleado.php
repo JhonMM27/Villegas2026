@@ -21,13 +21,20 @@ class Empleado extends Model
         'observaciones',
         'estado',
         'fecha_ingreso',
+        'fecha_salida',
     ];
 
     protected $casts = [
         'sueldo_planilla' => 'decimal:2',
         'sueldo_real' => 'decimal:2',
         'fecha_ingreso' => 'date',
+        'fecha_salida' => 'date',
     ];
+
+    public function getEstaActivoAttribute(): bool
+    {
+        return is_null($this->fecha_salida) && $this->estado === 'activo';
+    }
 
     public function adelantos(): HasMany
     {

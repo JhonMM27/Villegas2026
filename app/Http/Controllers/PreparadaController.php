@@ -144,7 +144,7 @@ class PreparadaController extends Controller
         // Convertir fechas antes de validar
         if ($request->filled('fecha')) {
             $request->merge([
-                'fecha' => str_replace('T', ' ', $request->fecha).':00',
+                'fecha' => \Carbon\Carbon::parse($request->fecha)->format('Y-m-d H:i:s'),
             ]);
         }
 
@@ -325,7 +325,6 @@ class PreparadaController extends Controller
                 },
             ])->findOrFail($id);
 
-            // Devolver vista parcial
             return view('preparadas.view', compact('preparada'));
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);

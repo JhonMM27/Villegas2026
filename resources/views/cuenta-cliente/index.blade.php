@@ -116,7 +116,7 @@
                                         
 
                                         <button type="button" class="btn btn-primary btn-sm"
-                                            onclick="window.location.href='{{ route('cuenta.corriente.cliente.creditos_por_cobrar') }}'">
+                                            onclick="navegarACreditosPorCobrar()">
                                             Créditos por Cobrar
                                         </button>
 
@@ -291,6 +291,18 @@
             closeOnSelect: false
         });
     }
+
+    window.navegarACreditosPorCobrar = function() {
+        const clientes = $('#filtro_clientes').val() || [];
+        if (clientes.length === 0) {
+            showError('Seleccione al menos un cliente');
+            return;
+        }
+        let url = '{{ route('cuenta.corriente.cliente.creditos_por_cobrar') }}';
+        const separator = url.includes('?') ? '&' : '?';
+        clientes.forEach(id => url += separator + 'cliente_ids[]=' + id);
+        window.location.href = url;
+    };
 
     function setDefaultDates() {
         const today = new Date().toISOString().slice(0, 10);

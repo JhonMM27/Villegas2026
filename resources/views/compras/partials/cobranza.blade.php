@@ -1,6 +1,6 @@
 <div class="border border-danger rounded px-2 py-1 mt-2 mt-md-0">
     <div class="text-center text-danger fw-bold" style="font-size:0.75rem; line-height:1;">
-        PAGOS
+        DISTRIBUIR CAJA
     </div>
 
     <div class="row g-1 align-items-center mt-1">
@@ -9,7 +9,8 @@
             <input type="text" class="form-control form-control-sm py-0" value="PRINCIPAL" readonly>
         </div>
         <div class="col-4">
-            <input type="text" name="principal" id="principal" class="form-control form-control-sm py-0 text-end" value="0.00">
+            <input type="text" name="principal" id="principal" class="form-control form-control-sm py-0 text-end"
+                value="0.00">
         </div>
     </div>
 
@@ -19,7 +20,8 @@
             <input type="text" class="form-control form-control-sm py-0" value="DEPÓSITO" readonly>
         </div>
         <div class="col-4">
-            <input type="text" name="deposito" id="deposito" class="form-control form-control-sm py-0 text-end" value="0.00" >
+            <input type="text" name="deposito" id="deposito" class="form-control form-control-sm py-0 text-end"
+                value="0.00">
         </div>
     </div>
 
@@ -29,14 +31,16 @@
             <input type="text" class="form-control form-control-sm py-0" value="CONSORCIO" readonly>
         </div>
         <div class="col-4">
-            <input type="text" name="consorcio" id="consorcio" class="form-control form-control-sm py-0 text-end" value="0.00">
+            <input type="text" name="consorcio" id="consorcio" class="form-control form-control-sm py-0 text-end"
+                value="0.00">
         </div>
     </div>
 
     <div class="row g-1 mt-1">
         <div class="col-8"></div>
         <div class="col-4">
-            <input type="text" name="total_cobranza" id="total_cobranza" class="form-control form-control-sm py-0 text-end fw-bold" value="0.00" readonly>
+            <input type="text" name="total_caja" id="total_caja"
+                class="form-control form-control-sm py-0 text-end fw-bold" value="0.00" readonly>
         </div>
     </div>
 </div>
