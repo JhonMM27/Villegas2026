@@ -435,9 +435,20 @@ class NucleoPreparadaManager extends CrudManager {
     }
 
     showCreateModal(){
-        super.showCreateModal();
-        document.getElementById('info_nucleo').classList.add('d-none');
+        this.isEditing = false;
+        this.resetForm();
+
+        // Forzar limpieza de los hidden de rectificación (defensa contra residuos de sesión)
+        const esRect = document.getElementById('es_rectificacion');
+        if (esRect) esRect.value = '0';
+        const preparadaAnuladaId = document.getElementById('preparada_anulada_id');
+        if (preparadaAnuladaId) preparadaAnuladaId.value = '';
+
         this.elements.modalTitle.textContent = 'Nuevo Núcleo Preparada';
+        this.elements.methodField.value = '';
+        this.form.action = this.baseUrl;
+
+        document.getElementById('info_nucleo').classList.add('d-none');
 
         document.getElementById('total_salida').textContent = '0.00';
         document.getElementById('total_salida').textContent = '0.00';
@@ -445,10 +456,21 @@ class NucleoPreparadaManager extends CrudManager {
 
         document.querySelector('#tablaDetalles tbody').innerHTML = '';
         document.querySelector('#tablaNucleos tbody').innerHTML = '';
-        
+
         document.getElementById('fecha').value = this.obtenerFechaHoraActual();
         const usuarioNombre = @json(auth()->user()->name);
         document.getElementById('usuario_nombre').textContent = usuarioNombre;
+
+        this.modal.show();
+        setTimeout(() => this.focusFirstField(), 150);
+    }
+
+    onModalHidden() {
+        const esRect = document.getElementById('es_rectificacion');
+        if (esRect) esRect.value = '0';
+        const preparadaAnuladaId = document.getElementById('preparada_anulada_id');
+        if (preparadaAnuladaId) preparadaAnuladaId.value = '';
+        this.isEditing = false;
     }
 
     obtenerFechaHoraActual() {

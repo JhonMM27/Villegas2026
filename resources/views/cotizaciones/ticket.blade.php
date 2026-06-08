@@ -1,70 +1,151 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
-    <title>{{ $cotizacion->comprobante_tipo_nombre }} - venta {{ $cotizacion->serie }}-{{ $cotizacion->correlativo }}</title>
+    <title>COTIZACIÓN {{ $cotizacion->serie }}-{{ str_pad($cotizacion->correlativo, 8, '0', STR_PAD_LEFT) }}</title>
     <style>
-        @page { margin: 4mm; size: 80mm auto; }
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10.5px; margin: 0; padding: 0; }
-        .ticket { width: 72mm; margin: 0; padding: 0; }
+        @page {
+            margin: 2mm 0mm 2mm 0mm;
+            size: 76mm auto;
+        }
+
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 10px;
+            margin: 0;
+            padding: 0;
+            line-height: 1.2;
+        }
+
+        .ticket {
+            width: 72mm;
+            margin: 0 auto;
+            text-align: left;
+        }
+
         .center { text-align: center; }
         .bold { font-weight: bold; }
-        h3 { margin: 0 0 2px 0; }
-        p { margin: 1px 0; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 1px 0; vertical-align: top; }
-        .line { border-top: 1px dashed #000; margin: 3px 0; }
-        .totales td { padding: 1px 0; }
+        .right { text-align: right; }
+
+        h3 { margin: 0; padding: 0; font-size: 12px; }
+        p { margin: 0; padding: 0; font-size: 9px; }
+
+        .line {
+            border-top: 1px dashed #000;
+            margin: 2px 0;
+        }
+
+        .spacer { height: 3px; }
     </style>
 </head>
+
 <body>
-<div class="ticket">
-    {{-- ENCABEZADO EMPRESA --}}
-    <div class="center">
-        <h3>{{ $empresa->razon_social }}</h3>
-        <p>{!! nl2br(e($empresa->direccion)) !!}</p>
-        <p>RUC: {{ $empresa->ruc }}</p>
-        <p>CEL: {{ $empresa->celular }}</p>
-        <br>
-        <h3 class="bold">Cotización {{ $cotizacion->serie }}-{{ str_pad($cotizacion->correlativo,8,'0',STR_PAD_LEFT) }}</h3>
-    </div>
-    <div class="line"></div>
-    {{-- DATOS PROVEEDOR --}}
-    <p><strong>Cliente:</strong> {{ $cotizacion->cliente_nombre }}</p>
-    <p><strong>Documento:</strong> {{ $cotizacion->cliente->documentoTipo->descripcion }} {{ $cotizacion->cliente->documento_numero }}</p>
-    <p><strong>Dirección:</strong> {{ $cotizacion->cliente->direccion ?? '-' }}</p>
-    <p><strong>Fecha:</strong> {{ \Carbon\Carbon::parse($cotizacion->fecha_cotizacion)->format('d/m/Y H:i') }}</p>
-    <div class="line"></div>
-    {{-- DETALLE PRODUCTOS --}}
-    <table>
-        <tr class="bold">
-            <td style="width: 12%; text-align: center;">Cant.</td>
-            <td style="width: 38%;">Descripción</td>
-            <td style="width: 25%; text-align: right; padding-right: 3px;">Precio</td>
-            <td style="width: 25%; text-align: right;">Importe</td>
-        </tr>
-        <tr><td colspan="4" style="border-top: 1px solid #000;"></td></tr>
-        @foreach($cotizacion->detalles as $detalle)
-        <tr>
-            <td style="text-align: center;">{{ $detalle->cantidad }} {{ $detalle->unidad_codigo }}</td>
-            <td>{{ $detalle->producto_nombre }}</td>            
-            <td style="text-align: right; padding-right: 3px;">{{ number_format($detalle->precio_unitario,2) }}</td>
-            <td style="text-align: right;">{{ number_format($detalle->total,2) }}</td>
-        </tr>
+    <div class="ticket">
+
+        {{-- ENCABEZADO EMPRESA --}}
+        <div class="center">
+            <h3>CONSORCIOS VILLEGAS E.I.R.L.</h3>
+        </div>
+
+        <div class="center">
+            <p>CEL: 967984895 / 978431737</p>
+            <p>COTIZACIÓN: {{ $cotizacion->serie }}-{{ str_pad($cotizacion->correlativo, 8, '0', STR_PAD_LEFT) }}</p>
+        </div>
+
+        <div class="line"></div>
+
+        {{-- FECHA Y HORA --}}
+        <table style="width: 100%;">
+            <tr>
+                <td></td>
+                <td class="right">FECHA: {{ \Carbon\Carbon::parse($cotizacion->fecha_cotizacion)->format('d/m/Y') }}</td>
+                <td class="right">HORA: {{ \Carbon\Carbon::parse($cotizacion->fecha_cotizacion)->format('H:i:s') }}</td>
+            </tr>
+        </table>
+
+        <div class="spacer"></div>
+
+        {{-- DATOS CLIENTE --}}
+        <p><strong>RUC/DNI:</strong> {{ $cotizacion->cliente->documento_numero ?? '-' }}</p>
+        <p><strong>CLIENTE:</strong> {{ $cotizacion->cliente_nombre }}</p>
+        <p><strong>DIRECCION:</strong> {{ $cotizacion->cliente->direccion ?? '-' }}</p>
+        <p><strong>TELEFONO:</strong> {{ $cotizacion->cliente->telefono ?? '-' }}</p>
+
+        <div class="spacer"></div>
+
+        <p><strong>FORMA DE PAGO:</strong> {{ $cotizacion->pago_forma_nombre ?? '-' }}</p>
+
+        <div class="line"></div>
+        <div class="spacer"></div>
+
+        {{-- ENCABEZADO TABLA --}}
+        <div class="bold">
+            <span style="display: inline-block; width: 30%;">Cant</span>
+            <span style="display: inline-block; width: 25%; text-align: right;">P.Unit</span>
+            <span style="display: inline-block; width: 35%; text-align: right;">Importe</span>
+        </div>
+        <div class="line"></div>
+
+        {{-- DETALLE PRODUCTOS --}}
+        @foreach ($cotizacion->detalles as $detalle)
+            @php
+                $unidadCodigo = $detalle->unidad_codigo ?? 'NIU';
+                $empaque = (float) ($detalle->producto_empaque ?? 1);
+
+                if ($unidadCodigo === 'KGM') {
+                    $cantidad = number_format((float) $detalle->cantidad * $empaque, 2);
+                    $unidadTexto = 'KG';
+                } elseif ($unidadCodigo === 'SCO') {
+                    $cantidad = number_format((float) $detalle->cantidad, 2);
+                    $unidadTexto = 'SACO';
+                } elseif ($unidadCodigo === 'ZZ') {
+                    $cantidad = number_format((float) $detalle->cantidad, 2);
+                    $unidadTexto = '';
+                } else {
+                    $cantidad = number_format((float) $detalle->cantidad, 2);
+                    $unidadTexto = $unidadCodigo;
+                }
+
+                $precio = number_format((float) $detalle->precio_unitario, 2);
+                $importe = number_format((float) $detalle->total, 2);
+            @endphp
+
+            <p class="bold">{{ $detalle->producto_nombre }}</p>
+            <p>
+                <span style="display: inline-block; width: 30%;">{{ $cantidad }} {{ $unidadTexto }}</span>
+                <span style="display: inline-block; width: 25%; text-align: right;">S/ {{ $precio }}</span>
+                <span style="display: inline-block; width: 35%; text-align: right;">S/ {{ $importe }}</span>
+            </p>
         @endforeach
-        <tr><td colspan="4" style="border-top: 1px solid #000;"></td></tr>
-    </table>
-    {{-- TOTALES --}}
-    <table class="totales">
-        <tr class="bold">
-            <td>TOTAL:</td>
-            <td style="text-align: right;">S/ {{ number_format($cotizacion->total,2) }}</td>
-        </tr>
-    </table>
-    {{ $total_letras }}
-    <div class="line"></div>
-    <br>
-    <p><strong>Usuario: </strong>{{ $cotizacion->user_nombre }}</p>
-</div>
+
+        <div class="line"></div>
+        <div class="spacer"></div>
+
+        {{-- TOTAL --}}
+        <p class="bold" style="text-align: right; font-size: 11px;">
+            TOTAL: S/ {{ number_format($cotizacion->total, 2) }}
+        </p>
+
+        <p class="center" style="font-size: 8px;">Son: {{ $total_letras }}</p>
+
+        <div class="line"></div>
+        <div class="spacer"></div>
+
+        {{-- VENDEDOR --}}
+        <p><strong>USUARIO:</strong> {{ $cotizacion->user_nombre }}</p>
+
+        <div class="line"></div>
+
+        <div class="center">
+            <p class="bold">GRACIAS POR SU PREFERENCIA</p>
+        </div>
+
+        <div class="spacer"></div>
+
+        <div style="height: 4mm;"></div>
+
+    </div>
 </body>
+
 </html>

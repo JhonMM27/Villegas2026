@@ -10,6 +10,9 @@ use App\Http\Controllers\CompraProvisionalController;
 use App\Http\Controllers\ComprobanteSerieController;
 use App\Http\Controllers\ComprobanteTipoController;
 use App\Http\Controllers\ConfiguracionController;
+use App\Http\Controllers\CostoCategoriaController;
+use App\Http\Controllers\CostoController;
+use App\Http\Controllers\CostoTipoController;
 use App\Http\Controllers\CotizacionController;
 use App\Http\Controllers\CuadreStockController;
 use App\Http\Controllers\CuentaCorrienteClienteController;
@@ -17,12 +20,11 @@ use App\Http\Controllers\CuentaCorrienteProveedorController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentoTipoController;
 use App\Http\Controllers\EmpleadoController;
+use App\Http\Controllers\EmpleadoVacacionController;
 use App\Http\Controllers\FormulacionController;
-use App\Http\Controllers\CostoController;
-use App\Http\Controllers\CostoTipoController;
+use App\Http\Controllers\GastoCategoriaController;
 use App\Http\Controllers\GastoController;
 use App\Http\Controllers\GastoTipoController;
-use App\Http\Controllers\GastoCategoriaController;
 use App\Http\Controllers\KardexController;
 use App\Http\Controllers\LineaController;
 use App\Http\Controllers\NucleoController;
@@ -39,6 +41,8 @@ use App\Http\Controllers\PreparadaController;
 use App\Http\Controllers\PrestamoController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\ProveedorController;
+use App\Http\Controllers\RationFormulationApiController;
+use App\Http\Controllers\RationFormulationController;
 use App\Http\Controllers\ReporteCajaController;
 use App\Http\Controllers\ReporteCompraController;
 use App\Http\Controllers\ReporteFormulacionController;
@@ -56,9 +60,6 @@ use App\Http\Controllers\VentaController;
 use App\Http\Controllers\VentaEntregaController;
 use App\Http\Controllers\VentaProvisionalController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\EmpleadoVacacionController;
-use App\Http\Controllers\RationFormulationApiController;
-use App\Http\Controllers\RationFormulationController;
 
 Route::middleware('guest')->group(function () {
     Route::get('/', function () {
@@ -224,14 +225,29 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/costos/{id}/imprimir', [CostoController::class, 'printTicket'])->name('costos.imprimir');
     Route::resource('costos', CostoController::class)->except(['create', 'edit']);
 
+    // Costo Categorias
+    Route::resource('costo-categorias', CostoCategoriaController::class)->except(['create', 'edit']);
+    Route::get('costos/select/categorias', [CostoController::class, 'selectCategorias'])->name('costos.select.categorias');
+
     // Costo Tipos
     Route::get('costos/tipos/select', [CostoController::class, 'selectTipos'])->name('costos.tipos.select');
     Route::resource('costo-tipos', CostoTipoController::class)->except(['create', 'edit']);
 
-    // Reporte Costos
-    Route::get('reportes/costos/resumen', [CostoController::class, 'reporteResumen'])->name('reportes.costos.resumen');
-    Route::get('reportes/costos/resumen/export', [CostoController::class, 'exportarResumen'])->name('reportes.costos.resumen.export');
-    Route::get('reportes/costos/resumen/imprimir', [CostoController::class, 'imprimirResumen'])->name('reportes.costos.resumen.imprimir');
+    // Reporte Costos - General (agrupado por Categoria → Tipo)
+    Route::get('reportes/costos', [CostoController::class, 'reporteGeneral'])->name('reportes.costos.index');
+    Route::get('reportes/costos/general', [CostoController::class, 'reporteGeneral'])->name('reportes.costos.general');
+    Route::get('reportes/costos/general/export', [CostoController::class, 'exportarGeneral'])->name('reportes.costos.general.export');
+    Route::get('reportes/costos/general/imprimir', [CostoController::class, 'imprimirGeneral'])->name('reportes.costos.general.imprimir');
+
+    // Reporte Costos - Detallado (línea por línea)
+    Route::get('reportes/costos/detallado', [CostoController::class, 'reporteDetallado'])->name('reportes.costos.detallado');
+    Route::get('reportes/costos/detallado/export', [CostoController::class, 'exportarDetallado'])->name('reportes.costos.detallado.export');
+    Route::get('reportes/costos/detallado/imprimir', [CostoController::class, 'imprimirDetallado'])->name('reportes.costos.detallado.imprimir');
+
+    // Aliases deprecados (mantener por compatibilidad)
+    Route::get('reportes/costos/resumen', [CostoController::class, 'reporteGeneral'])->name('reportes.costos.resumen');
+    Route::get('reportes/costos/resumen/export', [CostoController::class, 'exportarGeneral'])->name('reportes.costos.resumen.export');
+    Route::get('reportes/costos/resumen/imprimir', [CostoController::class, 'imprimirGeneral'])->name('reportes.costos.resumen.imprimir');
 
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 

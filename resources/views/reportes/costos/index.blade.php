@@ -50,7 +50,7 @@
                             </div>
 
                             <div id="reporteTab1">
-                                @include('reportes.gastos.general', ['reportes' => collect()])
+                                @include('reportes.costos.general', ['reportes' => collect()])
                             </div>
                         </div>
                         <div class="tab-pane fade" id="tab2">
@@ -85,7 +85,7 @@
                             </div>
 
                             <div id="reporteTab2">
-                                @include('reportes.gastos.detallado', ['reportes' => collect()])
+                                @include('reportes.costos.detallado', ['reportes' => collect()])
                             </div>
                         </div>
                     </div>
@@ -102,9 +102,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function cargarCategorias() {
         try {
-            const response = await fetch('{{ url('gastos/select/categorias') }}');
+            const response = await fetch('{{ route('costos.select.categorias') }}');
             const categorias = await response.json();
-            
+
             ['categoria', 'categoria_2'].forEach(id => {
                 const select = document.getElementById(id);
                 if (!select) return;
@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
-            const response = await fetch(`{{ url('gastos/select/tipos') }}?categoria_id=${categoriaId}`);
+            const response = await fetch(`{{ route('costos.tipos.select') }}?categoria_id=${categoriaId}`);
             const tipos = await response.json();
             select.innerHTML = '<option value="Todos">Todos</option>';
             tipos.forEach(tipo => {
@@ -185,15 +185,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const reporte = document.getElementById(`reporteTab${tabIndex}`);
         reporte.innerHTML = '<div class="text-center text-muted py-5">Preparando reporte...</div>';
 
-        let url = tabIndex === 1 
-            ? "{{ route('reportes.gastos.general') }}" 
-            : "{{ route('reportes.gastos.detallado') }}";
-        
+        let url = tabIndex === 1
+            ? "{{ route('reportes.costos.general') }}"
+            : "{{ route('reportes.costos.detallado') }}";
+
         url = new URL(url, window.location.origin);
         url.searchParams.append('fecha_inicio', fechaInicio);
         url.searchParams.append('fecha_fin', fechaFin);
         if (categoria && categoria !== 'Todos') url.searchParams.append('categoria_id', categoria);
-        if (tipo && tipo !== 'Todos') url.searchParams.append('gasto_tipo_id', tipo);
+        if (tipo && tipo !== 'Todos') url.searchParams.append('costo_tipo_id', tipo);
 
         fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(r => r.text())
@@ -221,15 +221,15 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        let url = tabIndex === 1 
-            ? "{{ route('reportes.gastos.general.export') }}" 
-            : "{{ route('reportes.gastos.detallado.export') }}";
+        let url = tabIndex === 1
+            ? "{{ route('reportes.costos.general.export') }}"
+            : "{{ route('reportes.costos.detallado.export') }}";
 
         url = new URL(url, window.location.origin);
         url.searchParams.append('fecha_inicio', fechaInicio);
         url.searchParams.append('fecha_fin', fechaFin);
         if (categoria && categoria !== 'Todos') url.searchParams.append('categoria_id', categoria);
-        if (tipo && tipo !== 'Todos') url.searchParams.append('gasto_tipo_id', tipo);
+        if (tipo && tipo !== 'Todos') url.searchParams.append('costo_tipo_id', tipo);
 
         window.open(url.toString(), '_blank');
     }
@@ -246,15 +246,15 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        let url = tabIndex === 1 
-            ? "{{ route('reportes.gastos.general.imprimir') }}" 
-            : "{{ route('reportes.gastos.detallado.imprimir') }}";
+        let url = tabIndex === 1
+            ? "{{ route('reportes.costos.general.imprimir') }}"
+            : "{{ route('reportes.costos.detallado.imprimir') }}";
 
         url = new URL(url, window.location.origin);
         url.searchParams.append('fecha_inicio', fechaInicio);
         url.searchParams.append('fecha_fin', fechaFin);
         if (categoria && categoria !== 'Todos') url.searchParams.append('categoria_id', categoria);
-        if (tipo && tipo !== 'Todos') url.searchParams.append('gasto_tipo_id', tipo);
+        if (tipo && tipo !== 'Todos') url.searchParams.append('costo_tipo_id', tipo);
 
         window.open(url.toString(), '_blank');
     }
@@ -268,6 +268,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 document.getElementById('mnuCaja')?.classList.add('menu-open');
-document.getElementById('itemReporteGastos')?.classList.add('active');
+document.getElementById('itemReporteCostos')?.classList.add('active');
 </script>
 @endpush

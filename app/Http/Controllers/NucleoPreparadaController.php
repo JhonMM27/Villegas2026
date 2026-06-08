@@ -139,8 +139,13 @@ class NucleoPreparadaController extends Controller
         $data = $this->validateData($request);
 
         try {
-            if ($request->input('es_rectificacion') == '1') {
-                $preparadaAnuladaId = $request->input('preparada_anulada_id');
+            $esRectificacion = $request->input('es_rectificacion') == '1';
+            $preparadaAnuladaId = $request->input('preparada_anulada_id');
+
+            if ($esRectificacion
+                && !empty($preparadaAnuladaId)
+                && NucleoPreparada::where('id', $preparadaAnuladaId)->exists()
+            ) {
                 $result = $this->service->rectificarNucleoPreparada(
                     $preparadaAnuladaId,
                     $data

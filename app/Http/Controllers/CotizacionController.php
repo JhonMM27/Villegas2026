@@ -429,23 +429,26 @@ class CotizacionController extends Controller
     }
 
     public function printTicket($id){
-        $cotizacion = Cotizacion::with(['cliente'])->findOrFail($id);
+        $cotizacion = Cotizacion::with(['cliente', 'detalles'])->findOrFail($id);
 
-        $empresa = (object)[
+        $correlativoFormateado = str_pad($cotizacion->correlativo, 8, '0', STR_PAD_LEFT);
+
+        $empresa = (object) [
             'razon_social' => 'CONSORCIOS VILLEGAS E.I.R.L.',
-            'direccion' => 'Carretera Pomalca KM 3' . "\n" . 'A espaldas de Ferretería Herrera',
+            'direccion' => 'Carretera Pomalca KM 3'."\n".'A espaldas de Ferretería Herrera',
             'ruc' => '20538937321',
-            'celular'=>'967984895 - 978431737 - 915177079',
+            'celular' => '967984895 - 978431737 - 915177079',
         ];
-        $formatter = new NumeroALetras();
+
+        $formatter = new NumeroALetras;
         $total_letras = $formatter->convertir($cotizacion->total);
 
-        $pdf = Pdf::loadView('cotizaciones.ticket', compact('cotizacion','empresa','total_letras'))
+        $pdf = Pdf::loadView('cotizaciones.ticket', compact('cotizacion', 'empresa', 'total_letras'))
             ->setPaper([0, 0, 226.77, 600], 'portrait')
             ->setOption('isRemoteEnabled', true)
             ->setOption('defaultFont', 'DejaVu Sans');
 
-        return $pdf->stream("ticket_{$cotizacion->id}.pdf");
+        return $pdf->stream("COT - {$cotizacion->serie}-{$correlativoFormateado}.pdf");
     }
 
     public function view($id)

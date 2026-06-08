@@ -87,6 +87,9 @@ class CrudManager {
             this.elements.modal.addEventListener('hidden.bs.modal', () => {
                 this.resetForm();
                 this.isEditing = false;
+                if (typeof this.onModalHidden === 'function') {
+                    this.onModalHidden();
+                }
             });
         }
     }
