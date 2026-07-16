@@ -7,7 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class NucleoPreparadaDetalle extends Model
 {
     protected $table = 'nucleo_preparada_detalles';
-    public $timestamps = false; 
+
+    public $timestamps = false;
 
     protected $fillable = [
         'nucleo_preparada_id',
@@ -24,7 +25,7 @@ class NucleoPreparadaDetalle extends Model
     protected $casts = [
         'costo_unitario' => 'decimal:4',
         'cantidad_porcentaje' => 'decimal:2',
-        'salida_kg' => 'decimal:4',        
+        'salida_kg' => 'decimal:4',
         'salida_soles' => 'decimal:4',
         'nucleo_preparada_id' => 'integer',
         'producto_id' => 'integer',

@@ -121,6 +121,15 @@ class CompraController extends Controller
 
                     return '<span class="badge bg-'.$color.'">'.ucfirst($row->estado).'</span>';
                 })
+                ->editColumn('fecha_compra', function ($row) {
+                    return \Carbon\Carbon::parse($row->fecha_compra)->format('Y-m-d');
+                })
+                ->editColumn('fecha_vencimiento', function ($row) {
+                    if (! $row->fecha_vencimiento) {
+                        return '';
+                    }
+                    return \Carbon\Carbon::parse($row->fecha_vencimiento)->format('Y-m-d');
+                })
                 ->make(true);
         }
 

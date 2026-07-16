@@ -9,6 +9,9 @@ use App\Services\EmpleadoService;
 use App\Services\PlanillaAdelantoService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Yajra\DataTables\DataTables;
 
 class PlanillaAdelantoController extends Controller
@@ -28,8 +31,15 @@ class PlanillaAdelantoController extends Controller
         if ($request->ajax()) {
             $data = PlanillaAdelanto::with('empleado')
                 ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
-                ->select(['id', 'numero_interno', 'empleado_id', 'monto', 'fecha', 'observaciones'])
-                ->orderByDesc('id');
+                ->select(['id', 'numero_interno', 'empleado_id', 'monto', 'fecha', 'observaciones']);
+
+            $mes = $request->get('mes');
+            if ($mes && preg_match('/^(\d{4})-(\d{2})$/', $mes, $m)) {
+                $data->whereYear('fecha', (int) $m[1])
+                     ->whereMonth('fecha', (int) $m[2]);
+            }
+
+            $data->orderByDesc('id');
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
@@ -155,7 +165,7 @@ class PlanillaAdelantoController extends Controller
             ? "unique:planilla_adelantos,numero_interno,{$id},id"
             : 'unique:planilla_adelantos,numero_interno';
 
-        return $request->validate([
+        $validator = Validator::make($request->all(), [
             'empleado_id' => 'required|exists:empleados,id',
             'numero_interno' => "required|integer|{$uniqueRule}",
             'monto' => 'required|numeric|min:0.01',
@@ -165,6 +175,20 @@ class PlanillaAdelantoController extends Controller
             'deposito' => 'nullable|numeric|min:0',
             'consorcio' => 'nullable|numeric|min:0',
         ]);
+
+        if ($validator->fails()) {
+            Log::warning('Validacion fallo en PlanillaAdelanto', [
+                'id' => $id,
+                'errors' => $validator->errors()->toArray(),
+                'data' => $request->only([
+                    'empleado_id', 'numero_interno', 'monto', 'fecha',
+                    'principal', 'deposito', 'consorcio',
+                ]),
+            ]);
+            throw new ValidationException($validator);
+        }
+
+        return $validator->validated();
     }
 
     public function printTicket($id)

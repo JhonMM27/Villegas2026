@@ -501,8 +501,8 @@ class CompraManager extends CrudManager {
         document.getElementById('comprobante_tipo_codigo').value = 'NC';
         document.getElementById('pago_forma_codigo').value = '1';
         document.getElementById('cobranza_tipo_id').value = '1';
-        document.getElementById('fecha_compra').value = this.obtenerFechaHoraActual();
-        document.getElementById('fecha_vencimiento').value = this.obtenerFechaActual();
+        this.setFieldValue('fecha_compra', this.obtenerFechaHoraActual());
+        this.setFieldValue('fecha_vencimiento', this.obtenerFechaActual());
         const usuarioNombre = @json(auth()->user()->name);
         document.getElementById('usuario_nombre').textContent = usuarioNombre;
         this.getSerie('NC');
@@ -663,13 +663,6 @@ class CompraManager extends CrudManager {
                 throw new Error("Respuesta vacía del servidor");
             }
 
-            // Formatear fecha para datetime-local input
-            const formatDateTimeLocal = (fecha) => {
-                if (!fecha || fecha.startsWith('-000') || fecha === 'null') return '';
-                if (typeof fecha !== 'string') return '';
-                return fecha.replace(' ', 'T').substring(0, 16);
-            };
-
             // Campos principales
             document.getElementById('pago_forma_codigo').value = response.pago_forma_codigo || '';
             document.getElementById('comprobante_tipo_codigo').value = response.comprobante_tipo_codigo || '';
@@ -683,8 +676,8 @@ class CompraManager extends CrudManager {
                 : '';
             document.getElementById('proveedor_razon_social').value = proveedorTexto;
 
-            document.getElementById('fecha_compra').value = formatDateTimeLocal(response.fecha_compra);
-            document.getElementById('fecha_vencimiento').value = response.fecha_vencimiento || '';
+            this.setFieldValue('fecha_compra', this.formatDateTimeLocal(response.fecha_compra));
+            this.setFieldValue('fecha_vencimiento', response.fecha_vencimiento || '');
             document.getElementById('usuario_nombre').textContent = response.user_nombre || '';
 
             // Determinar cobranza_tipo_id desde los datos de pago

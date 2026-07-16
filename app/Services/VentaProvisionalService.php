@@ -12,9 +12,9 @@
 
 namespace App\Services;
 
-use App\Models\VentaProvisional;
-use App\Models\Venta;
 use App\Models\Cliente;
+use App\Models\Venta;
+use App\Models\VentaProvisional;
 use Illuminate\Support\Facades\DB;
 
 class VentaProvisionalService
@@ -26,7 +26,7 @@ class VentaProvisionalService
      * 3. Crea el registro VentaProvisional + detalles
      * 4. Aplica abonos a las ventas vinculadas (suma abonos, resta saldo)
      *
-     * @param  array $data Datos validados del request
+     * @param  array  $data  Datos validados del request
      * @return VentaProvisional El registro recién creado
      *
      * @throws \Exception Si ocurre cualquier error
@@ -37,16 +37,16 @@ class VentaProvisionalService
 
             // 1) Generar número_recibo correlativo numérico
             $ultimoRecibo = VentaProvisional::whereRaw("numero_recibo REGEXP '^[0-9]+$'")
-                ->selectRaw("MAX(CAST(numero_recibo AS UNSIGNED)) as max_recibo")
+                ->selectRaw('MAX(CAST(numero_recibo AS UNSIGNED)) as max_recibo')
                 ->value('max_recibo');
-            $data['numero_recibo'] = $ultimoRecibo ? ((int)$ultimoRecibo + 1) : 1;
+            $data['numero_recibo'] = $ultimoRecibo ? ((int) $ultimoRecibo + 1) : 1;
 
             // 2) Procesar datos (cabecera + detalles calculados)
             $provisionalData = $this->processProvisionalData($data, true);
 
             // 3) Persistir cabecera y detalles
             $provisional = VentaProvisional::create($provisionalData['provisional']);
-            if (!empty($provisionalData['detalles'])) {
+            if (! empty($provisionalData['detalles'])) {
                 $provisional->detalles()->createMany($provisionalData['detalles']);
                 $this->aplicarDetallesEnVentas($provisional->id);
             }
@@ -61,8 +61,8 @@ class VentaProvisionalService
      * 2. Recalcula cabecera y detalles con los nuevos datos
      * 3. Reemplaza detalles y aplica nuevos abonos
      *
-     * @param  int   $id   ID del provisional a actualizar
-     * @param  array $data Datos validados del request
+     * @param  int  $id  ID del provisional a actualizar
+     * @param  array  $data  Datos validados del request
      * @return VentaProvisional El registro actualizado
      *
      * @throws \Exception Si ocurre cualquier error
@@ -81,7 +81,7 @@ class VentaProvisionalService
             // 3) Actualizar cabecera y recrear detalles
             $provisional->update($provisionalData['provisional']);
             $provisional->detalles()->delete();
-            if (!empty($provisionalData['detalles'])) {
+            if (! empty($provisionalData['detalles'])) {
                 $provisional->detalles()->createMany($provisionalData['detalles']);
                 $this->aplicarDetallesEnVentas($provisional->id);
             }
@@ -95,8 +95,7 @@ class VentaProvisionalService
      * 1. Revierte los abonos en las ventas vinculadas
      * 2. Elimina detalles y cabecera
      *
-     * @param  int  $id ID del provisional a eliminar
-     * @return void
+     * @param  int  $id  ID del provisional a eliminar
      *
      * @throws \Exception Si ocurre cualquier error
      */
@@ -108,7 +107,7 @@ class VentaProvisionalService
             // Revertir impacto en ventas si tiene detalles
             if ($provisional->detalles->isNotEmpty()) {
                 foreach ($provisional->detalles as $detalle) {
-                    if (!$detalle->venta_id || $detalle->monto <= 0) {
+                    if (! $detalle->venta_id || $detalle->monto <= 0) {
                         continue;
                     }
 
@@ -117,18 +116,20 @@ class VentaProvisionalService
                         ->lockForUpdate()
                         ->first();
 
-                    if (!$venta) continue;
+                    if (! $venta) {
+                        continue;
+                    }
 
-                    $m = (float)$detalle->monto;
+                    $m = (float) $detalle->monto;
 
                     // Restar abono
-                    $venta->abonos = (float)($venta->abonos ?? 0) - $m;
+                    $venta->abonos = (float) ($venta->abonos ?? 0) - $m;
                     if ($venta->abonos < 0) {
                         $venta->abonos = 0;
                     }
 
                     // Sumar saldo
-                    $venta->saldo = (float)($venta->saldo ?? 0) + $m;
+                    $venta->saldo = (float) ($venta->saldo ?? 0) + $m;
 
                     $venta->save();
                 }
@@ -146,8 +147,8 @@ class VentaProvisionalService
      * Consulta el cliente y las ventas vinculadas, calcula el monto libre
      * (no aplicado a ninguna venta) y determina el tipo (APLICADO o ADELANTO).
      *
-     * @param  array $data  Datos validados del request
-     * @param  bool  $isNew true=creación (asigna user_id, numero_recibo), false=edición
+     * @param  array  $data  Datos validados del request
+     * @param  bool  $isNew  true=creación (asigna user_id, numero_recibo), false=edición
      * @return array ['provisional' => [...], 'detalles' => [...]]
      */
     private function processProvisionalData(array $data, bool $isNew = true): array
@@ -164,11 +165,15 @@ class VentaProvisionalService
         // Calcular detalles (filtra montos <= 0 y ventas inexistentes)
         $detallesCalculados = [];
         foreach ($ventasInput as $detalle) {
-            $monto = (float)($detalle['monto'] ?? 0);
-            if ($monto <= 0) continue;
+            $monto = (float) ($detalle['monto'] ?? 0);
+            if ($monto <= 0) {
+                continue;
+            }
 
             $ventaId = $detalle['venta_id'] ?? null;
-            if (!$ventaId || !isset($ventas[$ventaId])) continue;
+            if (! $ventaId || ! isset($ventas[$ventaId])) {
+                continue;
+            }
 
             $detallesCalculados[] = $this->calculateDetail(
                 $ventas[$ventaId],
@@ -179,34 +184,34 @@ class VentaProvisionalService
 
         // Calcular monto libre (total - aplicado)
         $totalAplicado = collect($detallesCalculados)
-            ->sum(fn($d) => (float)($d['monto'] ?? 0));
+            ->sum(fn ($d) => (float) ($d['monto'] ?? 0));
 
-        $totalProvisional = (float)($data['total_cobranza'] ?? 0);
+        $totalProvisional = (float) ($data['total_cobranza'] ?? 0);
         $montoLibre = $totalProvisional - $totalAplicado;
 
         // Construir cabecera
         $provisionalData = [
-            'numero_interno'    => $data['numero_interno'],
+            'numero_interno' => $data['numero_interno'],
             'fecha_provisional' => $data['fecha_provisional'] ?? now(),
-            'monto'             => $data['total_cobranza'] ?? 0,
-            'libre'             => $montoLibre,
-            'cliente_id'        => $data['cliente_id'],
-            'cliente_nombre'    => $cliente->razon_social ?? '',
-            'importe_p'         => $data['principal'] ?? 0,
-            'importe_d'         => $data['deposito'] ?? 0,
-            'importe_c'         => $data['consorcio'] ?? 0,
-            'tipo'              => count($detallesCalculados) ? 'APLICADO' : 'ADELANTO',
+            'monto' => $data['total_cobranza'] ?? 0,
+            'libre' => $montoLibre,
+            'cliente_id' => $data['cliente_id'],
+            'cliente_nombre' => $cliente->razon_social ?? '',
+            'importe_p' => $data['principal'] ?? 0,
+            'importe_d' => $data['deposito'] ?? 0,
+            'importe_c' => $data['consorcio'] ?? 0,
+            'tipo' => count($detallesCalculados) ? 'APLICADO' : 'ADELANTO',
         ];
 
         if ($isNew) {
             $provisionalData['numero_recibo'] = $data['numero_recibo'];
-            $provisionalData['user_id']       = auth()->id();
-            $provisionalData['user_nombre']   = auth()->user()->name;
+            $provisionalData['user_id'] = auth()->id();
+            $provisionalData['user_nombre'] = auth()->user()->name;
         }
 
         return [
             'provisional' => $provisionalData,
-            'detalles'    => $detallesCalculados
+            'detalles' => $detallesCalculados,
         ];
     }
 
@@ -214,8 +219,7 @@ class VentaProvisionalService
      * Aplica los montos de los detalles como abonos en las ventas vinculadas.
      * Agrupa por venta_id y suma abonos / resta saldo con lockForUpdate.
      *
-     * @param  int  $provisionalId ID del provisional cuyos detalles se aplican
-     * @return void
+     * @param  int  $provisionalId  ID del provisional cuyos detalles se aplican
      */
     private function aplicarDetallesEnVentas(int $provisionalId): void
     {
@@ -233,11 +237,13 @@ class VentaProvisionalService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $m = (float)$s->total;
+            $m = (float) $s->total;
 
-            $venta->abonos = (float)($venta->abonos ?? 0) + $m;
-            $venta->saldo  = (float)($venta->saldo ?? 0) - $m;
-            if ($venta->saldo < 0) $venta->saldo = 0;
+            $venta->abonos = (float) ($venta->abonos ?? 0) + $m;
+            $venta->saldo = (float) ($venta->saldo ?? 0) - $m;
+            if ($venta->saldo < 0) {
+                $venta->saldo = 0;
+            }
 
             $venta->save();
         }
@@ -247,8 +253,7 @@ class VentaProvisionalService
      * Revierte los abonos previamente aplicados a las ventas vinculadas.
      * Agrupa por venta_id y resta abonos / suma saldo con lockForUpdate.
      *
-     * @param  int  $provisionalId ID del provisional cuyos detalles se revierten
-     * @return void
+     * @param  int  $provisionalId  ID del provisional cuyos detalles se revierten
      */
     private function revertirDetallesEnVentas(int $provisionalId): void
     {
@@ -265,14 +270,18 @@ class VentaProvisionalService
                 ->where('estado', '!=', 'anulada')
                 ->lockForUpdate()
                 ->first();
-            if (!$venta) continue;
+            if (! $venta) {
+                continue;
+            }
 
-            $m = (float)$s->total;
+            $m = (float) $s->total;
 
-            $venta->abonos = (float)($venta->abonos ?? 0) - $m;
-            if ($venta->abonos < 0) $venta->abonos = 0;
+            $venta->abonos = (float) ($venta->abonos ?? 0) - $m;
+            if ($venta->abonos < 0) {
+                $venta->abonos = 0;
+            }
 
-            $venta->saldo = (float)($venta->saldo ?? 0) + $m;
+            $venta->saldo = (float) ($venta->saldo ?? 0) + $m;
 
             $venta->save();
         }
@@ -281,25 +290,25 @@ class VentaProvisionalService
     /**
      * Calcula un detalle individual del provisional (genera comentario automático).
      *
-     * @param  Venta  $venta          Venta vinculada
-     * @param  array  $detalle        Datos del detalle desde el request
-     * @param  string $clienteNombre  Nombre del cliente para el comentario
-     * @return array  Detalle listo para createMany()
+     * @param  Venta  $venta  Venta vinculada
+     * @param  array  $detalle  Datos del detalle desde el request
+     * @param  string  $clienteNombre  Nombre del cliente para el comentario
+     * @return array Detalle listo para createMany()
      */
     private function calculateDetail($venta, $detalle, string $clienteNombre): array
     {
         $comentarioBase = '';
-        $doc = trim(($detalle['comprobante_tipo_codigo'] ?? '') . ($detalle['serie'] && $detalle['correlativo'] ? "{$detalle['serie']}-{$detalle['correlativo']}" : ''));
+        $doc = trim(($detalle['comprobante_tipo_codigo'] ?? '').($detalle['serie'] && $detalle['correlativo'] ? "{$detalle['serie']}-{$detalle['correlativo']}" : ''));
         $autoComentario = trim("COBRANZA A {$doc} {$clienteNombre}");
-        $comentarioFinal = $comentarioBase !== '' ? ($autoComentario . ' - ' . $comentarioBase) : $autoComentario;
+        $comentarioFinal = $comentarioBase !== '' ? ($autoComentario.' - '.$comentarioBase) : $autoComentario;
 
         return [
-            'venta_id'                => $detalle['venta_id'],
+            'venta_id' => $detalle['venta_id'],
             'comprobante_tipo_codigo' => $detalle['comprobante_tipo_codigo'] ?? null,
-            'serie'                   => $detalle['serie'] ?? null,
-            'correlativo'             => $detalle['correlativo'] ?? null,
-            'monto'                   => $detalle['monto'] ?? 0,
-            'comentario'              => $comentarioFinal
+            'serie' => $detalle['serie'] ?? null,
+            'correlativo' => $detalle['correlativo'] ?? null,
+            'monto' => $detalle['monto'] ?? 0,
+            'comentario' => $comentarioFinal,
         ];
     }
 }

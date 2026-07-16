@@ -2,29 +2,29 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\User;
-use App\Models\CompraDetalle;
-use App\Models\Compra;
-use Carbon\Carbon;
 use App\Exports\ComprasAcumuladasProductoExport;
+use App\Exports\ComprasDetalladasFechaExport;
 use App\Exports\ComprasDetalladasProductoExport;
 use App\Exports\ComprasDetalladasProveedorExport;
-use App\Exports\ComprasDetalladasFechaExport;
 use App\Exports\ComprasFechaExport;
 use App\Exports\ComprasProveedorExport;
-use Maatwebsite\Excel\Facades\Excel;
+use App\Models\Compra;
+use App\Models\CompraDetalle;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReporteCompraController extends Controller
 {
-    public function __construct(){
-        $this->middleware('can:compras_report')->only(['index','comprasAcumuladasProducto','comprasPorFecha','exportarComprasAcumuladasProducto','exportarComprasFecha','comprasPorProveedor','exportarComprasProveedor',
-        'comprasDetalladasProducto','exportarComprasDetalladasProducto','comprasDetalladasProveedor','exportarComprasDetalladasProveedor',
-        'comprasDetalladasFecha','exportarComprasDetalladasFecha', 'imprimirComprasAcumuladasProducto',
-        'imprimirComprasFecha','imprimirComprasDetalladasFecha', 'imprimirComprasDetalladasProducto','imprimirComprasDetalladasProveedor','imprimirComprasProveedor']);
-        
-        $this->middleware('can:dashboard_estadisticas')->only(['topProductosMes','comprasUltimos15','comprasUltimos15Continuo']);
+    public function __construct()
+    {
+        $this->middleware('can:compras_report')->only(['index', 'comprasAcumuladasProducto', 'comprasPorFecha', 'exportarComprasAcumuladasProducto', 'exportarComprasFecha', 'comprasPorProveedor', 'exportarComprasProveedor',
+            'comprasDetalladasProducto', 'exportarComprasDetalladasProducto', 'comprasDetalladasProveedor', 'exportarComprasDetalladasProveedor',
+            'comprasDetalladasFecha', 'exportarComprasDetalladasFecha', 'imprimirComprasAcumuladasProducto',
+            'imprimirComprasFecha', 'imprimirComprasDetalladasFecha', 'imprimirComprasDetalladasProducto', 'imprimirComprasDetalladasProveedor', 'imprimirComprasProveedor']);
+
+        $this->middleware('can:dashboard_estadisticas')->only(['topProductosMes', 'comprasUltimos15', 'comprasUltimos15Continuo']);
     }
 
     public function index(Request $request)
@@ -35,14 +35,14 @@ class ReporteCompraController extends Controller
 
     public function comprasAcumuladasProducto(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
         $query = CompraDetalle::query()
-        ->selectRaw('
+            ->selectRaw('
             compra_detalles.producto_id,
             compra_detalles.producto_nombre,
             compra_detalles.producto_empaque,
@@ -52,20 +52,20 @@ class ReporteCompraController extends Controller
             SUM(compra_detalles.total) as importe_total,
             SUM(compra_detalles.cantidad * compra_detalles.producto_empaque) as kg_total
         ')
-        ->join('compras', 'compra_detalles.compra_id', '=', 'compras.id')
-        ->join('productos', 'compra_detalles.producto_id', '=', 'productos.id')
-        ->join('lineas', 'productos.linea_id', '=', 'lineas.id')
-        ->where('compras.estado', '!=', 'anulada');
+            ->join('compras', 'compra_detalles.compra_id', '=', 'compras.id')
+            ->join('productos', 'compra_detalles.producto_id', '=', 'productos.id')
+            ->join('lineas', 'productos.linea_id', '=', 'lineas.id')
+            ->where('compras.estado', '!=', 'anulada');
 
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
         $reportes = $query
-            ->groupBy('producto_id', 'producto_nombre', 'lineas.nombre','producto_empaque')
+            ->groupBy('producto_id', 'producto_nombre', 'lineas.nombre', 'producto_empaque')
             ->orderBy('lineas.nombre')
             ->orderBy('compra_detalles.producto_nombre')
             ->get();
@@ -78,7 +78,7 @@ class ReporteCompraController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-        $fileName = 'compras_acumuladas_producto_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'compras_acumuladas_producto_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new ComprasAcumuladasProductoExport($fechaInicio, $fechaFin),
@@ -92,7 +92,7 @@ class ReporteCompraController extends Controller
         $fechaFin = $request->input('fecha_fin');
 
         $query = CompraDetalle::query()
-        ->selectRaw('
+            ->selectRaw('
             compra_detalles.producto_id,
             compra_detalles.producto_nombre,
             compra_detalles.producto_empaque,
@@ -102,20 +102,20 @@ class ReporteCompraController extends Controller
             SUM(compra_detalles.total) as importe_total,
             SUM(compra_detalles.cantidad * compra_detalles.producto_empaque) as kg_total
         ')
-        ->join('compras', 'compra_detalles.compra_id', '=', 'compras.id')
-        ->join('productos', 'compra_detalles.producto_id', '=', 'productos.id')
-        ->join('lineas', 'productos.linea_id', '=', 'lineas.id')
-        ->where('compras.estado', '!=', 'anulada');
+            ->join('compras', 'compra_detalles.compra_id', '=', 'compras.id')
+            ->join('productos', 'compra_detalles.producto_id', '=', 'productos.id')
+            ->join('lineas', 'productos.linea_id', '=', 'lineas.id')
+            ->where('compras.estado', '!=', 'anulada');
 
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
         $reportes = $query
-            ->groupBy('producto_id', 'producto_nombre', 'lineas.nombre','producto_empaque')
+            ->groupBy('producto_id', 'producto_nombre', 'lineas.nombre', 'producto_empaque')
             ->orderBy('lineas.nombre')
             ->orderBy('compra_detalles.producto_nombre')
             ->get();
@@ -124,16 +124,16 @@ class ReporteCompraController extends Controller
             'reportes.compras.compras_acumuladas_producto_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('compras_acumuladas_producto.pdf');
     }
 
     public function comprasPorFecha(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
         $fechaInicio = $request->input('fecha_inicio');
@@ -159,7 +159,7 @@ class ReporteCompraController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
@@ -187,7 +187,7 @@ class ReporteCompraController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-        $fileName = 'compras_fecha_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'compras_fecha_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new ComprasFechaExport($fechaInicio, $fechaFin),
@@ -220,7 +220,7 @@ class ReporteCompraController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
@@ -244,16 +244,16 @@ class ReporteCompraController extends Controller
             'reportes.compras.compras_fecha_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('compras_fecha.pdf');
     }
 
     public function comprasPorProveedor(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
         $fechaInicio = $request->input('fecha_inicio');
@@ -279,7 +279,7 @@ class ReporteCompraController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
@@ -297,7 +297,7 @@ class ReporteCompraController extends Controller
             )
             ->orderBy('proveedores.razon_social', 'asc') // primero por proveedor
             ->orderBy('compras.fecha_compra', 'asc')     // luego por fecha
-            ->orderBy('compras.correlativo', 'asc') 
+            ->orderBy('compras.correlativo', 'asc')
             ->get();
 
         return view('reportes.compras.compras_proveedor', compact('reportes', 'fechaInicio', 'fechaFin'));
@@ -308,7 +308,7 @@ class ReporteCompraController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-        $fileName = 'compras_proveedor_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'compras_proveedor_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new ComprasProveedorExport($fechaInicio, $fechaFin),
@@ -341,7 +341,7 @@ class ReporteCompraController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
@@ -359,23 +359,23 @@ class ReporteCompraController extends Controller
             )
             ->orderBy('proveedores.razon_social', 'asc') // primero por proveedor
             ->orderBy('compras.fecha_compra', 'asc')     // luego por fecha
-            ->orderBy('compras.correlativo', 'asc') 
+            ->orderBy('compras.correlativo', 'asc')
             ->get();
 
         $pdf = Pdf::loadView(
             'reportes.compras.compras_proveedor_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('compras_proveedor.pdf');
     }
 
     public function comprasDetalladasProducto(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
@@ -407,7 +407,7 @@ class ReporteCompraController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
@@ -424,7 +424,7 @@ class ReporteCompraController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-        $fileName = 'compras_detalladas_producto_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'compras_detalladas_producto_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new ComprasDetalladasProductoExport($fechaInicio, $fechaFin),
@@ -462,7 +462,7 @@ class ReporteCompraController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
@@ -475,16 +475,16 @@ class ReporteCompraController extends Controller
             'reportes.compras.compras_detalladas_producto_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('compras_detalladas_producto.pdf');
     }
 
     public function comprasDetalladasProveedor(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
@@ -513,7 +513,7 @@ class ReporteCompraController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
@@ -530,7 +530,7 @@ class ReporteCompraController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-        $fileName = 'compras_detalladas_proveedor_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'compras_detalladas_proveedor_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new ComprasDetalladasProveedorExport($fechaInicio, $fechaFin),
@@ -565,7 +565,7 @@ class ReporteCompraController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
@@ -578,16 +578,16 @@ class ReporteCompraController extends Controller
             'reportes.compras.compras_detalladas_proveedor_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'landscape')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('compras_detalladas_proveedor.pdf');
     }
 
     public function comprasDetalladasFecha(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
@@ -616,7 +616,7 @@ class ReporteCompraController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
@@ -639,7 +639,7 @@ class ReporteCompraController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-        $fileName = 'compras_detalladas_fecha_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'compras_detalladas_fecha_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new ComprasDetalladasFechaExport($fechaInicio, $fechaFin),
@@ -674,7 +674,7 @@ class ReporteCompraController extends Controller
         if ($fechaInicio && $fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ]);
         }
 
@@ -689,26 +689,27 @@ class ReporteCompraController extends Controller
             'reportes.compras.compras_detalladas_fecha_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('compras__detalladas_fecha.pdf');
     }
-    /// desde aca para abajo no tiene estado ->where('compras.estado', '!=', 'anulada');
+
+    // / desde aca para abajo no tiene estado ->where('compras.estado', '!=', 'anulada');
     public function topProductosMes(Request $request)
-    {  
-        if (!$request->ajax()) {
+    {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
         $inicioMes = now()->startOfMonth();
         $finMes = now()->endOfMonth();
 
-        $top = CompraDetalle::selectRaw("
+        $top = CompraDetalle::selectRaw('
                 producto_nombre,
                 SUM(cantidad) as total_cantidad,
                 SUM(cantidad * producto_empaque) as total_kg
-            ")
+            ')
             ->join('compras', 'compra_detalles.compra_id', '=', 'compras.id')
             ->whereBetween('compras.fecha_compra', [$inicioMes, $finMes])
             ->where('compras.estado', '!=', 'anulada')
@@ -722,7 +723,7 @@ class ReporteCompraController extends Controller
 
     public function comprasUltimos15(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
         // Buscar en los últimos 30 días, no 15
@@ -730,10 +731,10 @@ class ReporteCompraController extends Controller
         $finFiltro = now()->toDateString();
 
         // Obtener compras agrupadas por día
-        $totales = Compra::selectRaw("
+        $totales = Compra::selectRaw('
                 DATE(fecha_compra) as fecha,
                 SUM(total) as total_dia
-            ")
+            ')
             ->whereDate('fecha_compra', '>=', $inicioFiltro)
             ->whereDate('fecha_compra', '<=', $finFiltro)
             ->where('compras.estado', '!=', 'anulada')
@@ -744,11 +745,11 @@ class ReporteCompraController extends Controller
             ->sortBy('fecha')         // luego los ordenamos ascendente para el gráfico
             ->values();
 
-        //return response()->json($totales);
-        $totalesFormateados = $totales->map(function($item) {
+        // return response()->json($totales);
+        $totalesFormateados = $totales->map(function ($item) {
             return [
                 'fecha' => \Carbon\Carbon::parse($item->fecha)->format('d-m'),
-                'total_dia' => $item->total_dia
+                'total_dia' => $item->total_dia,
             ];
         });
 
@@ -757,14 +758,14 @@ class ReporteCompraController extends Controller
 
     public function comprasUltimos15Continuo(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
         $hoy = now()->toDateString();
         $inicio = now()->subDays(15)->toDateString();
 
         // Obtener totales por día
-        $totales = Compra::selectRaw("DATE(fecha_compra) as fecha, SUM(total) as total_dia")
+        $totales = Compra::selectRaw('DATE(fecha_compra) as fecha, SUM(total) as total_dia')
             ->whereDate('fecha_compra', '>=', $inicio)
             ->whereDate('fecha_compra', '<=', $hoy)
             ->where('compras.estado', '!=', 'anulada')
@@ -785,7 +786,7 @@ class ReporteCompraController extends Controller
         foreach ($fechas as $fecha) {
             $data[] = [
                 'fecha' => $fecha,
-                'total_dia' => $totales->get($fecha, 0) // si no existe, 0
+                'total_dia' => $totales->get($fecha, 0), // si no existe, 0
             ];
         }
 

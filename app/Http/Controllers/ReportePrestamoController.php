@@ -2,22 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\User;
-use App\Models\Formulacion;
-use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
-
-use App\Exports\FormulacionesFechaExport;
-use App\Exports\FormulacionesRangoExport;
-use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ReportePrestamoController extends Controller
 {
-    public function __construct(){
+    public function __construct()
+    {
         $this->middleware('can:prestamos_list')->only(
-                ['index', 'prestamoAPendiente','imprimirPrestamoAPediente','prestamoDePendiente','imprimirPrestamoDePendiente',
+            ['index', 'prestamoAPendiente', 'imprimirPrestamoAPediente', 'prestamoDePendiente', 'imprimirPrestamoDePendiente',
                 'prestamoGeneral', 'imprimirPrestamoGeneral']);
     }
 
@@ -29,7 +23,7 @@ class ReportePrestamoController extends Controller
 
     public function prestamoAPendiente(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
@@ -100,8 +94,7 @@ class ReportePrestamoController extends Controller
             })
             ->join('clientes as c', 'c.id', '=', 'pa.cliente_destino_id')
             ->where('pa.cliente_destino_id', $clienteEmpresaId)
-            ->when($fechaInicio && $fechaFin, fn($q) => 
-                $q->whereBetween(DB::raw('DATE(pa.fecha_prestamo)'), [$fechaInicio, $fechaFin])
+            ->when($fechaInicio && $fechaFin, fn ($q) => $q->whereBetween(DB::raw('DATE(pa.fecha_prestamo)'), [$fechaInicio, $fechaFin])
             )
             ->select([
                 'pa.prestamo_id as id',
@@ -118,7 +111,7 @@ class ReportePrestamoController extends Controller
                 'pa.producto_empaque',
                 'pa.cantidad_prestada',
                 DB::raw('COALESCE(dd.cantidad_devuelta, 0) AS cantidad_devuelta'),
-                DB::raw('(pa.cantidad_prestada - COALESCE(dd.cantidad_devuelta, 0)) AS saldo')
+                DB::raw('(pa.cantidad_prestada - COALESCE(dd.cantidad_devuelta, 0)) AS saldo'),
             ])
             // ->where('pa.estado', '!=', 'anulada')
             ->orderBy('pa.fecha_prestamo', 'desc')
@@ -202,8 +195,7 @@ class ReportePrestamoController extends Controller
             })
             ->join('clientes as c', 'c.id', '=', 'pa.cliente_destino_id')
             ->where('pa.cliente_destino_id', $clienteEmpresaId)
-            ->when($fechaInicio && $fechaFin, fn($q) => 
-                $q->whereBetween(DB::raw('DATE(pa.fecha_prestamo)'), [$fechaInicio, $fechaFin])
+            ->when($fechaInicio && $fechaFin, fn ($q) => $q->whereBetween(DB::raw('DATE(pa.fecha_prestamo)'), [$fechaInicio, $fechaFin])
             )
             ->select([
                 'pa.prestamo_id as id',
@@ -220,26 +212,26 @@ class ReportePrestamoController extends Controller
                 'pa.producto_empaque',
                 'pa.cantidad_prestada',
                 DB::raw('COALESCE(dd.cantidad_devuelta, 0) AS cantidad_devuelta'),
-                DB::raw('(pa.cantidad_prestada - COALESCE(dd.cantidad_devuelta, 0)) AS saldo')
+                DB::raw('(pa.cantidad_prestada - COALESCE(dd.cantidad_devuelta, 0)) AS saldo'),
             ])
             // ->where('pa.estado', '!=', 'anulada')
             ->orderBy('pa.fecha_prestamo', 'desc')
             ->get();
-        
+
         $pdf = Pdf::loadView(
             'reportes.prestamos.prestamos_a_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin', 'clienteEmpresaId')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
-        return $pdf->stream('prestamos_a'.$clienteEmpresaId.'_fecha_' . now()->format('Ymd_His') . '.pdf');
+        return $pdf->stream('prestamos_a'.$clienteEmpresaId.'_fecha_'.now()->format('Ymd_His').'.pdf');
     }
 
     public function prestamoDePendiente(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
@@ -310,8 +302,7 @@ class ReportePrestamoController extends Controller
             })
             ->join('clientes as c', 'c.id', '=', 'pa.cliente_origen_id')
             ->where('pa.cliente_origen_id', $clienteEmpresaId)
-            ->when($fechaInicio && $fechaFin, fn($q) => 
-                $q->whereBetween(DB::raw('DATE(pa.fecha_prestamo)'), [$fechaInicio, $fechaFin])
+            ->when($fechaInicio && $fechaFin, fn ($q) => $q->whereBetween(DB::raw('DATE(pa.fecha_prestamo)'), [$fechaInicio, $fechaFin])
             )
             ->select([
                 'pa.prestamo_id as id',
@@ -328,7 +319,7 @@ class ReportePrestamoController extends Controller
                 'pa.producto_empaque',
                 'pa.cantidad_prestada',
                 DB::raw('COALESCE(dd.cantidad_devuelta, 0) AS cantidad_devuelta'),
-                DB::raw('(pa.cantidad_prestada - COALESCE(dd.cantidad_devuelta, 0)) AS saldo')
+                DB::raw('(pa.cantidad_prestada - COALESCE(dd.cantidad_devuelta, 0)) AS saldo'),
             ])
             // ->where('pa.estado', '!=', 'anulada')
             ->orderBy('pa.fecha_prestamo', 'desc')
@@ -349,7 +340,7 @@ class ReportePrestamoController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-         /* =========================
+        /* =========================
         SUBCONSULTA: PRESTADO (PD)
         ==========================*/
         $prestado = DB::table('prestamo_detalles as d')
@@ -412,8 +403,7 @@ class ReportePrestamoController extends Controller
             })
             ->join('clientes as c', 'c.id', '=', 'pa.cliente_origen_id')
             ->where('pa.cliente_origen_id', $clienteEmpresaId)
-            ->when($fechaInicio && $fechaFin, fn($q) => 
-                $q->whereBetween(DB::raw('DATE(pa.fecha_prestamo)'), [$fechaInicio, $fechaFin])
+            ->when($fechaInicio && $fechaFin, fn ($q) => $q->whereBetween(DB::raw('DATE(pa.fecha_prestamo)'), [$fechaInicio, $fechaFin])
             )
             ->select([
                 'pa.prestamo_id as id',
@@ -430,21 +420,21 @@ class ReportePrestamoController extends Controller
                 'pa.producto_empaque',
                 'pa.cantidad_prestada',
                 DB::raw('COALESCE(dd.cantidad_devuelta, 0) AS cantidad_devuelta'),
-                DB::raw('(pa.cantidad_prestada - COALESCE(dd.cantidad_devuelta, 0)) AS saldo')
+                DB::raw('(pa.cantidad_prestada - COALESCE(dd.cantidad_devuelta, 0)) AS saldo'),
             ])
             // ->where('pa.estado', '!=', 'anulada')
             ->orderBy('pa.fecha_prestamo', 'desc')
             ->get();
-        
+
         $pdf = Pdf::loadView(
             'reportes.prestamos.prestamos_de_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin', 'clienteEmpresaId')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
-        return $pdf->stream('prestamos_de'.$clienteEmpresaId.'_fecha_' . now()->format('Ymd_His') . '.pdf');
+        return $pdf->stream('prestamos_de'.$clienteEmpresaId.'_fecha_'.now()->format('Ymd_His').'.pdf');
     }
 
     public function prestamoGeneral(Request $request)
@@ -669,6 +659,6 @@ class ReportePrestamoController extends Controller
         )->setPaper('letter', 'portrait')
             ->setOptions(['defaultFont' => 'Courier']);
 
-        return $pdf->stream('prestamos_general_' . now()->format('Ymd_His') . '.pdf');
+        return $pdf->stream('prestamos_general_'.now()->format('Ymd_His').'.pdf');
     }
 }

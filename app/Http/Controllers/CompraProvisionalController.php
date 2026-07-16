@@ -15,27 +15,26 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\CompraProvisional;
+use App\Helpers\NumeroALetras;
 use App\Models\Compra;
+use App\Models\CompraProvisional;
 use App\Models\Proveedor;
 use App\Services\CompraProvisionalService;
-use Illuminate\Http\Request;
-use Yajra\DataTables\DataTables;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Helpers\NumeroALetras;
+use Yajra\DataTables\DataTables;
 
 class CompraProvisionalController extends Controller
 {
-
     /**
      * Constructor: inyecta el servicio y define los middleware de permisos.
      *
-     * @param CompraProvisionalService $compraProvisionalService Servicio con la lógica de negocio
+     * @param  CompraProvisionalService  $compraProvisionalService  Servicio con la lógica de negocio
      */
     public function __construct(
         protected CompraProvisionalService $compraProvisionalService
-    ){
+    ) {
         $this->middleware('can:compra_provisionales_list')->only(['index', 'imprimir']);
         $this->middleware('can:compra_provisionales_create')->only(['store']);
         $this->middleware('can:compra_provisionales_edit')->only(['show', 'update']);
@@ -51,7 +50,7 @@ class CompraProvisionalController extends Controller
             $tipo = $request->get('tipo', 'T');
 
             $data = DB::table('compra_provisionales as v')
-            ->selectRaw("
+                ->selectRaw("
                 v.id,
                 v.user_nombre,
                 v.fecha_provisional,
@@ -87,22 +86,23 @@ class CompraProvisionalController extends Controller
                     }
                     $deleteButton = '';
                     if (auth()->user()->can('compra_provisionales_delete')) {
-                        $texto = trim(($row->proveedor_nombre ?? '') . ' - ' . ($row->numero_recibo ?? ''));
+                        $texto = trim(($row->proveedor_nombre ?? '').' - '.($row->numero_recibo ?? ''));
                         $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $texto])->render();
                     }
-                    $ticketButton= '<a href="' . route('compra-provisionales.imprimir', $row->id) . '" 
+                    $ticketButton = '<a href="'.route('compra-provisionales.imprimir', $row->id).'" 
                         target="_blank" 
                         class="btn btn-sm btn-secondary" 
                         title="Ver Comprobante">
                         <i class="bi bi-printer"></i>
                      </a>';
-                     $ver='<button class="btn btn-sm btn-primary btn-view-compra" data-id="'.$row->id.'" title="Ver Provisional">
+                    $ver = '<button class="btn btn-sm btn-primary btn-view-compra" data-id="'.$row->id.'" title="Ver Provisional">
                         <i class="bi bi-eye"></i>
                      </button>';
-                    return '<div class="btn-group">' . $editButton . $deleteButton . $ver . $ticketButton .'</div>';
+
+                    return '<div class="btn-group">'.$editButton.$deleteButton.$ver.$ticketButton.'</div>';
                 })
                 ->editColumn('monto', function ($row) {
-                    return number_format((float)$row->monto, 2, '.', '');
+                    return number_format((float) $row->monto, 2, '.', '');
                 })
                 ->rawColumns(['action'])
                 ->make(true);
@@ -120,7 +120,7 @@ class CompraProvisionalController extends Controller
     {
         if ($request->filled('fecha_provisional')) {
             $request->merge([
-                'fecha_provisional' => str_replace('T', ' ', $request->fecha_provisional) . ':00'
+                'fecha_provisional' => str_replace('T', ' ', $request->fecha_provisional).':00',
             ]);
         }
         $data = $this->validateData($request);
@@ -131,12 +131,12 @@ class CompraProvisionalController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Registro creado satisfactoriamente',
-                'compra_provisional_id' => $provisional->id
+                'compra_provisional_id' => $provisional->id,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al crear el registro: ' . $e->getMessage()
+                'message' => 'Error al crear el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -161,7 +161,7 @@ class CompraProvisionalController extends Controller
                             'abonos',
                             'saldo'
                         );
-                    }
+                    },
                 ])
                 ->findOrFail($id);
 
@@ -181,7 +181,7 @@ class CompraProvisionalController extends Controller
     {
         if ($request->filled('fecha_provisional')) {
             $request->merge([
-                'fecha_provisional' => str_replace('T', ' ', $request->fecha_provisional) . ':00'
+                'fecha_provisional' => str_replace('T', ' ', $request->fecha_provisional).':00',
             ]);
         }
 
@@ -192,12 +192,12 @@ class CompraProvisionalController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro actualizado satisfactoriamente'
+                'message' => 'Registro actualizado satisfactoriamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al actualizar el registro: ' . $e->getMessage()
+                'message' => 'Error al actualizar el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -214,12 +214,12 @@ class CompraProvisionalController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al eliminar el registro: ' . $e->getMessage()
+                'message' => 'Error al eliminar el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -227,31 +227,31 @@ class CompraProvisionalController extends Controller
     /**
      * Valida los datos del request para un pago provisional de compra.
      *
-     * @param  Request  $request Datos de la petición HTTP
-     * @param  int|null $id      ID del provisional (para validación en edición)
-     * @return array             Datos validados
+     * @param  Request  $request  Datos de la petición HTTP
+     * @param  int|null  $id  ID del provisional (para validación en edición)
+     * @return array Datos validados
      */
     protected function validateData(Request $request, $id = null): array
     {
         $rules = [
-        'numero_interno'     => 'nullable|string|max:10',
-        'fecha_provisional'  => 'required|date',
+            'numero_interno' => 'nullable|string|max:10',
+            'fecha_provisional' => 'required|date',
 
-        'proveedor_id'         => 'required|exists:proveedores,id',
-        'proveedor_nombre'     => 'required|string|max:100',
+            'proveedor_id' => 'required|exists:proveedores,id',
+            'proveedor_nombre' => 'required|string|max:100',
 
-        'principal' => 'nullable|numeric|min:0',
-        'deposito' => 'nullable|numeric|min:0',
-        'consorcio' => 'nullable|numeric|min:0',
-        'total_cobranza' => 'nullable|numeric|min:0.01',
+            'principal' => 'nullable|numeric|min:0',
+            'deposito' => 'nullable|numeric|min:0',
+            'consorcio' => 'nullable|numeric|min:0',
+            'total_cobranza' => 'nullable|numeric|min:0.01',
 
-        // compras es opcional: si es adelanto puede no venir o venir vacío
-        'compras'                 => 'nullable|array',
-        'compras.*.compra_id'      => 'nullable|exists:compras,id',
-        'compras.*.comprobante_tipo_codigo' => 'nullable|string|max:10',
-        'compras.*.serie'         => 'nullable|string|max:10',
-        'compras.*.correlativo'   => 'nullable|string|max:20',
-            'compras.*.monto'         => 'nullable|numeric|min:0',
+            // compras es opcional: si es adelanto puede no venir o venir vacío
+            'compras' => 'nullable|array',
+            'compras.*.compra_id' => 'nullable|exists:compras,id',
+            'compras.*.comprobante_tipo_codigo' => 'nullable|string|max:10',
+            'compras.*.serie' => 'nullable|string|max:10',
+            'compras.*.correlativo' => 'nullable|string|max:20',
+            'compras.*.monto' => 'nullable|numeric|min:0',
         ];
 
         $messages = [
@@ -260,9 +260,9 @@ class CompraProvisionalController extends Controller
         ];
 
         $validator = validator($request->all(), $rules, $messages);
+
         return $validator->validate();
     }
-
 
     /**
      * Buscar (para select2/autocomplete)
@@ -285,15 +285,15 @@ class CompraProvisionalController extends Controller
     /**
      * Consulta compras con saldo pendiente para un proveedor.
      *
-     * @param  Request $request Requiere 'proveedor_id'
+     * @param  Request  $request  Requiere 'proveedor_id'
      * @return \Illuminate\Http\JsonResponse
      */
     public function comprasConSaldo(Request $request)
     {
         $compras = Compra::where('proveedor_id', $request->proveedor_id)
-                    ->where('saldo', '>', 0)
-                    ->where('estado', '!=', 'anulada')
-                    ->get();
+            ->where('saldo', '>', 0)
+            ->where('estado', '!=', 'anulada')
+            ->get();
 
         return response()->json($compras);
     }
@@ -301,33 +301,50 @@ class CompraProvisionalController extends Controller
     /**
      * Genera y devuelve el ticket PDF de un pago provisional de compra.
      *
-     * @param  int $id ID del provisional
+     * @param  int  $id  ID del provisional
      * @return \Illuminate\Http\Response PDF streamed
      */
-    public function printTicket($id){
+    public function printTicket($id)
+    {
         $provisional = CompraProvisional::with(['proveedor.documentoTipo'])->findOrFail($id);
 
-        // Total deuda = suma de saldos de todas las compras del proveedor (solo saldos > 0)
+        // ────────────────────────────────────────────────────────────
+        // BLOQUE: Cálculo del total de deuda del proveedor
+        // ────────────────────────────────────────────────────────────
+        // ¿Qué hace?: Suma los saldos pendientes de todas las compras
+        //              activas del proveedor para mostrar el total
+        //              adeudado en el ticket del provisional.
+        //
+        // ¿Por qué filtrar estado != 'anulada'?:  Una compra anulada
+        //   ya no representa deuda real (la transacción fue cancelada).
+        //   Sin este filtro, compras con saldo residual huérfano
+        //   (generado por bugs en la anulación) inflan la deuda
+        //   mostrada al proveedor.
+        //
+        // Consistencia: Este criterio coincide con
+        //   CuentaCorrienteClienteController y con
+        //   VentaProvisionalController::printTicket.
+        // ────────────────────────────────────────────────────────────
         $totalDeuda = Compra::query()
             ->where('proveedor_id', $provisional->proveedor_id)
             ->where('estado', '!=', 'anulada')
             ->where('saldo', '>', 0)
             ->sum('saldo');
-        
+
         // Pago realizado (monto del provisional)
         $pagoRealizado = (float) $provisional->monto;
 
-        $empresa = (object)[
+        $empresa = (object) [
             'razon_social' => 'CONSORCIOS VILLEGAS E.I.R.L.',
-            'direccion' => 'Carretera Pomalca KM 3' . "\n" . 'A espaldas de Ferretería Herrera',
+            'direccion' => 'Carretera Pomalca KM 3'."\n".'A espaldas de Ferretería Herrera',
             'ruc' => '20538937321',
-            'celular'=>'967984895 - 978431737 - 915177079',
+            'celular' => '967984895 - 978431737 - 915177079',
         ];
 
-        $formatter = new NumeroALetras();
+        $formatter = new NumeroALetras;
         $total_letras = $formatter->convertir($provisional->monto);
 
-        $pdf = Pdf::loadView('compra-provisionales.ticket', compact('provisional','totalDeuda','empresa','total_letras'))
+        $pdf = Pdf::loadView('compra-provisionales.ticket', compact('provisional', 'totalDeuda', 'empresa', 'total_letras'))
             ->setPaper([0, 0, 226.77, 600], 'portrait')
             ->setOption('isRemoteEnabled', true)
             ->setOption('defaultFont', 'DejaVu Sans');
@@ -338,7 +355,7 @@ class CompraProvisionalController extends Controller
     /**
      * Devuelve la vista parcial con el detalle de un pago provisional de compra.
      *
-     * @param  int $id ID del provisional
+     * @param  int  $id  ID del provisional
      * @return \Illuminate\Contracts\View\View|JsonResponse
      */
     public function view($id)

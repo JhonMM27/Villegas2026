@@ -69,7 +69,7 @@ class EmpleadoService
     public function calcularDisponible(int $empleadoId, ?int $mes = null, ?int $anio = null): float
     {
         $empleado = $this->findById($empleadoId);
-        if (!$empleado) {
+        if (! $empleado) {
             return 0.0;
         }
 
@@ -105,13 +105,11 @@ class EmpleadoService
             $query->delMes($mes, $anio);
         } else {
             $query->whereYear('fecha', now()->year)
-                  ->whereMonth('fecha', now()->month);
+                ->whereMonth('fecha', now()->month);
         }
 
         $totalAdelantos = (float) $query->sum('monto');
 
         return max(0, $baseDisponible - $totalAdelantos);
     }
-
-    
 }

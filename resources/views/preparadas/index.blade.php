@@ -510,7 +510,7 @@ class PreparadaManager extends CrudManager {
         document.querySelector('#tablaDetalles tbody').innerHTML = '';
         document.querySelector('#tablaFormulaciones tbody').innerHTML = '';
         
-        document.getElementById('fecha').value = this.obtenerFechaHoraActual();
+        this.setFieldValue('fecha', this.obtenerFechaHoraActual());
         const usuarioNombre = @json(auth()->user()->name);
         document.getElementById('usuario_nombre').textContent = usuarioNombre;
     }
@@ -534,11 +534,11 @@ class PreparadaManager extends CrudManager {
             this.isEditing = true;
             document.getElementById('es_rectificacion').value = '0';
             document.getElementById('preparada_anulada_id').value = '';
-            
+
             this.elements.modalTitle.textContent = 'Editar Preparada: '+ response.id+ ' '+response.producto_nombre;
             this.elements.methodField.value = 'PUT';
-            
-            document.getElementById('fecha').value = response.fecha|| '';
+
+            this.setFieldValue('fecha', this.formatDateTimeLocal(response.fecha));
             const info = document.getElementById('info_formulacion');
             info.classList.remove('d-none');
 
@@ -587,23 +587,18 @@ class PreparadaManager extends CrudManager {
         this.resetForm();
         try {
             const response = await this.fetchData(`${this.baseUrl}/${id}`);
-            
+
             this.isEditing = false;
-            
+            this.isRectifying = true;
+
             this.elements.modalTitle.textContent = 'Rectificar Preparada: ' + response.id + ' ' + response.producto_nombre;
-            
+
             this.elements.methodField.value = 'POST';
             this.form.action = this.baseUrl;
             document.getElementById('es_rectificacion').value = '1';
             document.getElementById('preparada_anulada_id').value = id;
 
-            // Formatear fecha original para datetime-local input
-            const formatDateTimeLocal = (fecha) => {
-                if (!fecha || fecha.startsWith('-000') || fecha === 'null') return '';
-                if (typeof fecha !== 'string') return '';
-                return fecha.replace(' ', 'T').substring(0, 16);
-            };
-            document.getElementById('fecha').value = formatDateTimeLocal(response.fecha);
+            this.setFieldValue('fecha', this.formatDateTimeLocal(response.fecha));
             const info = document.getElementById('info_formulacion');
             info.classList.remove('d-none');
 

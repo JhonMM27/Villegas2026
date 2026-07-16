@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('caja_pagos', function (Blueprint $table) {
             // 🔑 Identificación
             $table->increments('id');
-            
+
             $table->unsignedSmallInteger('user_id');
             $table->string('user_nombre', 20)->nullable();
 
@@ -59,7 +59,6 @@ return new class extends Migration
             $table->decimal('importe3', 9, 2)->default(0);
             $table->decimal('total', 9, 2)->default(0);
 
-    
             $table->timestamps();
 
             $table->index('fecha_caja');
@@ -67,8 +66,8 @@ return new class extends Migration
             $table->index('persona_id');
 
             $table->foreign('user_id')->references('id')->on('users');
-            //$table->foreign('comprobante_tipo_codigo')->references('codigo')->on('comprobante_tipos');
-            //$table->foreign('cobranza_tipo_id')->references('id')->on('cobranza_tipos');
+            // $table->foreign('comprobante_tipo_codigo')->references('codigo')->on('comprobante_tipos');
+            // $table->foreign('cobranza_tipo_id')->references('id')->on('cobranza_tipos');
         });
     }
 

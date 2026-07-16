@@ -26,7 +26,7 @@ return new class extends Migration
             $table->unique(['nucleo_id', 'producto_id']);
 
             $table->foreign('nucleo_id')->references('id')->on('nucleos')->onDelete('cascade');
-            $table->foreign('producto_id')->references('id')->on('productos');            
+            $table->foreign('producto_id')->references('id')->on('productos');
         });
     }
 

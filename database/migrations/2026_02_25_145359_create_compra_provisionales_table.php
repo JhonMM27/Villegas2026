@@ -30,7 +30,7 @@ return new class extends Migration
             // Persona
             $table->unsignedSmallInteger('proveedor_id');
             $table->string('proveedor_nombre', 100);
-            //Cobranza
+            // Cobranza
             $table->decimal('importe_p', 8, 2);
             $table->decimal('importe_d', 8, 2);
             $table->decimal('importe_c', 8, 2);

@@ -28,7 +28,7 @@
                                 <!-- Desde -->
                                 <div class="col-12 col-sm-6 col-lg-2">
                                     <label class="form-label mb-0">Hasta</label>
-                                    <input type="date" id="fecha_inicio" class="form-control form-control-sm">
+                                    <input type="text" id="fecha_inicio" class="form-control form-control-sm date-picker">
                                 </div>
                                 <!-- Botones -->
                                 <div class="col-12 col-lg-auto">
@@ -51,13 +51,13 @@
                                 <!-- Desde -->
                                 <div class="col-12 col-sm-6 col-lg-2">
                                     <label class="form-label mb-0">Desde</label>
-                                    <input type="date" id="fecha_inicio_fechas" class="form-control form-control-sm">
+                                    <input type="text" id="fecha_inicio_fechas" class="form-control form-control-sm date-picker">
                                 </div>
 
                                 <!-- Hasta -->
                                 <div class="col-12 col-sm-6 col-lg-2">
                                     <label class="form-label mb-0">Hasta</label>
-                                    <input type="date" id="fecha_fin_fechas" class="form-control form-control-sm">
+                                    <input type="text" id="fecha_fin_fechas" class="form-control form-control-sm date-picker">
                                 </div>
 
                                 <!-- Producto -->
@@ -76,6 +76,7 @@
                                     <select id="filtro_operacion" class="form-select form-select-sm" multiple>
                                         <option value="COMPRA">COMPRA</option>
                                         <option value="VENTA">VENTA</option>
+                                        <option value="VENTA_ENTREGA">VENTA ENTREGA</option>
                                         <option value="PREPARADA">PREPARADA</option>
                                         <option value="PREPARADA_NUCLEO">PREPARADA NUCLEO</option>
                                         <option value="PRESTAMO">PRESTAMO</option>
@@ -119,12 +120,12 @@
                                 <!-- Desde -->
                                 <div class="col-12 col-sm-6 col-lg-2">
                                     <label class="form-label mb-0">Desde</label>
-                                    <input type="date" id="mov_fecha_inicio" class="form-control form-control-sm">
+                                    <input type="text" id="mov_fecha_inicio" class="form-control form-control-sm date-picker">
                                 </div>
                                 <!-- Hasta -->
                                 <div class="col-12 col-sm-6 col-lg-2">
                                     <label class="form-label mb-0">Hasta</label>
-                                    <input type="date" id="mov_fecha_fin" class="form-control form-control-sm">
+                                    <input type="text" id="mov_fecha_fin" class="form-control form-control-sm date-picker">
                                 </div>
                                 <!-- Producto -->
                                 <div class="col-12 col-lg-4">

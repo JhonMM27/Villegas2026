@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('user_nombre', 20)->nullable();
 
             // PRESTAMO | DEVOLUCION
-            $table->enum('movimiento_tipo', ['PA', 'DD','PD','DA']);
+            $table->enum('movimiento_tipo', ['PA', 'DD', 'PD', 'DA']);
 
             // QUIÉN ENTREGA
             $table->unsignedSmallInteger('cliente_origen_id');
@@ -35,7 +35,7 @@ return new class extends Migration
             $table->integer('correlativo');
 
             $table->dateTime('fecha_prestamo');
-            
+
             $table->decimal('total', 8, 2);
 
             $table->string('estado', 20)->default('REGISTRADO');

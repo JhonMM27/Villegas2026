@@ -18,14 +18,14 @@ return new class extends Migration
             $table->unsignedSmallInteger('proveedor_id');
             $table->string('proveedor_nombre', 100)->nullable();
             $table->char('comprobante_tipo_codigo', 2);
-            $table->string('comprobante_tipo_nombre', 2)->nullable();          
+            $table->string('comprobante_tipo_nombre', 2)->nullable();
             $table->char('pago_forma_codigo', 2);
             $table->string('pago_forma_nombre', 20)->nullable();
             $table->string('serie', 4);
             $table->integer('correlativo');
-            $table->datetime('fecha_compra');  
-            $table->date('fecha_vencimiento')->nullable();  
-            $table->string('moneda', 3);     
+            $table->datetime('fecha_compra');
+            $table->date('fecha_vencimiento')->nullable();
+            $table->string('moneda', 3);
             $table->decimal('op_gravada', 8, 2);
             $table->decimal('op_exonerada', 8, 2);
             $table->decimal('op_inafecta', 8, 2);

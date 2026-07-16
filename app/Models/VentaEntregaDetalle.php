@@ -25,9 +25,9 @@ class VentaEntregaDetalle extends Model
     ];
 
     protected $casts = [
-        'cantidad'        => 'decimal:2',
-        'saco_entregado'  => 'decimal:2',
-        'salida_kg'       => 'decimal:2',
+        'cantidad' => 'decimal:2',
+        'saco_entregado' => 'decimal:2',
+        'salida_kg' => 'decimal:2',
     ];
 
     /*

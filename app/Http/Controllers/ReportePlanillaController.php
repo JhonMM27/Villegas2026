@@ -67,7 +67,7 @@ class ReportePlanillaController extends Controller
         $sueldoReal = (float) $empleado->sueldo_real;
         $sueldoPlanilla = (float) $empleado->sueldo_planilla;
 
-        $pagos->each(function ($pago) use ($empleado, $sueldoReal, $sueldoPlanilla) {
+        $pagos->each(function ($pago) use ($empleado, $sueldoReal) {
             $pago->prorrateo_ingreso = false;
             $pago->prorrateo_salida = false;
             $pago->sueldo_base_mostrar = (float) $pago->sueldo_base;
@@ -161,16 +161,41 @@ class ReportePlanillaController extends Controller
         return $pdf->stream('reporte_prestamos.pdf');
     }
 
-    public function pagosPendientesPdf()
+    public function pagosPendientesPdf(Request $request)
     {
         $empresa = $this->getEmpresa();
 
-        $pagos = PlanillaPago::with(['empleado'])
+        $query = PlanillaPago::with(['empleado'])
             ->where('estado', 'pendiente')
             ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->orderByDesc('anio')
-            ->orderByDesc('mes')
-            ->get();
+            ->orderByDesc('mes');
+
+        $fechaInicio = $request->get('fecha_inicio');
+        $fechaFin = $request->get('fecha_fin');
+        if ($fechaInicio && $fechaFin) {
+            $mesInicio = (int) date('m', strtotime($fechaInicio));
+            $anioInicio = (int) date('Y', strtotime($fechaInicio));
+            $mesFin = (int) date('m', strtotime($fechaFin));
+            $anioFin = (int) date('Y', strtotime($fechaFin));
+
+            if ($anioInicio === $anioFin) {
+                $query->where('anio', $anioInicio)
+                    ->whereBetween('mes', [$mesInicio, $mesFin]);
+            } else {
+                $query->where(function ($q) use ($anioInicio, $anioFin, $mesInicio, $mesFin) {
+                    $q->where(function ($q1) use ($anioInicio, $mesInicio) {
+                        $q1->where('anio', $anioInicio)->where('mes', '>=', $mesInicio);
+                    })->orWhere(function ($q2) use ($anioFin, $mesFin) {
+                        $q2->where('anio', $anioFin)->where('mes', '<=', $mesFin);
+                    })->orWhere(function ($q3) use ($anioInicio, $anioFin) {
+                        $q3->where('anio', '>', $anioInicio)->where('anio', '<', $anioFin);
+                    });
+                });
+            }
+        }
+
+        $pagos = $query->get();
 
         $totalRegistros = $pagos->count();
 
@@ -180,6 +205,40 @@ class ReportePlanillaController extends Controller
                 ->whereYear('fecha', $pago->anio)
                 ->sum('monto');
             $pago->adelantos_calculado = $adelantos;
+
+            $sueldoReal = (float) $pago->empleado->sueldo_real;
+            $sueldoPlanilla = (float) $pago->empleado->sueldo_planilla;
+            $diasEnMes = (int) cal_days_in_month(CAL_GREGORIAN, (int) $pago->mes, (int) $pago->anio);
+
+            $pago->prorrateo_ingreso = false;
+            $pago->prorrateo_salida = false;
+            $pago->dias_trabajados = $diasEnMes;
+            $pago->sueldo_real_mostrar = $sueldoReal;
+            $pago->sueldo_planilla_mostrar = $sueldoPlanilla;
+
+            if ($pago->empleado->fecha_ingreso) {
+                $fi = $pago->empleado->fecha_ingreso;
+                if ($fi->year === $pago->anio && $fi->month === $pago->mes && $fi->day > 1) {
+                    $diasTrabajados = $diasEnMes - $fi->day + 1;
+                    $factor = $diasTrabajados / $diasEnMes;
+                    $pago->sueldo_real_mostrar = round($sueldoReal * $factor, 2);
+                    $pago->sueldo_planilla_mostrar = round($sueldoPlanilla * $factor, 2);
+                    $pago->prorrateo_ingreso = true;
+                    $pago->dias_trabajados = $diasTrabajados;
+                }
+            }
+
+            if ($pago->empleado->fecha_salida) {
+                $fs = $pago->empleado->fecha_salida;
+                if ($fs->year === $pago->anio && $fs->month === $pago->mes && $fs->day < 30) {
+                    $diasTrabajados = $fs->day;
+                    $factor = $diasTrabajados / $diasEnMes;
+                    $pago->sueldo_real_mostrar = round($pago->sueldo_real_mostrar * $factor, 2);
+                    $pago->sueldo_planilla_mostrar = round($pago->sueldo_planilla_mostrar * $factor, 2);
+                    $pago->prorrateo_salida = true;
+                    $pago->dias_trabajados = $diasTrabajados;
+                }
+            }
         });
 
         $pdf = PDF::loadView('planilla.reportes.pagos_pendientes', compact('pagos', 'empresa', 'totalRegistros'));
@@ -246,11 +305,11 @@ class ReportePlanillaController extends Controller
     //     $totalPagadoProporcional = 0;
     //     foreach ($pagos as $pago) {
     //         $fechaIngreso = $pago->empleado?->fecha_ingreso;
-    //         $esMesIngreso = $fechaIngreso 
-    //             && $pago->anio === $fechaIngreso->year 
-    //             && $pago->mes === $fechaIngreso->month 
+    //         $esMesIngreso = $fechaIngreso
+    //             && $pago->anio === $fechaIngreso->year
+    //             && $pago->mes === $fechaIngreso->month
     //             && $fechaIngreso->day > 1;
-            
+
     //         if ($esMesIngreso) {
     //             $pago->monto_proporcional = (float) $pago->total_pagar;
     //         } else {
@@ -299,170 +358,170 @@ class ReportePlanillaController extends Controller
     // }
 
     public function empleadoPdf(Request $request)
-{
-    $empresa = $this->getEmpresa();
+    {
+        $empresa = $this->getEmpresa();
 
-    $empleadoId = (int) $request->get('empleado_id');
-    $fechaInicio = $request->get('fecha_inicio', date('Y-01-01'));
-    $fechaFin = $request->get('fecha_fin', date('Y-m-d'));
+        $empleadoId = (int) $request->get('empleado_id');
+        $fechaInicio = $request->get('fecha_inicio', date('Y-01-01'));
+        $fechaFin = $request->get('fecha_fin', date('Y-m-d'));
 
-    $mesInicio = (int) date('m', strtotime($fechaInicio));
-    $anioInicio = (int) date('Y', strtotime($fechaInicio));
-    $mesFin = (int) date('m', strtotime($fechaFin));
-    $anioFin = (int) date('Y', strtotime($fechaFin));
+        $mesInicio = (int) date('m', strtotime($fechaInicio));
+        $anioInicio = (int) date('Y', strtotime($fechaInicio));
+        $mesFin = (int) date('m', strtotime($fechaFin));
+        $anioFin = (int) date('Y', strtotime($fechaFin));
 
-    $query = PlanillaPago::with('empleado')
-        ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'));
+        $query = PlanillaPago::with('empleado')
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'));
 
-    if ($empleadoId > 0) {
-        $query->where('empleado_id', $empleadoId);
-    }
+        if ($empleadoId > 0) {
+            $query->where('empleado_id', $empleadoId);
+        }
 
-    if ($anioInicio == $anioFin) {
-        $query->where('anio', $anioInicio)
-            ->whereBetween('mes', [$mesInicio, $mesFin]);
-    } else {
-        $query->where(function ($q) use ($anioInicio, $anioFin, $mesInicio, $mesFin) {
-            $q->where(function ($q1) use ($anioInicio, $mesInicio) {
-                $q1->where('anio', $anioInicio)
-                    ->where('mes', '>=', $mesInicio);
-            })->orWhere(function ($q2) use ($anioFin, $mesFin) {
-                $q2->where('anio', $anioFin)
-                    ->where('mes', '<=', $mesFin);
-            })->orWhere(function ($q3) use ($anioInicio, $anioFin) {
-                $q3->where('anio', '>', $anioInicio)
-                    ->where('anio', '<', $anioFin);
+        if ($anioInicio == $anioFin) {
+            $query->where('anio', $anioInicio)
+                ->whereBetween('mes', [$mesInicio, $mesFin]);
+        } else {
+            $query->where(function ($q) use ($anioInicio, $anioFin, $mesInicio, $mesFin) {
+                $q->where(function ($q1) use ($anioInicio, $mesInicio) {
+                    $q1->where('anio', $anioInicio)
+                        ->where('mes', '>=', $mesInicio);
+                })->orWhere(function ($q2) use ($anioFin, $mesFin) {
+                    $q2->where('anio', $anioFin)
+                        ->where('mes', '<=', $mesFin);
+                })->orWhere(function ($q3) use ($anioInicio, $anioFin) {
+                    $q3->where('anio', '>', $anioInicio)
+                        ->where('anio', '<', $anioFin);
+                });
             });
-        });
-    }
-
-    $pagos = $query->orderByDesc('anio')
-        ->orderByDesc('mes')
-        ->get();
-
-    $adelantosQuery = PlanillaAdelanto::whereBetween('fecha', [$fechaInicio, $fechaFin])
-        ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'));
-
-    if ($empleadoId > 0) {
-        $adelantosQuery->where('empleado_id', $empleadoId);
-    }
-
-    $adelantos = $adelantosQuery->orderBy('fecha', 'asc')->get();
-    $totalRegistros = $pagos->count();
-
-    $totalProporcional = 0;
-    $totalPagadoProporcional = 0;
-
-    foreach ($pagos as $pago) {
-        // No se prorratea de nuevo.
-        $pago->monto_proporcional = (float) $pago->total_pagar;
-
-        $totalProporcional += $pago->monto_proporcional;
-
-        if ($pago->estado === 'pagado') {
-            $totalPagadoProporcional += $pago->monto_proporcional;
-        }
-    }
-
-    if ($empleadoId > 0) {
-        $empleado = Empleado::find($empleadoId);
-
-        if (! $empleado) {
-            return redirect()->back()->with('error', 'Empleado no encontrado');
         }
 
-        /*
-         * Días trabajados reales dentro del rango seleccionado.
-         * Ejemplo:
-         * fechaInicio = 01/06/2026
-         * fechaFin = 05/06/2026
-         * fecha_ingreso = 02/06/2026
-         * Resultado = 4 días
-         */
-        $inicioReporte = \Carbon\Carbon::parse($fechaInicio)->startOfDay();
-        $finReporte = \Carbon\Carbon::parse($fechaFin)->startOfDay();
+        $pagos = $query->orderByDesc('anio')
+            ->orderByDesc('mes')
+            ->get();
 
-        $inicioTrabajo = $inicioReporte->copy();
-        $finTrabajo = $finReporte->copy();
+        $adelantosQuery = PlanillaAdelanto::whereBetween('fecha', [$fechaInicio, $fechaFin])
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'));
 
-        if ($empleado->fecha_ingreso) {
-            $fechaIngreso = \Carbon\Carbon::parse($empleado->fecha_ingreso)->startOfDay();
-
-            if ($fechaIngreso->greaterThan($inicioTrabajo)) {
-                $inicioTrabajo = $fechaIngreso;
-            }
+        if ($empleadoId > 0) {
+            $adelantosQuery->where('empleado_id', $empleadoId);
         }
 
-        if ($empleado->fecha_salida) {
-            $fechaSalida = \Carbon\Carbon::parse($empleado->fecha_salida)->startOfDay();
+        $adelantos = $adelantosQuery->orderBy('fecha', 'asc')->get();
+        $totalRegistros = $pagos->count();
 
-            if ($fechaSalida->lessThan($finTrabajo)) {
-                $finTrabajo = $fechaSalida;
-            }
-        }
-
-        $diasTrabajados = $inicioTrabajo->lessThanOrEqualTo($finTrabajo)
-            ? $inicioTrabajo->diffInDays($finTrabajo) + 1
-            : 0;
+        $totalProporcional = 0;
+        $totalPagadoProporcional = 0;
 
         foreach ($pagos as $pago) {
-            $pago->sueldo_planilla_proporcional = (float) $pago->sueldo_base;
-            $pago->dias_trabajados_reporte = $diasTrabajados;
+            // No se prorratea de nuevo.
+            $pago->monto_proporcional = (float) $pago->total_pagar;
+
+            $totalProporcional += $pago->monto_proporcional;
+
+            if ($pago->estado === 'pagado') {
+                $totalPagadoProporcional += $pago->monto_proporcional;
+            }
         }
 
-        $resumen = [
-            'total_sueldo_planilla' => (float) $empleado->sueldo_planilla,
-            'total_sueldo_real' => (float) $empleado->sueldo_real,
-            'total_sueldo_base' => $pagos->sum('sueldo_base'),
-            'total_horas_extras' => $pagos->sum('horas_extras'),
-            'total_adelantos' => $adelantos->sum('monto'),
-            'total_dias_faltas' => $pagos->sum('dias_faltados'),
-            'total_descuento_faltas' => $pagos->sum('descuento_faltas'),
-            'total_cts_planilla' => $pagos->sum('cts_planilla') ?? 0,
-            'total_cts_sueldo_real' => $pagos->sum('cts_sueldo_real') ?? 0,
-            'total_pagado' => $pagos->where('estado', 'pagado')->sum('total_pagar'),
-            'total_pendiente' => $pagos->where('estado', 'pendiente')->sum('total_pagar'),
-            'total_general' => $pagos->sum('total_pagar'),
+        if ($empleadoId > 0) {
+            $empleado = Empleado::find($empleadoId);
 
-            // Este es el que debe mostrarse en el PDF.
-            'dias_en_rango' => $diasTrabajados,
+            if (! $empleado) {
+                return redirect()->back()->with('error', 'Empleado no encontrado');
+            }
 
-            'total_proporcional' => $totalProporcional,
-            'total_pagado_proporcional' => $totalPagadoProporcional,
-            'total_pendiente_proporcional' => $totalProporcional - $totalPagadoProporcional,
-        ];
+            /*
+             * Días trabajados reales dentro del rango seleccionado.
+             * Ejemplo:
+             * fechaInicio = 01/06/2026
+             * fechaFin = 05/06/2026
+             * fecha_ingreso = 02/06/2026
+             * Resultado = 4 días
+             */
+            $inicioReporte = \Carbon\Carbon::parse($fechaInicio)->startOfDay();
+            $finReporte = \Carbon\Carbon::parse($fechaFin)->startOfDay();
+
+            $inicioTrabajo = $inicioReporte->copy();
+            $finTrabajo = $finReporte->copy();
+
+            if ($empleado->fecha_ingreso) {
+                $fechaIngreso = \Carbon\Carbon::parse($empleado->fecha_ingreso)->startOfDay();
+
+                if ($fechaIngreso->greaterThan($inicioTrabajo)) {
+                    $inicioTrabajo = $fechaIngreso;
+                }
+            }
+
+            if ($empleado->fecha_salida) {
+                $fechaSalida = \Carbon\Carbon::parse($empleado->fecha_salida)->startOfDay();
+
+                if ($fechaSalida->lessThan($finTrabajo)) {
+                    $finTrabajo = $fechaSalida;
+                }
+            }
+
+            $diasTrabajados = $inicioTrabajo->lessThanOrEqualTo($finTrabajo)
+                ? $inicioTrabajo->diffInDays($finTrabajo) + 1
+                : 0;
+
+            foreach ($pagos as $pago) {
+                $pago->sueldo_planilla_proporcional = (float) $pago->sueldo_base;
+                $pago->dias_trabajados_reporte = $diasTrabajados;
+            }
+
+            $resumen = [
+                'total_sueldo_planilla' => (float) $empleado->sueldo_planilla,
+                'total_sueldo_real' => (float) $empleado->sueldo_real,
+                'total_sueldo_base' => $pagos->sum('sueldo_base'),
+                'total_horas_extras' => $pagos->sum('horas_extras'),
+                'total_adelantos' => $adelantos->sum('monto'),
+                'total_dias_faltas' => $pagos->sum('dias_faltados'),
+                'total_descuento_faltas' => $pagos->sum('descuento_faltas'),
+                'total_cts_planilla' => $pagos->sum('cts_planilla') ?? 0,
+                'total_cts_sueldo_real' => $pagos->sum('cts_sueldo_real') ?? 0,
+                'total_pagado' => $pagos->where('estado', 'pagado')->sum('total_pagar'),
+                'total_pendiente' => $pagos->where('estado', 'pendiente')->sum('total_pagar'),
+                'total_general' => $pagos->sum('total_pagar'),
+
+                // Este es el que debe mostrarse en el PDF.
+                'dias_en_rango' => $diasTrabajados,
+
+                'total_proporcional' => $totalProporcional,
+                'total_pagado_proporcional' => $totalPagadoProporcional,
+                'total_pendiente_proporcional' => $totalProporcional - $totalPagadoProporcional,
+            ];
+
+            $pdf = PDF::loadView(
+                'planilla.reportes.empleados_pdf',
+                compact(
+                    'empleado',
+                    'pagos',
+                    'adelantos',
+                    'empresa',
+                    'totalRegistros',
+                    'resumen',
+                    'fechaInicio',
+                    'fechaFin'
+                )
+            );
+
+            return $pdf->stream('reporte_empleado_'.$empleadoId.'.pdf');
+        }
 
         $pdf = PDF::loadView(
             'planilla.reportes.empleados_pdf',
             compact(
-                'empleado',
                 'pagos',
                 'adelantos',
                 'empresa',
                 'totalRegistros',
-                'resumen',
                 'fechaInicio',
                 'fechaFin'
             )
         );
 
-        return $pdf->stream('reporte_empleado_'.$empleadoId.'.pdf');
+        return $pdf->stream('reporte_empleados.pdf');
     }
-
-    $pdf = PDF::loadView(
-        'planilla.reportes.empleados_pdf',
-        compact(
-            'pagos',
-            'adelantos',
-            'empresa',
-            'totalRegistros',
-            'fechaInicio',
-            'fechaFin'
-        )
-    );
-
-    return $pdf->stream('reporte_empleados.pdf');
-}
 
     public function inasistenciasPdf(Request $request)
     {
@@ -656,18 +715,15 @@ class ReportePlanillaController extends Controller
         $totalProporcional = 0;
         $totalPagadoProporcional = 0;
         foreach ($pagos as $pago) {
-            $fechaIngreso = $pago->empleado?->fecha_ingreso;
-            $esMesIngreso = $fechaIngreso 
-                && $pago->anio === $fechaIngreso->year 
-                && $pago->mes === $fechaIngreso->month 
-                && $fechaIngreso->day > 1;
-            
-            if ($esMesIngreso) {
-                $pago->monto_proporcional = (float) $pago->total_pagar;
-            } else {
-                $pago->monto_proporcional = round(((float) $pago->total_pagar / 30) * $diasEnRango, 2);
-            }
-            $pago->sueldo_planilla_proporcional = round(((float) $empleado->sueldo_planilla / 30) * $diasEnRango, 2);
+            // total_pagar y sueldo_base ya están prorrateados por fecha_ingreso en la BD.
+            // Aquí solo se aplica el proporcional al rango del reporte.
+            $diasEnMes = (int) cal_days_in_month(CAL_GREGORIAN, (int) $pago->mes, (int) $pago->anio);
+            $diasEfectivos = min($diasEnRango, $diasEnMes);
+            $factor = $diasEnMes > 0 ? $diasEfectivos / $diasEnMes : 1;
+
+            $pago->monto_proporcional = round(((float) $pago->total_pagar) * $factor, 2);
+            $pago->sueldo_planilla_proporcional = round(((float) $empleado->sueldo_planilla) * $factor, 2);
+
             $totalProporcional += $pago->monto_proporcional;
             if ($pago->estado === 'pagado') {
                 $totalPagadoProporcional += $pago->monto_proporcional;

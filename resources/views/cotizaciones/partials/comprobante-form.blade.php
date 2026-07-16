@@ -6,9 +6,7 @@
             </select>
         </div>
         <div class="col-md-4">
-            <label for="fecha_cotizacion" class="form-label">Fecha Cotización <span class="text-danger"></span></label>
-            <input type="datetime-local" id="fecha_cotizacion" name="fecha_cotizacion" class="form-control form-control-sm">
-            <div class="invalid-feedback"></div>
+            <x-datetime-picker id="fecha_cotizacion" label="Fecha Cotización" />
         </div>
         <div class="col-md-4">
             <label for="comprobante_tipo_codigo" class="form-label">Comprobante <span

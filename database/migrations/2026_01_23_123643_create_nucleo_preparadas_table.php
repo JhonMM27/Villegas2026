@@ -19,14 +19,14 @@ return new class extends Migration
             $table->string('nucleo_nombre', 50)->nullable();
             $table->string('unidad_nombre', 50)->nullable();
             $table->unsignedSmallInteger('producto_empaque')->nullable();
-            $table->string('numero_interno',10)->nullable();
+            $table->string('numero_interno', 10)->nullable();
             $table->datetime('fecha');
             $table->decimal('cantidad_porcentaje', 8, 2)->nullable();
             $table->decimal('costo_unitario', 9, 4)->nullable();
             $table->decimal('ingreso_saco', 9, 4)->nullable();
             $table->decimal('ingreso_kg', 9, 4)->nullable();
             $table->decimal('ingreso_soles', 9, 4)->nullable();
-            $table->integer('items')->nullable();            
+            $table->integer('items')->nullable();
             $table->timestamps();
 
             // Índices

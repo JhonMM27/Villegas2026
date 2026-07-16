@@ -13,6 +13,10 @@
                     @endcan
                 </div>
                 <div class="card-body">
+                    <div id="filtroMesWrapper" class="d-flex align-items-center gap-2 mb-2">
+                        <label for="filtroMes" class="form-label mb-0 text-muted small">Mes:</label>
+                        <input type="month" id="filtroMes" class="form-control form-control-sm" style="width: 170px" value="{{ date('Y-m') }}">
+                    </div>
                     <div class="table-responsive">
                         <table id="listadoTable" class="table table-striped table-hover table-sm">
                             <thead>
@@ -38,8 +42,9 @@
 @endsection
 @push('scripts')
 <script>
-class InasistenciaManager {
+class InasistenciaManager extends CrudManager {
     constructor(baseUrl) {
+        super(baseUrl);
         this.baseUrl = baseUrl;
         this.tabla = null;
         this.modal = null;
@@ -52,7 +57,31 @@ class InasistenciaManager {
         this.tabla = $('#listadoTable').DataTable({
             processing: true,
             serverSide: true,
-            ajax: { url: this.baseUrl, type: 'GET' },
+            ajax: {
+                url: this.baseUrl,
+                type: 'GET',
+                data: (d) => { d.mes = $('#filtroMes').val() || ''; }
+            },
+            dom: "<'row'<'col-md-6'<'#filtroMesPlaceholder'>><'col-md-6'f>>rtip",
+            initComplete: () => {
+                const placeholder = document.getElementById('filtroMesPlaceholder');
+                const wrapper = document.getElementById('filtroMesWrapper');
+                if (placeholder && wrapper) {
+                    placeholder.appendChild(wrapper);
+                }
+            },
+            language: {
+                emptyTable: "No hay inasistencias en este mes.",
+                zeroRecords: "No se encontraron inasistencias que coincidan con el filtro.",
+                info: "Mostrando _START_ a _END_ de _TOTAL_ inasistencias",
+                infoEmpty: "Mostrando 0 inasistencias",
+                infoFiltered: "(filtrado de _MAX_ inasistencias totales)",
+                lengthMenu: "Mostrar _MENU_ registros",
+                loadingRecords: "Cargando...",
+                processing: "Procesando...",
+                search: "Buscar:",
+                paginate: { first: "Primero", last: "Último", next: "Siguiente", previous: "Anterior" }
+            },
             columns: [
                 { data: 'action', name: 'action', orderable: false, searchable: false },
                 { data: 'empleado_id', name: 'empleado_id' },
@@ -68,9 +97,9 @@ class InasistenciaManager {
         if (modalEl) {
             this.modal = new bootstrap.Modal(modalEl);
             this.form = document.getElementById('formUpdate');
-            this.form.addEventListener('submit', (e) => this.handleSubmit(e));
         }
         document.getElementById('btnCreate')?.addEventListener('click', () => this.showCreateModal());
+        document.getElementById('filtroMes')?.addEventListener('change', () => this.tabla.ajax.reload());
         this.setupLiveSearch();
     }
 
@@ -181,7 +210,7 @@ class InasistenciaManager {
         this.form.reset();
         document.getElementById('empleado_id').value = '';
         document.getElementById('empleado_nombre').value = '';
-        document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
+        this.setFieldValue('fecha', new Date().toISOString().split('T')[0]);
         document.getElementById('medio_dia').checked = false;
         document.getElementById('observacion').value = '';
         this.modal.show();
@@ -196,7 +225,7 @@ class InasistenciaManager {
             this.form.action = `${this.baseUrl}/${id}`;
             document.getElementById('empleado_id').value = response.inasistencia.empleado_id;
             document.getElementById('empleado_nombre').value = response.inasistencia.empleado?.nombre || '';
-            document.getElementById('fecha').value = response.inasistencia.fecha ? response.inasistencia.fecha.split('T')[0] : '';
+            this.setFieldValue('fecha', response.inasistencia.fecha ? response.inasistencia.fecha.split('T')[0] : '');
             document.getElementById('medio_dia').checked = response.inasistencia.medio_dia;
             document.getElementById('observacion').value = response.inasistencia.observacion || '';
             this.modal.show();

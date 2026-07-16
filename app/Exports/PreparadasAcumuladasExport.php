@@ -4,18 +4,18 @@ namespace App\Exports;
 
 use App\Models\Preparada;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 
 class PreparadasAcumuladasExport implements FromCollection
 {
     protected $fechaInicio;
+
     protected $fechaFin;
 
     public function __construct($fechaInicio, $fechaFin)
     {
         $this->fechaInicio = $fechaInicio;
-        $this->fechaFin    = $fechaFin;
+        $this->fechaFin = $fechaFin;
     }
 
     public function collection()
@@ -25,7 +25,7 @@ class PreparadasAcumuladasExport implements FromCollection
             ->join('lineas', 'productos.linea_id', '=', 'lineas.id')
             ->whereBetween('preparadas.fecha', [
                 Carbon::parse($this->fechaInicio)->startOfDay(),
-                Carbon::parse($this->fechaFin)->endOfDay()
+                Carbon::parse($this->fechaFin)->endOfDay(),
             ])
             ->where('preparadas.estado', '!=', 'anulada')
             ->select([
@@ -47,12 +47,12 @@ class PreparadasAcumuladasExport implements FromCollection
 
         // FILA 1: título
         $rows[] = [
-            'Fechas: del ' .
-            Carbon::parse($this->fechaInicio)->format('d/m/Y') .
-            ' al ' .
+            'Fechas: del '.
+            Carbon::parse($this->fechaInicio)->format('d/m/Y').
+            ' al '.
             Carbon::parse($this->fechaFin)->format('d/m/Y'),
             '', '', '', '', '', '', '', '',
-            now()->format('d/m/Y H:i:s')
+            now()->format('d/m/Y H:i:s'),
         ];
 
         // FILA 2: vacía
@@ -71,7 +71,7 @@ class PreparadasAcumuladasExport implements FromCollection
             'Soles',
         ];
 
-        $totalIngresoKg    = 0.0;
+        $totalIngresoKg = 0.0;
         $totalIngresoSacos = 0.0;
         $totalIngresoSoles = 0.0;
 
@@ -83,15 +83,15 @@ class PreparadasAcumuladasExport implements FromCollection
                 $item->producto_nombre,
                 $item->producto_empaque,
                 $item->linea_nombre,
-                number_format((float)$item->costo_unitario, 4, '.', ''),
-                number_format((float)$item->ingreso_saco, 4, '.', ''),
-                number_format((float)$item->ingreso_kg, 4, '.', ''),
-                number_format((float)$item->ingreso_soles, 4, '.', ''),
+                number_format((float) $item->costo_unitario, 4, '.', ''),
+                number_format((float) $item->ingreso_saco, 4, '.', ''),
+                number_format((float) $item->ingreso_kg, 4, '.', ''),
+                number_format((float) $item->ingreso_soles, 4, '.', ''),
             ];
 
-            $totalIngresoKg    += (float)$item->ingreso_kg;
-            $totalIngresoSacos += (float)$item->ingreso_saco;
-            $totalIngresoSoles += (float)$item->ingreso_soles;
+            $totalIngresoKg += (float) $item->ingreso_kg;
+            $totalIngresoSacos += (float) $item->ingreso_saco;
+            $totalIngresoSoles += (float) $item->ingreso_soles;
         }
 
         // TOTAL GENERAL

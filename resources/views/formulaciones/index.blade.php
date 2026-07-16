@@ -326,7 +326,7 @@ class FormulacionManager extends CrudManager {
         document.getElementById('producto_empaque_text').textContent = '';
         document.getElementById('linea').textContent = '';
 
-        document.getElementById('fecha').value = this.obtenerFechaHoraActual();
+        this.setFieldValue('fecha', this.obtenerFechaHoraActual());
         const usuarioNombre = @json(auth()->user()->name);
         document.getElementById('usuario_nombre').textContent = usuarioNombre;
     }
@@ -356,7 +356,7 @@ class FormulacionManager extends CrudManager {
             // Llenar campos específicos
             // Llenar campos principales del modal
             //console.log(response);
-            document.getElementById('fecha').value = response.fecha|| '';
+            this.setFieldValue('fecha', this.formatDateTimeLocal(response.fecha));
             const item = {
                 id: response.producto_id,
                 nombre: response.producto_nombre,

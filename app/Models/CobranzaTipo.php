@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 class CobranzaTipo extends Model
 {
     protected $table = 'cobranza_tipos';
+
     protected $primaryKey = 'id';
 
     protected $fillable = [
         'nombre',
-        'activo'
+        'activo',
     ];
 
     protected $casts = [

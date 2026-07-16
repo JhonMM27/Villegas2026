@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class NucleoDetalle extends Model
 {
     protected $table = 'nucleo_detalles';
-    public $timestamps = false; 
+
+    public $timestamps = false;
 
     protected $fillable = [
         'nucleo_id',

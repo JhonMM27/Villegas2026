@@ -61,19 +61,19 @@ class Movimiento extends Model
      * Asegura que los valores se manejen como decimales en PHP.
      */
     protected $casts = [
-        'fecha'           => 'datetime',
-        'cantidad'        => 'decimal:4',
-        'cantidad_kg'     => 'decimal:4',
-        'entrada'         => 'decimal:4',
-        'salida'          => 'decimal:4',
-        'costo_unitario'  => 'decimal:4',
-        'costo_total'     => 'decimal:4',
-        'stock_anterior'  => 'decimal:4',
-        'costo_actual'    => 'decimal:4',
-        'valor_anterior'  => 'decimal:4',
-        'stock_nuevo'     => 'decimal:4',
-        'costo_nuevo'     => 'decimal:4',
-        'valor_nuevo'     => 'decimal:4',
+        'fecha' => 'datetime',
+        'cantidad' => 'decimal:4',
+        'cantidad_kg' => 'decimal:4',
+        'entrada' => 'decimal:4',
+        'salida' => 'decimal:4',
+        'costo_unitario' => 'decimal:4',
+        'costo_total' => 'decimal:4',
+        'stock_anterior' => 'decimal:4',
+        'costo_actual' => 'decimal:4',
+        'valor_anterior' => 'decimal:4',
+        'stock_nuevo' => 'decimal:4',
+        'costo_nuevo' => 'decimal:4',
+        'valor_nuevo' => 'decimal:4',
     ];
 
     // ─── Relaciones ─────────────────────────────────────────
@@ -110,6 +110,6 @@ class Movimiento extends Model
     public function scopeDeTransaccion($query, string $tipo, int $id)
     {
         return $query->where('transaccion_tipo', $tipo)
-                     ->where('transaccion_id', $id);
+            ->where('transaccion_id', $id);
     }
 }

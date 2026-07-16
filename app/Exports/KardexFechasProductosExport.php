@@ -11,7 +11,7 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class KardexFechasProductosExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
+class KardexFechasProductosExport implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStyles
 {
     public function __construct(
         private Collection $reportes
@@ -43,21 +43,21 @@ class KardexFechasProductosExport implements FromCollection, WithHeadings, WithM
 
     public function map($r): array
     {
-        $fecha = !empty($r->fecha) ? Carbon::parse($r->fecha)->format('d/m/Y H:i') : '';
+        $fecha = ! empty($r->fecha) ? Carbon::parse($r->fecha)->format('d/m/Y H:i') : '';
 
         return [
             $fecha,
             $r->operacion ?? '',
             $r->id ?? '',
             $r->producto ?? '',
-            (float)($r->empaque ?? 0),
+            (float) ($r->empaque ?? 0),
             $r->linea ?? '',
             $r->unidad ?? '',
             $r->documento ?? '',
-            (float)($r->entrada_und ?? 0),
-            (float)($r->salida_und ?? 0),
-            (float)($r->precio_unitario ?? 0),
-            (float)($r->stock_und ?? $r->stock ?? 0), // ✅ por si tu campo se llama stock_und
+            (float) ($r->entrada_und ?? 0),
+            (float) ($r->salida_und ?? 0),
+            (float) ($r->precio_unitario ?? 0),
+            (float) ($r->stock_und ?? $r->stock ?? 0), // ✅ por si tu campo se llama stock_und
             $r->referencia ?? '',
         ];
     }

@@ -348,7 +348,7 @@ class VentaEntregaManager extends CrudManager {
 
             // Campos del modal (ajusta IDs según tu action.blade.php)
             document.getElementById('venta_id').value = response.venta_id || '';
-            document.getElementById('fecha_entrega').value = (response.fecha_entrega || '').replace(' ', 'T').slice(0,16);
+            this.setFieldValue('fecha_entrega', this.formatDateTimeLocal(response.fecha_entrega));
             //document.getElementById('numero_recibo').value = response.numero_recibo || '';
             document.getElementById('cliente_id').value = response.cliente_id || '';
             document.getElementById('cliente_nombre').value = response.cliente_nombre || '';
@@ -435,7 +435,7 @@ class VentaEntregaManager extends CrudManager {
         document.getElementById('usuario_nombre').textContent = usuarioNombre;
 
         // Defaults (si quieres)
-        document.getElementById('fecha_entrega').value = this.obtenerFechaHoraActual();
+        this.setFieldValue('fecha_entrega', this.obtenerFechaHoraActual());
         this.limpiarTablaVentas();
     }
 

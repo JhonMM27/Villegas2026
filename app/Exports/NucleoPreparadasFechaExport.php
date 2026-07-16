@@ -9,12 +9,13 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 class NucleoPreparadasFechaExport implements FromCollection
 {
     protected string $fechaInicio;
+
     protected string $fechaFin;
 
     public function __construct($fechaInicio, $fechaFin)
     {
         $this->fechaInicio = $fechaInicio;
-        $this->fechaFin    = $fechaFin;
+        $this->fechaFin = $fechaFin;
     }
 
     /**
@@ -23,7 +24,7 @@ class NucleoPreparadasFechaExport implements FromCollection
     public function collection()
     {
         $inicio = Carbon::parse($this->fechaInicio)->startOfDay();
-        $fin    = Carbon::parse($this->fechaFin)->endOfDay();
+        $fin = Carbon::parse($this->fechaFin)->endOfDay();
 
         $reportes = NucleoPreparada::query()
             ->select([
@@ -65,7 +66,7 @@ class NucleoPreparadasFechaExport implements FromCollection
             now()->format('d/m/Y H:i:s'),
         ];
         $rows[] = [
-            'Rango seleccionado: del ' . $inicio->format('d/m/Y') . ' al ' . $fin->format('d/m/Y'),
+            'Rango seleccionado: del '.$inicio->format('d/m/Y').' al '.$fin->format('d/m/Y'),
         ];
 
         // Fila vacía
@@ -105,19 +106,19 @@ class NucleoPreparadasFechaExport implements FromCollection
                 $r->nucleo_id,
                 $r->nucleo_nombre,
                 $r->producto_empaque,
-                number_format((float)$r->ingreso_kg, 4, '.', ''),
-                number_format((float)$r->ingreso_saco, 4, '.', ''),
-                number_format((float)$r->ingreso_soles, 4, '.', ''),
+                number_format((float) $r->ingreso_kg, 4, '.', ''),
+                number_format((float) $r->ingreso_saco, 4, '.', ''),
+                number_format((float) $r->ingreso_soles, 4, '.', ''),
             ];
 
             $nucleoActual = $r->nucleo_nombre;
-            $subIngKg   += (float)$r->ingreso_kg;
-            $subIngSaco += (float)$r->ingreso_saco;
-            $subIngSol  += (float)$r->ingreso_soles;
+            $subIngKg += (float) $r->ingreso_kg;
+            $subIngSaco += (float) $r->ingreso_saco;
+            $subIngSol += (float) $r->ingreso_soles;
 
-            $totIngKg   += (float)$r->ingreso_kg;
-            $totIngSaco += (float)$r->ingreso_saco;
-            $totIngSol  += (float)$r->ingreso_soles;
+            $totIngKg += (float) $r->ingreso_kg;
+            $totIngSaco += (float) $r->ingreso_saco;
+            $totIngSol += (float) $r->ingreso_soles;
         }
 
         // Último subtotal

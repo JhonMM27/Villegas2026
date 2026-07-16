@@ -198,8 +198,8 @@ class VacacionManager extends CrudManager {
         document.getElementById('anio_generado').value = new Date().getFullYear();
         document.getElementById('dias_generados').value = '15';
         document.getElementById('dias_tomados').value = '0';
-        document.getElementById('fecha_inicio').value = '';
-        document.getElementById('fecha_fin').value = '';
+        this.setFieldValue('fecha_inicio', '');
+        this.setFieldValue('fecha_fin', '');
         document.getElementById('observaciones').value = '';
         document.getElementById('dias_faltantes').value = '15';
     }
@@ -212,8 +212,8 @@ class VacacionManager extends CrudManager {
             document.getElementById('anio_generado').value = data.anio_generado;
             document.getElementById('dias_generados').value = data.dias_generados || 15;
             document.getElementById('dias_tomados').value = data.dias_tomados || 0;
-            document.getElementById('fecha_inicio').value = data.fecha_inicio || '';
-            document.getElementById('fecha_fin').value = data.fecha_fin || '';
+            this.setFieldValue('fecha_inicio', data.fecha_inicio || '');
+            this.setFieldValue('fecha_fin', data.fecha_fin || '');
             document.getElementById('observaciones').value = data.observaciones || '';
             const diasFalt = (data.dias_generados || 15) - (data.dias_tomados || 0);
             document.getElementById('dias_faltantes').value = Math.max(0, diasFalt);

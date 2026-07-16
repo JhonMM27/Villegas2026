@@ -121,7 +121,7 @@ class GastoManager extends CrudManager {
             this.elements.modalTitle.textContent = 'Editar Gasto: '+ response.numero_recibo;
             this.elements.methodField.value = 'PUT';
 
-            document.getElementById('fecha_gasto').value = (response.fecha_gasto || '').replace(' ', 'T').slice(0,16);
+            this.setFieldValue('fecha_gasto', this.formatDateTimeLocal(response.fecha_gasto));
             document.getElementById('numero_interno').value = response.numero_interno || '';
             document.getElementById('total_cobranza').value = response.monto || 0;
             document.getElementById('principal').value = response.importe_p || 0;
@@ -179,7 +179,7 @@ class GastoManager extends CrudManager {
     showCreateModal() {
         super.showCreateModal();
         this.elements.modalTitle.textContent = 'Nuevo Gasto';
-        document.getElementById('fecha_gasto').value = this.obtenerFechaHoraActual();
+        this.setFieldValue('fecha_gasto', this.obtenerFechaHoraActual());
         this.cargarCategoriasSelect();
     }
 

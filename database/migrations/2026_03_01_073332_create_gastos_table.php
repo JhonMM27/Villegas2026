@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('numero_recibo', 10)->nullable();
             $table->string('numero_interno', 10)->nullable();
             $table->decimal('monto', 8, 2)->default(0);
-            //Cobranza
+            // Cobranza
             $table->decimal('importe_p', 8, 2)->default(0);
             $table->decimal('importe_d', 8, 2)->default(0);
             $table->decimal('importe_c', 8, 2)->default(0);

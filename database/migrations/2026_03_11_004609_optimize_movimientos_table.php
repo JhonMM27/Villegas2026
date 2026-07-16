@@ -47,7 +47,7 @@ return new class extends Migration
             $table->decimal('stock_anterior', 10, 4)->default(0)->change();
             $table->decimal('stock_nuevo', 10, 4)->default(0)->change();
 
-            // Revertir valores monetarios 
+            // Revertir valores monetarios
             $table->decimal('costo_unitario', 10, 4)->default(0)->change();
             $table->decimal('costo_total', 12, 4)->default(0)->change();
             $table->decimal('costo_actual', 10, 4)->default(0)->change();

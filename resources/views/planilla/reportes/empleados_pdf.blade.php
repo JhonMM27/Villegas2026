@@ -333,7 +333,8 @@
                             <tr>
                                 <td class="text-center">{{ $pago->id }}</td>
                                 <td>{{ str_pad($pago->mes, 2, '0', STR_PAD_LEFT) }}/{{ $pago->anio }}</td>
-                                <td class="text-right">S/ {{ number_format((float) ($pago->sueldo_planilla_proporcional ?? 0), 2) }}
+                                <td class="text-right">S/
+                                    {{ number_format((float) ($pago->sueldo_planilla_proporcional ?? 0), 2) }}
                                 </td>
                                 <td class="text-right">S/ {{ number_format((float) $empleado->sueldo_real, 2) }}</td>
                                 <td class="text-right">S/ {{ number_format((float) $pago->sueldo_base, 2) }}</td>
@@ -341,7 +342,8 @@
                                 <td class="text-right">{{ number_format((float) ($pago->dias_faltados ?? 0), 2) }}</td>
                                 <td class="text-right" style="color: red;">S/
                                     {{ number_format((float) ($pago->descuento_faltas ?? 0), 2) }}</td>
-                                <td class="text-right">S/ {{ number_format((float) ($pago->monto_proporcional ?? 0), 2) }}</td>
+                                <td class="text-right">S/
+                                    {{ number_format((float) ($pago->monto_proporcional ?? 0), 2) }}</td>
                                 <td class="text-center">
                                     @if ($pago->estado === 'pagado')
                                         <span class="badge badge-success">Pagado</span>
@@ -419,7 +421,8 @@
                                     </td>
                                     <td class="text-right" style="color: red;">S/
                                         {{ number_format((float) ($pago->descuento_faltas ?? 0), 2) }}</td>
-<td class="text-right">S/ {{ number_format((float) ($pago->monto_proporcional ?? 0), 2) }}</td>
+                                    <td class="text-right">S/
+                                        {{ number_format((float) ($pago->monto_proporcional ?? 0), 2) }}</td>
                                     <td class="text-center">
                                         @if ($pago->estado === 'pagado')
                                             <span class="badge badge-success">Pagado</span>

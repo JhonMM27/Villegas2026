@@ -19,7 +19,7 @@ class GastoController extends Controller
         $this->middleware('can:gastos_report')->only([
             'reporteGeneral', 'reporteDetallado',
             'exportarGeneral', 'exportarDetallado',
-            'imprimirGeneral', 'imprimirDetallado'
+            'imprimirGeneral', 'imprimirDetallado',
         ]);
     }
 

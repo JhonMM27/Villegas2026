@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('user_nombre', 20)->nullable();
             $table->unsignedSmallInteger('cliente_id');
             $table->string('cliente_nombre', 100)->nullable();
-            $table->unsignedSmallInteger('items')->nullable(); 
+            $table->unsignedSmallInteger('items')->nullable();
             $table->char('comprobante_tipo_codigo', 2);
             $table->string('comprobante_tipo_nombre', 2)->nullable();
             $table->string('serie', 4);
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->datetime('fecha_cotizacion');
             $table->char('pago_forma_codigo', 2);
             $table->string('pago_forma_nombre', 20);
-            $table->string('moneda', 3);     
+            $table->string('moneda', 3);
             $table->decimal('op_gravada', 8, 2);
             $table->decimal('op_exonerada', 8, 2);
             $table->decimal('op_inafecta', 8, 2);

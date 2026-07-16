@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Compra;
-use App\Models\Venta;
 use App\Models\Cliente;
+use App\Models\Compra;
 use App\Models\Producto;
+use App\Models\Venta;
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    //public function __construct(){
+    // public function __construct(){
     //    $this->middleware('can:dashboard')->only(['index']);
-    //}
+    // }
 
     public function index(Request $request)
     {
@@ -37,8 +37,8 @@ class DashboardController extends Controller
 
                 $producto->color_stock = match (true) {
                     $producto->stock_almacen <= $producto->stock_minimo * 0.5 => 'text-bg-danger',
-                    $producto->stock_almacen <= $producto->stock_minimo       => 'text-bg-warning',
-                    default                                                     => 'text-bg-success',
+                    $producto->stock_almacen <= $producto->stock_minimo => 'text-bg-warning',
+                    default => 'text-bg-success',
                 };
 
                 return $producto;
@@ -55,6 +55,7 @@ class DashboardController extends Controller
                     ? min(100, round(abs($producto->stock_almacen / $producto->stock_minimo) * 100))
                     : 0;
                 $producto->color_stock = 'text-bg-danger';
+
                 return $producto;
             });
 

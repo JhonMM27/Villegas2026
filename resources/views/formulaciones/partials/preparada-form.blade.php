@@ -1,9 +1,7 @@
 <div class="border border-primary rounded p-3">
     <div class="row">
         <div class="col-md-4">
-            <label for="fecha" class="form-label">Fecha <span class="text-danger">*</span></label>
-            <input type="datetime-local" id="fecha" name="fecha" class="form-control form-control-sm">
-            <div class="invalid-feedback"></div>
+            <x-datetime-picker id="fecha" label="Fecha" :required="true" />
         </div>
         <div class="col-md-8">
             <label for="producto_nombre_preparada" class="form-label">Producto <span class="text-danger">*</span></label>

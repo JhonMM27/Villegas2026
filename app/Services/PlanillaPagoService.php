@@ -269,12 +269,12 @@ class PlanillaPagoService
 
         $empleados = Empleado::where('estado', 'activo')
             ->where('fecha_ingreso', '<=', $fechaLimite)
-            ->where(function($q) use ($mes, $anio) {
+            ->where(function ($q) use ($mes, $anio) {
                 $q->whereNull('fecha_salida')
-                  ->orWhere(function($q2) use ($mes, $anio) {
-                      $q2->whereYear('fecha_salida', $anio)
-                         ->whereMonth('fecha_salida', $mes);
-                  });
+                    ->orWhere(function ($q2) use ($mes, $anio) {
+                        $q2->whereYear('fecha_salida', $anio)
+                            ->whereMonth('fecha_salida', $mes);
+                    });
             })
             ->get();
 
@@ -397,7 +397,7 @@ class PlanillaPagoService
     public function registrarGastoIndividualPago(PlanillaPago $pago): void
     {
         $empleado = $this->empleadoService->findById($pago->empleado_id);
-        if (!$empleado) {
+        if (! $empleado) {
             return;
         }
 
@@ -406,7 +406,7 @@ class PlanillaPagoService
         $montoGasto = $sueldoPlanilla + $totalPagar;
 
         $categoria = GastoCategoria::where('nombre', 'Gastos_Personal')->first();
-        if (!$categoria) {
+        if (! $categoria) {
             $categoria = GastoCategoria::create([
                 'nombre' => 'Gastos_Personal',
                 'activo' => true,
@@ -416,7 +416,7 @@ class PlanillaPagoService
         $tipo = GastoTipo::where('nombre', 'Sueldos')
             ->where('categoria_gasto_id', $categoria->id)
             ->first();
-        if (!$tipo) {
+        if (! $tipo) {
             $tipo = GastoTipo::create([
                 'nombre' => 'Sueldos',
                 'activo' => true,
@@ -444,7 +444,7 @@ class PlanillaPagoService
             ->value('max_interno');
         $siguienteInterno = $ultimoInterno ? ((int) $ultimoInterno + 1) : 1;
 
-        if (!$gastoExistente) {
+        if (! $gastoExistente) {
             Gasto::create([
                 'user_id' => $userId,
                 'user_nombre' => $userNombre,

@@ -36,6 +36,11 @@
                                 Reportes Generales
                             </a>
                         </li>
+                        {{-- <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="tab3-link" data-bs-toggle="tab" href="#tab3" role="tab">
+                                Reporte Biométrico
+                            </a>
+                        </li> --}}
                     </ul>
                 </div>
 
@@ -64,11 +69,11 @@
                             <div class="row g-2 align-items-end mb-2">
                                 <div class="col-12 col-lg-3">
                                     <label class="form-label mb-0">Fecha Inicio</label>
-                                    <input type="date" id="fecha_inicio" class="form-control form-control-sm" value="{{ date('Y-01-01') }}">
+                                    <input type="text" id="fecha_inicio" class="form-control form-control-sm date-picker" value="{{ date('Y-01-01') }}">
                                 </div>
                                 <div class="col-12 col-lg-3">
                                     <label class="form-label mb-0">Fecha Fin</label>
-                                    <input type="date" id="fecha_fin" class="form-control form-control-sm" value="{{ date('Y-m-d') }}">
+                                    <input type="text" id="fecha_fin" class="form-control form-control-sm date-picker" value="{{ date('Y-m-d') }}">
                                 </div>
                                 <div class="col-12 col-lg-2">
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="btnHoyTab1">
@@ -105,11 +110,11 @@
                             <div class="row g-2 align-items-end mb-2">
                                 <div class="col-12 col-lg-2">
                                     <label class="form-label mb-0">Fecha Inicio</label>
-                                    <input type="date" id="fecha_inicio_general" class="form-control form-control-sm" value="{{ date('Y-01-01') }}">
+                                    <input type="text" id="fecha_inicio_general" class="form-control form-control-sm date-picker" value="{{ date('Y-01-01') }}">
                                 </div>
                                 <div class="col-12 col-lg-2">
                                     <label class="form-label mb-0">Fecha Fin</label>
-                                    <input type="date" id="fecha_fin_general" class="form-control form-control-sm" value="{{ date('Y-m-d') }}">
+                                    <input type="text" id="fecha_fin_general" class="form-control form-control-sm date-picker" value="{{ date('Y-m-d') }}">
                                 </div>
                                 <div class="col-12 col-lg-2">
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="btnHoyTab2">
@@ -144,12 +149,14 @@
                                         <button type="button" class="btn btn-success btn-sm btn-report"
                                             data-tab="2"
                                             data-url="{{ route('reportes.planilla.trabajadores_sueldo') }}">
-                                            <i class="bi bi-currency-dollar"></i> Trabajadores c/ Sueldo
+                                            <i class="bi bi-currency-dollar"></i> Trabajador c/ Sueldo
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+
                     </div>
                 </div>
             </div>
@@ -169,16 +176,21 @@
     });
 
     function initSelect2() {
-        $('#filtro_empleado').select2({
+        const commonOptions = {
             width: '100%',
-            placeholder: '-- Seleccionar empleado --',
             allowClear: true,
             language: {
                 noResults: function() {
                     return "No se encontraron empleados";
                 }
             }
+        };
+
+        $('#filtro_empleado').select2({
+            ...commonOptions,
+            placeholder: '-- Seleccionar empleado --',
         });
+
     }
 
     function getParams(tab, skipEmployeeValidation = false) {
@@ -239,6 +251,8 @@
             descargarTodosLosPdfs();
         });
 
+
+
         document.addEventListener('click', function(e) {
             const btn = e.target.closest('.btn-report');
             if (!btn) return;
@@ -254,6 +268,7 @@
             const finalUrl = url + '?' + params.toString();
             window.open(finalUrl, '_blank');
         });
+
     }
 
     function showError(message) {

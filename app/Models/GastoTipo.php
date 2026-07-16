@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class GastoTipo extends Model
 {
     protected $table = 'gasto_tipos';
+
     protected $primaryKey = 'id';
 
     protected $fillable = [

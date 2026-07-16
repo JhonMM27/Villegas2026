@@ -55,11 +55,26 @@ class VentaEntregaService
             // 3) Persistir cabecera y detalles
             $entrega = VentaEntrega::create($entregaData['entrega']);
             if (! empty($entregaData['detalles'])) {
-                $entrega->detalles()->createMany($entregaData['detalles']);
+                // ────────────────────────────────────────────────────────
+                // BLOQUE: Crear detalles y registrar movimientos
+                // ────────────────────────────────────────────────────────
+                // ¿Por qué $detallesCreados?: createMany() devuelve la
+                //   colección de modelos recién creados (con sus IDs
+                //   asignados por la BD). Si iteráramos sobre
+                //   $entrega->detalles (cargado al inicio con
+                //   with('detalles') en updateEntrega/rectificarEntrega),
+                //   podríamos estar usando la versión cached de la
+                //   relación, que NO contiene los detalles nuevos.
+                //
+                //   Los movimientos de kardex DEBEN referenciar el
+                //   detalle_id correcto; usar la versión cached causaría
+                //   movimientos huérfanos o con detalle_id incorrecto.
+                // ────────────────────────────────────────────────────────
+                $detallesCreados = $entrega->detalles()->createMany($entregaData['detalles']);
                 $this->aplicarDetalleEnVentas($entrega->id);
 
                 // 4) Registrar movimientos de SALIDA en el kardex por cada detalle entregado
-                foreach ($entrega->detalles as $detalle) {
+                foreach ($detallesCreados as $detalle) {
                     $this->movimientoService->registrarSalida([
                         'tipo' => MovimientoService::TIPO_VENTA,
                         'fecha' => $entrega->fecha_entrega,
@@ -110,11 +125,11 @@ class VentaEntregaService
             $entrega->update($entregaData['entrega']);
             $entrega->detalles()->delete();
             if (! empty($entregaData['detalles'])) {
-                $entrega->detalles()->createMany($entregaData['detalles']);
+                $detallesCreados = $entrega->detalles()->createMany($entregaData['detalles']);
                 $this->aplicarDetalleEnVentas($entrega->id);
 
                 // 5) Registrar nuevos movimientos de SALIDA
-                foreach ($entrega->detalles as $detalle) {
+                foreach ($detallesCreados as $detalle) {
                     $this->movimientoService->registrarSalida([
                         'tipo' => MovimientoService::TIPO_VENTA,
                         'fecha' => $entrega->fecha_entrega,
@@ -415,11 +430,11 @@ class VentaEntregaService
             ]));
             $entrega->detalles()->delete();
             if (! empty($entregaData['detalles'])) {
-                $entrega->detalles()->createMany($entregaData['detalles']);
+                $detallesCreados = $entrega->detalles()->createMany($entregaData['detalles']);
                 $this->aplicarDetalleEnVentas($entrega->id);
 
                 // 5) Registrar nuevos movimientos de SALIDA
-                foreach ($entrega->detalles as $detalle) {
+                foreach ($detallesCreados as $detalle) {
                     $this->movimientoService->registrarSalida([
                         'tipo' => MovimientoService::TIPO_VENTA,
                         'fecha' => $entrega->fecha_entrega,

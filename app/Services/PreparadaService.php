@@ -95,7 +95,7 @@ class PreparadaService
                 'cantidad_kg' => $preparada->ingreso_kg,
                 'costo_unitario' => $preparada->costo_unitario,
                 'costo_saco' => $preparada->costo_unitario,
-            ], true);
+            ]);
 
             return $preparada;
         });
@@ -216,6 +216,22 @@ class PreparadaService
             $preparada->load('detalles');
 
             $productosAfectados = [];
+            // ────────────────────────────────────────────────────────────
+            // BLOQUE: Reconstrucción de movimientos del kardex
+            // ────────────────────────────────────────────────────────────
+            // ¿Qué hace?: Tras reemplazar los detalles de la preparada,
+            //   restaura los movimientos neutralizados de SALIDA de
+            //   insumos y del INGRESO del producto final.
+            //
+            // ¿Por qué $movimientosUsados?:  Una preparada puede tener
+            //   dos insumos del mismo producto (ej: CALCIO de 2 lotes
+            //   distintos). Sin este tracking, ambas líneas encontrarían
+            //   el mismo movimiento neutralizado y lo sobrescribirían,
+            //   dejando una línea sin restaurar. El mismo array protege
+            //   también el producto final si su id coincide con un
+            //   insumo.
+            // ────────────────────────────────────────────────────────────
+            $movimientosUsados = [];
 
             // 4) Reemplazar movimientos de SALIDA de insumos en el kardex
             foreach ($detallesNuevos as $detalle) {
@@ -229,6 +245,8 @@ class PreparadaService
                     ->where('entrada', 0)
                     ->where('salida', 0)
                     ->where('cantidad_kg', 0)
+                    ->whereNotIn('id', $movimientosUsados)
+                    ->orderBy('id', 'asc')
                     ->first();
 
                 if ($movNeutralizado) {
@@ -252,6 +270,7 @@ class PreparadaService
                         'salida' => $cantidadStock,
                         'comentario' => 'Rectificación de preparada (Actualizado)',
                     ]);
+                    $movimientosUsados[] = $movNeutralizado->id;
                     $productosAfectados[] = $detalle->producto_id;
                 } else {
                     $this->movimientoService->registrarSalida([
@@ -279,6 +298,8 @@ class PreparadaService
                 ->where('entrada', 0)
                 ->where('salida', 0)
                 ->where('cantidad_kg', 0)
+                ->whereNotIn('id', $movimientosUsados)
+                ->orderBy('id', 'asc')
                 ->first();
 
             if ($movNeutralizadoProd) {
@@ -333,18 +354,30 @@ class PreparadaService
                     'costo_unitario' => $preparada->costo_unitario,
                     'costo_saco' => $preparada->costo_unitario,
                     'comentario' => 'Rectificación de preparada',
-                ], true);
+                ]);
                 $productosAfectados[] = $preparada->producto_id;
             }
 
             // 6) Recalcular Kardex para productos afectados
+            $fechaPreparada = $preparada->fecha instanceof \Carbon\Carbon
+                ? $preparada->fecha
+                : \Carbon\Carbon::parse($preparada->fecha);
+
             foreach (array_unique($productosAfectados) as $pId) {
-                $primerMov = Movimiento::where('transaccion_id', $preparada->id)
-                    ->where('producto_id', $pId)
-                    ->orderBy('id', 'asc')
-                    ->first();
-                if ($primerMov) {
-                    $this->movimientoService->recalcularKardexProducto($pId, $primerMov->id);
+                if ($fechaPreparada->lt(today())) {
+                    // IMPORTANTE: datetime completo para punto de partida exacto (por hora, no solo fecha)
+                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                        $pId,
+                        $fechaPreparada->format('Y-m-d H:i:s')
+                    );
+                } else {
+                    $primerMov = Movimiento::where('transaccion_id', $preparada->id)
+                        ->where('producto_id', $pId)
+                        ->orderBy('id', 'asc')
+                        ->first();
+                    if ($primerMov) {
+                        $this->movimientoService->recalcularKardexProducto($pId, $primerMov->id);
+                    }
                 }
             }
 

@@ -188,8 +188,7 @@
                     this.elements.modalTitle.textContent = 'Editar Costo: ' + response.numero_recibo;
                     this.elements.methodField.value = 'PUT';
 
-                    document.getElementById('fecha_costo').value = (response.fecha_costo || '').replace(' ', 'T').slice(
-                        0, 16);
+                    this.setFieldValue('fecha_costo', this.formatDateTimeLocal(response.fecha_costo));
                     document.getElementById('numero_interno').value = response.numero_interno || '';
                     document.getElementById('total_cobranza').value = response.monto || 0;
                     document.getElementById('principal').value = response.importe_p || 0;
@@ -247,7 +246,7 @@
             showCreateModal() {
                 super.showCreateModal();
                 this.elements.modalTitle.textContent = 'Nuevo Costo';
-                document.getElementById('fecha_costo').value = this.obtenerFechaHoraActual();
+                this.setFieldValue('fecha_costo', this.obtenerFechaHoraActual());
                 this.cargarCategoriasSelect();
             }
 

@@ -3,14 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Proveedor;
-use Illuminate\Http\Request;
-use Yajra\DataTables\DataTables;
-use Illuminate\Validation\Rule;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Yajra\DataTables\DataTables;
 
 class ProveedorController extends Controller
 {
-    public function __construct(){
+    public function __construct()
+    {
         $this->middleware('can:proveedores_list')->only(['index', 'imprimir']);
         $this->middleware('can:proveedores_create')->only(['store']);
         $this->middleware('can:proveedores_edit')->only(['show', 'update']);
@@ -34,7 +35,7 @@ class ProveedorController extends Controller
                     'email',
                     'representante',
                     'representante_telefono',
-                    'cuenta_bancaria'
+                    'cuenta_bancaria',
                 ]);
 
             return DataTables::of($data)
@@ -43,15 +44,16 @@ class ProveedorController extends Controller
                     return $row->documentoTipo ? $row->documentoTipo->descripcion : '';
                 })
                 ->addColumn('action', function ($row) {
-                    $editButton ='';
-                    if(auth()->user()->can('proveedores_edit')){
+                    $editButton = '';
+                    if (auth()->user()->can('proveedores_edit')) {
                         $editButton = view('components.button-edit', ['id' => $row->id])->render();
                     }
                     $deleteButton = '';
-                    if(auth()->user()->can('proveedores_delete')){
+                    if (auth()->user()->can('proveedores_delete')) {
                         $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $row->razon_social])->render();
                     }
-                    return '<div class="btn-group">' . $editButton . $deleteButton . '</div>';
+
+                    return '<div class="btn-group">'.$editButton.$deleteButton.'</div>';
                 })
                 ->rawColumns(['action'])
                 ->make(true);
@@ -65,13 +67,13 @@ class ProveedorController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $this->validateData($request);        
+        $data = $this->validateData($request);
         $registro = Proveedor::create($data);
 
         return response()->json([
-            'success'=> true,
-            'message'=>'Registro creado satisfactoriamente',
-            'proveedor'=> $registro
+            'success' => true,
+            'message' => 'Registro creado satisfactoriamente',
+            'proveedor' => $registro,
         ]);
     }
 
@@ -87,6 +89,7 @@ class ProveedorController extends Controller
             if (array_key_exists('documento_numero', $data)) {
                 $data['documento_numero'] = $data['documento_numero'];
             }
+
             return response()->json($data);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
@@ -109,7 +112,7 @@ class ProveedorController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Registro actualizado correctamente'
+            'message' => 'Registro actualizado correctamente',
         ]);
 
     }
@@ -125,11 +128,11 @@ class ProveedorController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro'
+                'message' => 'Error al eliminar el registro',
             ], 500);
         }
     }
@@ -173,18 +176,19 @@ class ProveedorController extends Controller
     public function buscar(Request $request)
     {
         $q = $request->input('q');
+
         return Proveedor::where('id', $q)
-                    ->orWhere('razon_social', 'like', "%{$q}%")
-                    ->orWhere('documento_numero', 'like', "%{$q}%")
-                    ->select('id', 'documento_numero as documento_numero', 'razon_social')
-                    ->limit(10)
-                    ->get();
+            ->orWhere('razon_social', 'like', "%{$q}%")
+            ->orWhere('documento_numero', 'like', "%{$q}%")
+            ->select('id', 'documento_numero as documento_numero', 'razon_social')
+            ->limit(10)
+            ->get();
     }
 
     public function imprimir(Request $request)
     {
         $query = Proveedor::with('documentoTipo')
-                ->select(['id', 'documento_tipo_codigo', 'documento_numero','razon_social',
+            ->select(['id', 'documento_tipo_codigo', 'documento_numero', 'razon_social',
                 'direccion', 'telefono', 'email']);
 
         $reportes = $query
@@ -195,10 +199,10 @@ class ProveedorController extends Controller
             'proveedores.reporte_pdf',
             compact('reportes')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
+
         return $pdf->stream('proveedores.pdf');
     }
-
 }

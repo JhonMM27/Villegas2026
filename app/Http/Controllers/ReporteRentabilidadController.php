@@ -2,21 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\User;
-use App\Models\Producto;
 use App\Models\Venta;
-use App\Models\VentaDetalle;
-use Carbon\Carbon;
-
-use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ReporteRentabilidadController extends Controller
 {
-    public function __construct(){
-        $this->middleware('can:rentabilidad_report')->only(['index','rentabilidadVentasFechas','imprimirRentabilidadVentasFechas','rentabilidadDetalleVentasFechas','imprimirRentabilidadDetalleVentasFechas','rentabilidadProductoVentasFechas','imprimirRentabilidadProductoVentasFechas','rentabilidadProductosFechas','imprimirRentabilidadProductosFechas']);
+    public function __construct()
+    {
+        $this->middleware('can:rentabilidad_report')->only(['index', 'rentabilidadVentasFechas', 'imprimirRentabilidadVentasFechas', 'rentabilidadDetalleVentasFechas', 'imprimirRentabilidadDetalleVentasFechas', 'rentabilidadProductoVentasFechas', 'imprimirRentabilidadProductoVentasFechas', 'rentabilidadProductosFechas', 'imprimirRentabilidadProductosFechas']);
     }
 
     public function index(Request $request)
@@ -27,13 +23,13 @@ class ReporteRentabilidadController extends Controller
 
     public function rentabilidadVentasFechas(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
         $data = $request->validate([
-            'fecha_inicio'  => ['required', 'date'],
-            'fecha_fin'     => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
         ]);
 
         $fechaInicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
@@ -67,9 +63,9 @@ class ReporteRentabilidadController extends Controller
                     'rentabilidad',
                 ]);
             },
-            'detalles.producto:id,linea_id,nombre',
-            'detalles.producto.linea:id,nombre',
-        ]);
+                'detalles.producto:id,linea_id,nombre',
+                'detalles.producto.linea:id,nombre',
+            ]);
 
         $reportes = $query->get();
 
@@ -79,8 +75,8 @@ class ReporteRentabilidadController extends Controller
     public function imprimirRentabilidadVentasFechas(Request $request)
     {
         $data = $request->validate([
-            'fecha_inicio'  => ['required', 'date'],
-            'fecha_fin'     => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
         ]);
 
         $fechaInicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
@@ -113,9 +109,9 @@ class ReporteRentabilidadController extends Controller
                     'rentabilidad',
                 ]);
             },
-            'detalles.producto:id,linea_id,nombre',
-            'detalles.producto.linea:id,nombre',
-        ]);
+                'detalles.producto:id,linea_id,nombre',
+                'detalles.producto.linea:id,nombre',
+            ]);
 
         $reportes = $query->get();
 
@@ -123,23 +119,22 @@ class ReporteRentabilidadController extends Controller
             'reportes.rentabilidad.ventas_fechas_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'landscape')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('rentabilidad_ventas_fechas.pdf');
     }
 
-
     public function rentabilidadDetalleVentasFechas(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
-        
+
         $data = $request->validate([
-            'fecha_inicio'  => ['required', 'date'],
-            'fecha_fin'     => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
         ]);
 
         $fechaInicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
@@ -173,9 +168,9 @@ class ReporteRentabilidadController extends Controller
                     'rentabilidad',
                 ]);
             },
-            'detalles.producto:id,linea_id,nombre',
-            'detalles.producto.linea:id,nombre',
-        ]);
+                'detalles.producto:id,linea_id,nombre',
+                'detalles.producto.linea:id,nombre',
+            ]);
 
         $reportes = $query->get();
 
@@ -185,8 +180,8 @@ class ReporteRentabilidadController extends Controller
     public function imprimirRentabilidadDetalleVentasFechas(Request $request)
     {
         $data = $request->validate([
-            'fecha_inicio'  => ['required', 'date'],
-            'fecha_fin'     => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
         ]);
 
         $fechaInicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
@@ -221,8 +216,8 @@ class ReporteRentabilidadController extends Controller
                     'rentabilidad',
                 ]);
             },
-            'detalles.producto:id,linea_id,nombre',
-            'detalles.producto.linea:id,nombre',
+                'detalles.producto:id,linea_id,nombre',
+                'detalles.producto.linea:id,nombre',
             ]);
 
         $reportes = $query->get();
@@ -231,29 +226,29 @@ class ReporteRentabilidadController extends Controller
             'reportes.rentabilidad.ventas_detalles_fechas_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'landscape')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('rentabilidad_ventas_fechas.pdf');
     }
 
     public function rentabilidadProductosFechas(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
         $data = $request->validate([
             'fecha_inicio' => ['required', 'date'],
-            'fecha_fin'    => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
         ]);
 
         $fechaInicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
-        $fechaFin    = Carbon::parse($data['fecha_fin'])->endOfDay();
+        $fechaFin = Carbon::parse($data['fecha_fin'])->endOfDay();
 
         // costo total ajustado por empaque (misma lógica que tu calculateDetail)
-        $costoAjustadoExpr = "
+        $costoAjustadoExpr = '
             ROUND(
                 (
                     (COALESCE(p.costo_unitario, 0) / COALESCE(NULLIF(p.empaque, 0), 1))
@@ -261,7 +256,7 @@ class ReporteRentabilidadController extends Controller
                 )
                 * COALESCE(vd.cantidad, 0)
             , 2)
-        ";
+        ';
 
         $reportes = DB::table('ventas as v')
             ->join('venta_detalles as vd', 'vd.venta_id', '=', 'v.id')
@@ -313,14 +308,14 @@ class ReporteRentabilidadController extends Controller
     {
         $data = $request->validate([
             'fecha_inicio' => ['required', 'date'],
-            'fecha_fin'    => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
         ]);
 
         $fechaInicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
-        $fechaFin    = Carbon::parse($data['fecha_fin'])->endOfDay();
+        $fechaFin = Carbon::parse($data['fecha_fin'])->endOfDay();
 
         // costo total ajustado por empaque (misma lógica que tu calculateDetail)
-        $costoAjustadoExpr = "
+        $costoAjustadoExpr = '
             ROUND(
                 (
                     (COALESCE(p.costo_unitario, 0) / COALESCE(NULLIF(p.empaque, 0), 1))
@@ -328,7 +323,7 @@ class ReporteRentabilidadController extends Controller
                 )
                 * COALESCE(vd.cantidad, 0)
             , 2)
-        ";
+        ';
 
         $reportes = DB::table('ventas as v')
             ->join('venta_detalles as vd', 'vd.venta_id', '=', 'v.id')
@@ -377,26 +372,26 @@ class ReporteRentabilidadController extends Controller
             'reportes.rentabilidad.productos_fechas_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('rentabilidad_productos_fechas.pdf');
     }
 
     public function rentabilidadProductosVentasFechas(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
         $data = $request->validate([
             'fecha_inicio' => ['required', 'date'],
-            'fecha_fin'    => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
         ]);
 
         $fechaInicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
-        $fechaFin    = Carbon::parse($data['fecha_fin'])->endOfDay();
+        $fechaFin = Carbon::parse($data['fecha_fin'])->endOfDay();
 
         $ventasFiltradas = DB::table('ventas')
             ->select('id', 'pago_forma_codigo')
@@ -421,23 +416,23 @@ class ReporteRentabilidadController extends Controller
                 SUM(CASE WHEN NOT($condContado) THEN COALESCE(vd.rentabilidad, 0) ELSE 0 END) as credito,
                 SUM(COALESCE(vd.rentabilidad, 0)) as total
             ")
-            ->groupBy('p.linea_id','l.nombre','p.id','p.nombre','p.empaque')
+            ->groupBy('p.linea_id', 'l.nombre', 'p.id', 'p.nombre', 'p.empaque')
             ->orderBy('l.nombre')
             ->orderBy('p.nombre')
             ->get();
 
         return view('reportes.rentabilidad.productos_ventas_fechas', compact('reportes', 'fechaInicio', 'fechaFin'));
     }
-    
+
     public function ImprimirRentabilidadProductosVentasFechas(Request $request)
     {
         $data = $request->validate([
             'fecha_inicio' => ['required', 'date'],
-            'fecha_fin'    => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
         ]);
 
         $fechaInicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
-        $fechaFin    = Carbon::parse($data['fecha_fin'])->endOfDay();
+        $fechaFin = Carbon::parse($data['fecha_fin'])->endOfDay();
 
         $ventasFiltradas = DB::table('ventas')
             ->select('id', 'pago_forma_codigo')
@@ -462,7 +457,7 @@ class ReporteRentabilidadController extends Controller
                 SUM(CASE WHEN NOT($condContado) THEN COALESCE(vd.rentabilidad, 0) ELSE 0 END) as credito,
                 SUM(COALESCE(vd.rentabilidad, 0)) as total
             ")
-            ->groupBy('p.linea_id','l.nombre','p.id','p.nombre','p.empaque')
+            ->groupBy('p.linea_id', 'l.nombre', 'p.id', 'p.nombre', 'p.empaque')
             ->orderBy('l.nombre')
             ->orderBy('p.nombre')
             ->get();
@@ -471,9 +466,9 @@ class ReporteRentabilidadController extends Controller
             'reportes.rentabilidad.productos_ventas_fechas_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('rentabilidad_productos_ventas.pdf');
     }

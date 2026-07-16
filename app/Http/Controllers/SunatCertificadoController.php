@@ -5,11 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\SunatCertificado;
 use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
-use Illuminate\Validation\Rule;
 
 class SunatCertificadoController extends Controller
 {
-    public function __construct(){
+    public function __construct()
+    {
         $this->middleware('can:sunat_list')->only(['index']);
         $this->middleware('can:sunat_create')->only(['store']);
         $this->middleware('can:sunat_edit')->only(['show', 'update']);
@@ -24,14 +24,15 @@ class SunatCertificadoController extends Controller
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
                     $editButton = '';
-                    if(auth()->user()->can('sunat_edit')){
+                    if (auth()->user()->can('sunat_edit')) {
                         $editButton = view('components.button-edit', ['id' => $row->id])->render();
                     }
                     $deleteButton = '';
-                    if(auth()->user()->can('sunat_delete')){
+                    if (auth()->user()->can('sunat_delete')) {
                         $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $row->nombre])->render();
                     }
-                    return '<div class="btn-group">' . $editButton . $deleteButton . '</div>';
+
+                    return '<div class="btn-group">'.$editButton.$deleteButton.'</div>';
                 })
                 ->rawColumns(['action', 'activo'])
                 ->editColumn('activo', function ($row) {
@@ -49,8 +50,8 @@ class SunatCertificadoController extends Controller
         SunatCertificado::create($data);
 
         return response()->json([
-            'success'=> true,
-            'message'=>'Registro creado satisfactoriamente'
+            'success' => true,
+            'message' => 'Registro creado satisfactoriamente',
         ]);
     }
 
@@ -58,6 +59,7 @@ class SunatCertificadoController extends Controller
     {
         try {
             $registro = SunatCertificado::where('id', $id)->firstOrFail();
+
             return response()->json($registro);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
@@ -72,7 +74,7 @@ class SunatCertificadoController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Registro actualizado correctamente'
+            'message' => 'Registro actualizado correctamente',
         ]);
     }
 
@@ -84,11 +86,11 @@ class SunatCertificadoController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro'
+                'message' => 'Error al eliminar el registro',
             ], 500);
         }
     }
@@ -100,13 +102,14 @@ class SunatCertificadoController extends Controller
             'certificado_path' => 'nullable|string|max:255',
             'password' => 'nullable|string|max:255',
             'activo' => 'sometimes|boolean',
-            'expires_at' => 'nullable|date'
+            'expires_at' => 'nullable|date',
         ]);
     }
 
     public function select(Request $request)
     {
         $items = SunatCertificado::select('id', 'nombre')->where('activo', true)->get();
+
         return response()->json($items);
     }
 }

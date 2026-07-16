@@ -34,9 +34,7 @@
             </div>
             <div class="col-lg-6">
               <div class="form-group mb-3">
-                <label for="expires_at" class="form-label">Expira</label>
-                <input type="datetime-local" id="expires_at" name="expires_at" class="form-control">
-                <div class="invalid-feedback"></div>
+                <x-datetime-picker id="expires_at" label="Expira" />
               </div>
             </div>
             <div class="col-lg-12">

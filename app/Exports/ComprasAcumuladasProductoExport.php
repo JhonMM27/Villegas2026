@@ -3,14 +3,15 @@
 namespace App\Exports;
 
 use App\Models\CompraDetalle;
+use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Illuminate\Support\Carbon;
 
 class ComprasAcumuladasProductoExport implements FromCollection, WithHeadings, WithMapping
 {
     protected $fechaInicio;
+
     protected $fechaFin;
 
     public function __construct($fechaInicio = null, $fechaFin = null)
@@ -39,7 +40,7 @@ class ComprasAcumuladasProductoExport implements FromCollection, WithHeadings, W
         if ($this->fechaInicio && $this->fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($this->fechaInicio)->startOfDay(),
-                Carbon::parse($this->fechaFin)->endOfDay()
+                Carbon::parse($this->fechaFin)->endOfDay(),
             ]);
         }
 
@@ -61,7 +62,7 @@ class ComprasAcumuladasProductoExport implements FromCollection, WithHeadings, W
             'Kg',
             'Cantidad',
             'Precio',
-            'Importe'
+            'Importe',
         ];
     }
 
@@ -73,10 +74,10 @@ class ComprasAcumuladasProductoExport implements FromCollection, WithHeadings, W
             $item->producto_empaque,
             $item->producto_nombre,
             $item->linea,
-            number_format((float)$item->kg_total, 2, '.', ''),
-            number_format((float)$item->cantidad_total, 2, '.', ''),
-            number_format((float)$item->costo_unitario, 4, '.', ''),
-            number_format((float)$item->importe_total, 2, '.', '')
+            number_format((float) $item->kg_total, 2, '.', ''),
+            number_format((float) $item->cantidad_total, 2, '.', ''),
+            number_format((float) $item->costo_unitario, 4, '.', ''),
+            number_format((float) $item->importe_total, 2, '.', ''),
         ];
     }
 }

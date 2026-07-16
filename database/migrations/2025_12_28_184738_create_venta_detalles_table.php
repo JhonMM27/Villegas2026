@@ -21,7 +21,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('producto_empaque')->nullable();
             $table->char('unidad_codigo', 3)->nullable();
             $table->decimal('salida_saco', 9, 4);
-            $table->decimal('salida_kg', 8, 2);            
+            $table->decimal('salida_kg', 8, 2);
             $table->decimal('cantidad', 8, 2);
             $table->decimal('entregado', 8, 2);
             $table->decimal('saldo', 8, 2);
@@ -33,7 +33,6 @@ return new class extends Migration
             $table->decimal('costo_unitario', 10, 4)->default(0);
             $table->decimal('costo_total', 10, 4)->default(0);
             $table->decimal('rentabilidad', 10, 4)->default(0);
-            
 
             $table->foreign('venta_id')->references('id')->on('ventas')->onDelete('cascade');
             $table->foreign('producto_id')->references('id')->on('productos');

@@ -2,16 +2,18 @@
 
 namespace App\Exports;
 
+use App\Models\Venta;
+use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Illuminate\Support\Carbon;
-use App\Models\Venta;
 
 class VentasDocumentosTipoExport implements FromCollection, WithHeadings, WithMapping
 {
     protected $fechaInicio;
+
     protected $fechaFin;
+
     protected $tipoDoc;
 
     public function __construct($fechaInicio = null, $fechaFin = null, $tipoDoc = null)
@@ -40,10 +42,10 @@ class VentasDocumentosTipoExport implements FromCollection, WithHeadings, WithMa
         if ($this->fechaInicio && $this->fechaFin) {
             $query->whereBetween('ventas.fecha_venta', [
                 Carbon::parse($this->fechaInicio)->startOfDay(),
-                Carbon::parse($this->fechaFin)->endOfDay()
+                Carbon::parse($this->fechaFin)->endOfDay(),
             ]);
         }
-        if (!empty($tipoDoc)) {
+        if (! empty($tipoDoc)) {
             $query->where('ventas.comprobante_tipo_codigo', $tipoDoc);
         }
 
@@ -66,7 +68,7 @@ class VentasDocumentosTipoExport implements FromCollection, WithHeadings, WithMa
             'Ítems',
             'Forma Pago',
             'ID Cliente',
-            'Razón Social'
+            'Razón Social',
         ];
     }
 
@@ -78,12 +80,12 @@ class VentasDocumentosTipoExport implements FromCollection, WithHeadings, WithMa
             $item->comprobante_tipo_codigo,
             $item->serie,
             $item->correlativo,
-            number_format((float)$item->total, 2, '.', ''),
-            number_format((float)$item->acuenta, 2, '.', ''),
+            number_format((float) $item->total, 2, '.', ''),
+            number_format((float) $item->acuenta, 2, '.', ''),
             $item->items,
             $item->pago_forma_nombre,
             $item->cliente_id,
-            $item->cliente_nombre
+            $item->cliente_nombre,
         ];
     }
 }

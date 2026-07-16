@@ -1,4 +1,10 @@
 @php
+    // Ingresos manuales a caja (nuevo módulo)
+    $icP = (float)($ingresosCaja->importe_p ?? 0);
+    $icD = (float)($ingresosCaja->importe_d ?? 0);
+    $icC = (float)($ingresosCaja->importe_c ?? 0);
+    $icTotal = $icP + $icD + $icC;
+
     // Helpers para evitar warnings
     $vTotal   = (float)($ventas->total ?? 0);
     $vAcuenta = (float)($ventas->acuenta ?? 0);
@@ -26,6 +32,12 @@
     $gastoP = (float)($gastos->importe_p ?? 0);
     $gastoD = (float)($gastos->importe_d ?? 0);
     $gastoC = (float)($gastos->importe_c ?? 0);
+
+    // COSTOS (se restan del neto de cada caja, NO se suman a Egresos)
+    $costoTotal = (float)($costos->total ?? 0);
+    $costoP = (float)($costos->importe_p ?? 0);
+    $costoD = (float)($costos->importe_d ?? 0);
+    $costoC = (float)($costos->importe_c ?? 0);
 
     // Planilla - GASTOS EMPLEADOS
     $adelantoTotal = (float)($adelantos->total ?? 0);
@@ -104,6 +116,15 @@
                 <td class="text-end">{{ number_format($cC, 2, '.', '') }}</td>
             </tr>
 
+            <tr class="table-info">
+                <td><strong>Ingresos Caja (manuales)</strong></td>
+                <td class="text-end">{{ number_format($icTotal, 2, '.', '') }}</td>
+                <td class="text-end">—</td>
+                <td class="text-end">{{ number_format($icP, 2, '.', '') }}</td>
+                <td class="text-end">{{ number_format($icD, 2, '.', '') }}</td>
+                <td class="text-end">{{ number_format($icC, 2, '.', '') }}</td>
+            </tr>
+
             <tr>
                 <td><strong>Provisionales Venta</strong></td>
                 <td class="text-end">{{ number_format($pvTotal, 2, '.', '') }}</td>
@@ -140,6 +161,15 @@
                 <td class="text-end">{{ number_format($gastosEmpleadosC, 2, '.', '') }}</td>
             </tr>
 
+            <tr>
+                <td><strong>Costos</strong></td>
+                <td class="text-end">{{ number_format($costoTotal, 2, '.', '') }}</td>
+                <td class="text-end">—</td>
+                <td class="text-end">{{ number_format($costoP, 2, '.', '') }}</td>
+                <td class="text-end">{{ number_format($costoD, 2, '.', '') }}</td>
+                <td class="text-end">{{ number_format($costoC, 2, '.', '') }}</td>
+            </tr>
+
             <tr class="table-secondary fw-bold">
                 <td>Ingresos (Ventas + Provisionales)</td>
                 <td class="text-end" colspan="2"></td>
@@ -149,7 +179,7 @@
             </tr>
 
             <tr class="table-secondary fw-bold">
-                <td>Egresos (Compras + Provisionales + Gastos + Planilla)</td>
+                <td>Egresos (Compras + Provisionales + Gastos + Planilla + Costos)</td>
                 <td class="text-end" colspan="2"></td>
                 <td class="text-end">{{ number_format($egrP, 2, '.', '') }}</td>
                 <td class="text-end">{{ number_format($egrD, 2, '.', '') }}</td>
@@ -325,6 +355,72 @@
                                 <td class="text-end">{{ number_format((float)(($comprasList ?? collect())->sum('importe_p')),2,'.','') }}</td>
                                 <td class="text-end">{{ number_format((float)(($comprasList ?? collect())->sum('importe_d')),2,'.','') }}</td>
                                 <td class="text-end">{{ number_format((float)(($comprasList ?? collect())->sum('importe_c')),2,'.','') }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                </div>
+            </div>
+        </div>
+
+        {{-- ===================================================== --}}
+        {{-- INGRESOS MANUALES A CAJA --}}
+        {{-- ===================================================== --}}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="hIngresosCaja">
+                <button class="accordion-button collapsed" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#cIngresosCaja">
+
+                    <div class="w-100 d-flex justify-content-between">
+                        <div>
+                            <strong>Ingresos Caja (manuales)</strong>
+                            <small class="text-muted ms-2">
+                                ({{ ($ingresosCajaList ?? collect())->count() }} registros)
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted">Total:</small>
+                            <strong>
+                                {{ number_format((float)(($ingresosCajaList ?? collect())->sum('monto')), 2, '.', '') }}
+                            </strong>
+                        </div>
+                    </div>
+
+                </button>
+            </h2>
+
+            <div id="cIngresosCaja" class="accordion-collapse collapse"
+                data-bs-parent="#accReporteCaja">
+                <div class="accordion-body p-2">
+
+                    <table class="table table-sm table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Caja</th>
+                                <th>Monto</th>
+                                <th>Usuario</th>
+                                <th>Comentario</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($ingresosCajaList ?? [] as $ic)
+                            <tr>
+                                <td>{{ $ic->fecha ? \Carbon\Carbon::parse($ic->fecha)->format('d/m/Y') : '—' }}</td>
+                                <td>{{ $ic->caja_destino }}</td>
+                                <td class="text-end">S/ {{ number_format((float)$ic->monto, 2) }}</td>
+                                <td>{{ $ic->user_nombre ?? '—' }}</td>
+                                <td>{{ $ic->comentario ?? '—' }}</td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="5" class="text-center text-muted">Sin ingresos en este rango</td></tr>
+                            @endforelse
+                        </tbody>
+                        <tfoot class="table-secondary fw-bold">
+                            <tr>
+                                <td colspan="2" class="text-end">TOTALES:</td>
+                                <td class="text-end">S/ {{ number_format((float)(($ingresosCajaList ?? collect())->sum('monto')), 2) }}</td>
+                                <td colspan="2"></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -750,6 +846,87 @@
                 </div>
             </div>
         </div>
+
+
+        {{-- ===================================================== --}}
+        {{-- COSTOS --}}
+        {{-- ===================================================== --}}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="hCostos">
+                <button class="accordion-button collapsed" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#cCostos">
+
+                    <div class="w-100 d-flex justify-content-between">
+                        <div>
+                            <strong>Costos</strong>
+                            <small class="text-muted ms-2">
+                                ({{ ($costosList ?? collect())->count() }} registros)
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted">Total:</small>
+                            <strong>
+                                {{ number_format((float)(($costosList ?? collect())->sum('monto')),2,'.','') }}
+                            </strong>
+                        </div>
+                    </div>
+
+                </button>
+            </h2>
+
+            <div id="cCostos" class="accordion-collapse collapse"
+                data-bs-parent="#accReporteCaja">
+                <div class="accordion-body p-2">
+
+                    <table class="table table-sm table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center" style="width:40px;">Ver</th>
+                                <th>Fecha</th>
+                                <th>Descripción</th>
+                                <th>Responsable</th>
+                                <th class="text-end">Monto</th>
+                                <th class="text-end">Principal</th>
+                                <th class="text-end">Depósito</th>
+                                <th class="text-end">Consorcio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($costosList ?? [] as $co)
+                            <tr>
+                                <td class="text-center">
+                                    <a href="javascript:void(0)"
+                                    class="btn-view-costo text-muted"
+                                    data-id="{{ $co->id }}"
+                                    title="Ver documento">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                                <td>{{ $co->fecha_costo }}</td>
+                                <td>{{ $co->descripcion }}</td>
+                                <td>{{ $co->responsable }}</td>
+                                <td class="text-end">{{ number_format((float)$co->monto,2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)$co->importe_p,2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)$co->importe_d,2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)$co->importe_c,2,'.','') }}</td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="8" class="text-center text-muted">Sin costos</td></tr>
+                            @endforelse
+                        </tbody>
+                        <tfoot class="table-secondary fw-bold">
+                            <tr>
+                                <td colspan="5" class="text-end">TOTALES:</td>
+                                <td class="text-end">{{ number_format((float)(($costosList ?? collect())->sum('importe_p')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($costosList ?? collect())->sum('importe_d')),2,'.','') }}</td>
+                                <td class="text-end">{{ number_format((float)(($costosList ?? collect())->sum('importe_c')),2,'.','') }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                </div>
+            </div>
+        </div>
     </div>
 
 </div>
@@ -867,6 +1044,15 @@
         if (e.target.closest('.btn-view-gasto')) {
             const id = e.target.closest('.btn-view-gasto').dataset.id;
             const url = "{{ route('gastos.ver', ':id') }}".replace(':id', id);
+            loadModal(url);
+        }
+
+        // ===========================
+        // COSTOS
+        // ===========================
+        if (e.target.closest('.btn-view-costo')) {
+            const id = e.target.closest('.btn-view-costo').dataset.id;
+            const url = "{{ route('costos.ver', ':id') }}".replace(':id', id);
             loadModal(url);
         }
 

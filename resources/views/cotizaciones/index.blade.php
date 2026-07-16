@@ -1,6 +1,15 @@
 @extends('plantilla.app')
 @push('estilos')
-
+<style>
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
+</style>
 @endpush
 @section('contenido')
 <div class="container-fluid">
@@ -106,7 +115,7 @@ class CotizacionManager extends CrudManager {
             delay : 300,
         });
 
-        document.getElementById('btnRegistrarCliente').addEventListener('click', () => this.registerSupplier());
+        document.getElementById('btnRegistrarCliente').addEventListener('click', () => this.registerCliente());
 
         // Evento para el select de comprobante_tipo_codigo
         const selectComprobante = document.getElementById('comprobante_tipo_codigo');
@@ -460,7 +469,7 @@ class CotizacionManager extends CrudManager {
         document.getElementById('cliente_razon_social').value = '';
         document.getElementById('comprobante_tipo_codigo').value = 'CZ';
         document.getElementById('pago_forma_codigo').value = '1';
-        document.getElementById('fecha_cotizacion').value = this.obtenerFechaHoraActual();
+        this.setFieldValue('fecha_cotizacion', this.obtenerFechaHoraActual());
         const usuarioNombre = @json(auth()->user()->name);
         document.getElementById('usuario_nombre').textContent = usuarioNombre;
         this.getSerie('CZ');
@@ -495,8 +504,7 @@ class CotizacionManager extends CrudManager {
             document.getElementById('correlativo').value = response.correlativo || '';
             document.getElementById('cliente_id').value = response.cliente_id || '';
             document.getElementById('cliente_razon_social').value = response.cliente_nombre || '';
-            document.getElementById('fecha_cotizacion').value =
-                this.formatDateTimeLocal(response.fecha_cotizacion);
+            this.setFieldValue('fecha_cotizacion', this.formatDateTimeLocal(response.fecha_cotizacion));
 
             document.getElementById('usuario_nombre').textContent = response.user_nombre|| '';
 
@@ -537,7 +545,7 @@ class CotizacionManager extends CrudManager {
             this.getSerie(response.comprobante_tipo_codigo);
             document.getElementById('cliente_id').value = response.cliente_id || '';
             document.getElementById('cliente_razon_social').value = response.cliente_nombre || '';
-            document.getElementById('fecha_cotizacion').value = this.obtenerFechaHoraActual();
+            this.setFieldValue('fecha_cotizacion', this.obtenerFechaHoraActual());
             document.getElementById('usuario_nombre').textContent = response.user_nombre|| '';
 
             // Llenar tabla de detalles (productos)
@@ -637,7 +645,7 @@ class CotizacionManager extends CrudManager {
         }, { once: true });
     }
     
-    async registerSupplier() {
+    async registerCliente() {
         // Recoge los datos del formulario
         const documento_tipo_codigo = document.getElementById('documento_tipo_codigo').value;
         const documento_numero = document.getElementById('documento_numero').value;
@@ -648,7 +656,7 @@ class CotizacionManager extends CrudManager {
             return;
         }
         try {
-            const url = "{{ route('proveedores.store') }}";
+            const url = "{{ route('clientes.store') }}";
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
             const response = await fetch(url, {
@@ -667,24 +675,24 @@ class CotizacionManager extends CrudManager {
 
             const data = await response.json();
 
-            if (response.ok && data.success && data.proveedor) {
+            if (response.ok && data.success && data.cliente) {
                 // Asigna los datos al formulario principal
-                document.getElementById('proveedor_id').value = data.proveedor.id;
-                document.getElementById('proveedor_razon_social').value = data.proveedor.razon_social;
+                document.getElementById('cliente_id').value = data.cliente.id;
+                document.getElementById('cliente_razon_social').value = data.cliente.razon_social;
 
                 // Cambia a la tab de "Buscar Cliente"
                 new bootstrap.Tab(document.getElementById('nav-buscar-tab')).show();
-                this.showNotification('success', 'Proveedor registrado correctamente');
+                this.showNotification('success', 'Cliente registrado correctamente');
                 document.getElementById('documento_numero').value = '';
                 document.getElementById('razon_social').value = '';
-            } 
+            }
             else if (response.status === 422) {
-                this.handleFormErrors({ status: 422, data }); 
+                this.handleFormErrors({ status: 422, data });
             } else {
-                this.showNotification('error', data.message || 'Error al registrar proveedor');
+                this.showNotification('error', data.message || 'Error al registrar cliente');
             }
         } catch (error) {
-            this.showNotification('error', 'Error de red al registrar proveedor');
+            this.showNotification('error', 'Error de red al registrar cliente');
             console.error(error);
         }
     }
@@ -795,13 +803,6 @@ class CotizacionManager extends CrudManager {
                 errorDiv.remove();
             }
         });
-    }
-
-    formatDateTimeLocal(fecha) {
-        if (!fecha || fecha.startsWith('-000')) return '';
-
-        // "2025-12-29 09:58:00" → "2025-12-29T09:58"
-        return fecha.replace(' ', 'T').substring(0, 16);
     }
 
 }

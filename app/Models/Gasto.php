@@ -33,14 +33,19 @@ class Gasto extends Model
 
     protected $casts = [
         'fecha_gasto' => 'datetime',
-        'monto'       => 'decimal:2',
-        'importe_p'   => 'decimal:2',
-        'importe_d'   => 'decimal:2',
-        'importe_c'   => 'decimal:2',
+        'monto' => 'decimal:2',
+        'importe_p' => 'decimal:2',
+        'importe_d' => 'decimal:2',
+        'importe_c' => 'decimal:2',
         'planilla_mes' => 'integer',
         'planilla_anio' => 'integer',
         'empleado_id' => 'integer',
     ];
+
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
 
     public function user(): BelongsTo
     {

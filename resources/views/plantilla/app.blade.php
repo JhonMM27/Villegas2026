@@ -51,6 +51,10 @@
     <!--begin::DataTables Bootstrap5-->
     <link rel="stylesheet" href="{{asset('datatables/dataTables.bootstrap5.css')}}">
     <!--end::DataTables Bootstrap5-->
+
+    <!--begin::Flatpickr (selector de fecha/hora)-->
+    <link rel="stylesheet" href="{{asset('css/flatpickr.min.css')}}">
+    <!--end::Flatpickr-->
     
     <!--
       NOTA: Todos los estilos personalizados del sidebar ahora están centralizados
@@ -283,6 +287,11 @@
     <script src="{{asset('datatables/dataTables.bootstrap5.js')}}"></script>
     <script src="{{asset('js/sweetalert2.js')}}"></script>
     <script src="{{asset('js/crud.js')}}"></script>
+    <!--begin::Flatpickr (selector de fecha/hora)-->
+    <script src="{{asset('js/flatpickr.min.js')}}"></script>
+    <script src="{{asset('js/flatpickr-es.js')}}"></script>
+    <script src="{{asset('js/flatpickr-init.js')}}"></script>
+    <!--end::Flatpickr-->
     <!--begin::Custom Zynix JS-->
     <!--<script src="{{asset('js/zynix-custom.js')}}"></script>-->
     <!--end::Custom Zynix JS-->

@@ -16,10 +16,7 @@
 namespace App\Services;
 
 use App\Models\Nucleo;
-use App\Models\NucleoDetalle;
 use App\Models\Producto;
-use App\Models\Movimiento;
-use App\Services\MovimientoService;
 use Illuminate\Support\Facades\DB;
 
 class NucleoService
@@ -37,7 +34,7 @@ class NucleoService
      * 1. Procesa cabecera y detalles calculados
      * 2. Crea el registro Nucleo + NucleoDetalles
      *
-     * @param  array  $data Datos validados del request
+     * @param  array  $data  Datos validados del request
      * @return Nucleo El núcleo recién creado (con detalles cargados)
      *
      * @throws \Exception Si ocurre cualquier error
@@ -63,7 +60,7 @@ class NucleoService
      * 1. Valida que no esté ya anulado
      * 2. Cambia el estado a 'anulado'
      *
-     * @param  int    $id ID del núcleo a anular
+     * @param  int  $id  ID del núcleo a anular
      * @return Nucleo El núcleo anulado
      *
      * @throws \Exception Si el núcleo ya está anulado o si ocurre error
@@ -89,9 +86,8 @@ class NucleoService
      * Rectifica un núcleo previamente anulado (Actualización in-situ).
      * Modifica el registro existente en lugar de crear uno nuevo.
      *
-     * @param int   $nucleoId ID del núcleo anulado
-     * @param array $data      Datos validados del request
-     * @return array
+     * @param  int  $nucleoId  ID del núcleo anulado
+     * @param  array  $data  Datos validados del request
      */
     public function rectificarNucleo(int $nucleoId, array $data): array
     {
@@ -104,11 +100,11 @@ class NucleoService
 
             // 1) Procesar datos (cabecera + detalles calculados)
             $nucleoDataRaw = $this->processNucleoData($data, false);
-            $nucleoData    = $nucleoDataRaw['nucleo'];
-            
+            $nucleoData = $nucleoDataRaw['nucleo'];
+
             // Forzamos estado y nota
             $nucleoData['estado'] = 'activo';
-            $nucleoData['nota']   = trim(($data['nota'] ?? $nucleo->nota ?? '') . " | Rectificado el " . now()->format('d/m/Y H:i'));
+            $nucleoData['nota'] = trim(($data['nota'] ?? $nucleo->nota ?? '').' | Rectificado el '.now()->format('d/m/Y H:i'));
 
             // 2) Actualizar la cabecera del registro existente
             $nucleo->update($nucleoData);
@@ -119,8 +115,8 @@ class NucleoService
             $nucleo->load('detalles');
 
             return [
-                'nucleo'    => $nucleo,
-                'detalles'  => $detallesNuevos
+                'nucleo' => $nucleo,
+                'detalles' => $detallesNuevos,
             ];
         });
     }
@@ -128,8 +124,8 @@ class NucleoService
     /**
      * Procesa y construye los datos del núcleo (cabecera + detalles calculados).
      *
-     * @param  array $data  Datos validados del request
-     * @param  bool  $isNew true=nuevo registro, false=edición
+     * @param  array  $data  Datos validados del request
+     * @param  bool  $isNew  true=nuevo registro, false=edición
      * @return array ['nucleo' => [...], 'detalles' => [...]]
      */
     private function processNucleoData(array $data, bool $isNew = true): array
@@ -159,14 +155,14 @@ class NucleoService
 
         // Construir array de la cabecera
         $nucleoData = [
-            'id'                  => $productoNucleo->id,
-            'nombre'              => $productoNucleo->nombre ?? '',
-            'unidad_codigo'       => $productoNucleo->unidad_codigo ?? '',
-            'unidad_nombre'       => $productoNucleo->unidad->descripcion ?? '',
-            'empaque'             => $productoNucleo->empaque ?? 0,
+            'id' => $productoNucleo->id,
+            'nombre' => $productoNucleo->nombre ?? '',
+            'unidad_codigo' => $productoNucleo->unidad_codigo ?? '',
+            'unidad_nombre' => $productoNucleo->unidad->descripcion ?? '',
+            'empaque' => $productoNucleo->empaque ?? 0,
             'cantidad_porcentaje' => $cantidadTotal,
-            'items'               => count($detallesCalculados),
-            'estado'              => 'activo',
+            'items' => count($detallesCalculados),
+            'estado' => 'activo',
         ];
 
         // Campo exclusivo de creación
@@ -175,26 +171,26 @@ class NucleoService
         }
 
         return [
-            'nucleo'    => $nucleoData,
-            'detalles'  => $detallesCalculados
+            'nucleo' => $nucleoData,
+            'detalles' => $detallesCalculados,
         ];
     }
 
     /**
      * Calcula los valores de un detalle de núcleo individual.
      *
-     * @param  Producto $producto     Producto componente
-     * @param  string   $unidad_codigo Código de unidad
-     * @param  float    $cantidad      Cantidad
-     * @return array    Detalle listo para createMany()
+     * @param  Producto  $producto  Producto componente
+     * @param  string  $unidad_codigo  Código de unidad
+     * @param  float  $cantidad  Cantidad
+     * @return array Detalle listo para createMany()
      */
     private function calculateDetail($producto, $unidad_codigo, $cantidad): array
     {
         return [
-            'producto_id'      => $producto->id,
-            'producto_nombre'  => $producto->nombre,
-            'unidad_codigo'    => $unidad_codigo,
-            'cantidad'         => $cantidad
+            'producto_id' => $producto->id,
+            'producto_nombre' => $producto->nombre,
+            'unidad_codigo' => $unidad_codigo,
+            'cantidad' => $cantidad,
         ];
     }
 }

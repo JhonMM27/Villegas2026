@@ -383,7 +383,7 @@ class CompraProvisionalManager extends CrudManager {
             this.elements.methodField.value = 'PUT';
 
             // Campos del modal (ajusta IDs según tu action.blade.php)
-            document.getElementById('fecha_provisional').value = (response.fecha_provisional || '').replace(' ', 'T').slice(0,16);
+            this.setFieldValue('fecha_provisional', this.formatDateTimeLocal(response.fecha_provisional));
             //document.getElementById('numero_recibo').value = response.numero_recibo || '';
             document.getElementById('numero_interno').value = response.numero_interno || '';
             document.getElementById('proveedor_id').value = response.proveedor_id || '';
@@ -489,14 +489,16 @@ class CompraProvisionalManager extends CrudManager {
         document.getElementById('usuario_nombre').textContent = usuarioNombre;
 
         // Defaults (si quieres)
-        document.getElementById('fecha_provisional').value = this.obtenerFechaHoraActual();
+        this.setFieldValue('fecha_provisional', this.obtenerFechaHoraActual());
         this.limpiarTablaCompras();
     }
 
     focusFirstField() {
         const modalEl = this.modal._element;
         modalEl.addEventListener('shown.bs.modal', () => {
-            const input = document.getElementById('fecha_provisional');
+            // Se enfoca 'numero_interno' en lugar de 'fecha_provisional' para evitar
+            // que se abra automáticamente el selector de fecha (calendario).
+            const input = document.getElementById('numero_interno');
             if (input) input.focus();
         }, { once: true });
     }

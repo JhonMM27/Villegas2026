@@ -151,30 +151,40 @@
             @endphp
             @foreach ($pagos as $p)
                 @php
-                    $sueldoReal = (float) ($p->empleado->sueldo_real ?? 0);
-                    $sueldoPlanilla = (float) ($p->empleado->sueldo_planilla ?? 0);
+                    $sueldoReal = (float) ($p->sueldo_real_mostrar ?? $p->empleado->sueldo_real ?? 0);
+                    $sueldoPlanilla = (float) ($p->sueldo_planilla_mostrar ?? $p->empleado->sueldo_planilla ?? 0);
                     $disponible = $sueldoReal - $sueldoPlanilla;
                     $adelantos = (float) ($p->adelantos_calculado ?? 0);
-                    $xPagar = $disponible - $adelantos;
                     $horasExtras = (float) $p->horas_extras;
                     $descuentoFaltas = (float) ($p->descuento_faltas ?? 0);
+                    $totalPagar = $disponible - $adelantos + $horasExtras - $descuentoFaltas;
 
                     $totalSueldo += $sueldoReal;
                     $totalPlanilla += $sueldoPlanilla;
                     $totalAdelantos += $adelantos;
                     $totalHorasExtras += $horasExtras;
                     $totalDescuentoFaltas += $descuentoFaltas;
-                    $totalXPorPagar += $xPagar + $horasExtras - $descuentoFaltas;
+                    $totalXPorPagar += $totalPagar;
                 @endphp
                 <tr>
-                    <td class="text-left">{{ $p->empleado->nombre ?? 'N/A' }}</td>
+                    <td class="text-left">
+                        {{ $p->empleado->nombre ?? 'N/A' }}
+                        @if ($p->prorrateo_ingreso ?? false)
+                            <span class="badge bg-info ms-1"
+                                title="Prorrateo por fecha de ingreso ({{ $p->dias_trabajados ?? 0 }} días)">   </span>
+                        @endif
+                        @if ($p->prorrateo_salida ?? false)
+                            <span class="badge bg-warning ms-1"
+                                title="Prorrateo por fecha de salida ({{ $p->dias_trabajados ?? 0 }} días)"></span>
+                        @endif
+                    </td>
                     <td>{{ $p->empleado->dni ?? 'N/A' }}</td>
                     <td class="text-right">S/ {{ number_format($sueldoReal, 2) }}</td>
                     <td class="text-right">S/ {{ number_format($sueldoPlanilla, 2) }}</td>
                     <td class="text-right">S/ {{ number_format($adelantos, 2) }}</td>
                     <td class="text-right">S/ {{ number_format($horasExtras, 2) }}</td>
                     <td class="text-right">S/ {{ number_format($descuentoFaltas, 2) }}</td>
-                    <td class="text-right">S/ {{ number_format($xPagar + $horasExtras - $descuentoFaltas, 2) }}</td>
+                    <td class="text-right"><strong>S/ {{ number_format($totalPagar, 2) }}</strong></td>
                     <td><span class="signature-box"></span></td>
                 </tr>
             @endforeach

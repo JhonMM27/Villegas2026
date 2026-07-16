@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Nucleo extends Model
 {
@@ -13,7 +13,7 @@ class Nucleo extends Model
     // id NO es autoincremental
     public $incrementing = false;
 
-    //protected $keyType = 'int';
+    // protected $keyType = 'int';
 
     protected $fillable = [
         'id',
@@ -23,7 +23,7 @@ class Nucleo extends Model
         'empaque',
         'cantidad_porcentaje',
         'items',
-        'activo'
+        'activo',
     ];
 
     /**

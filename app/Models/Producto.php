@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
-//use App\Models\Producto;
+
+// use App\Models\Producto;
 
 class Producto extends Model
 {
@@ -32,7 +32,7 @@ class Producto extends Model
     {
         return $this->belongsTo(AfectacionTipo::class, 'afectacion_tipo_codigo', 'codigo');
     }
-    
+
     public function linea()
     {
         return $this->belongsTo(Linea::class, 'linea_id', 'id');
@@ -42,7 +42,6 @@ class Producto extends Model
     {
         return $this->hasMany(ProductoFraccion::class, 'producto_id', 'id');
     }
-
 
     /* ============================================================
      * COMENTADO: Migrado a MovimientoService::registrarIngreso()
@@ -81,11 +80,11 @@ class Producto extends Model
         foreach ($detalles as $detalle) {
 
             $producto = self::where('id', $detalle['producto_id'])
-            ->lockForUpdate()
-            ->firstOrFail();
+                ->lockForUpdate()
+                ->firstOrFail();
 
             $cantidadDetalle = floatval($detalle['cantidad']);
-            $empaqueDetalle  = floatval($detalle['producto_empaque']);          // viene del detalle
+            $empaqueDetalle = floatval($detalle['producto_empaque']);          // viene del detalle
             $empaqueProducto = floatval($producto->empaque);           // base del producto
 
             if ($empaqueDetalle <= 0 || $empaqueProducto <= 0) {
@@ -101,7 +100,7 @@ class Producto extends Model
 
             // ➕➖ Actualización de stock
             if ($increase) {
-                $producto->stock_kardex = round((float)$producto->stock_kardex + $cantidadFinal, 4);
+                $producto->stock_kardex = round((float) $producto->stock_kardex + $cantidadFinal, 4);
             } else {
                 /*
                 if ($producto->stock_kardex < $cantidadFinal) {
@@ -179,7 +178,6 @@ class Producto extends Model
     //     }
     // }
 
-
     public static function updateStockPreparadaNucleo(bool $increase, NucleoPreparada $preparada): void
     {
         // =========================================================
@@ -205,8 +203,8 @@ class Producto extends Model
                 (float) $productoFinal->stock_almacen + ($increase ? $unidadesFinal : -$unidadesFinal),
                 4
             );
-            $productoFinal->stock_kardex= round(
-                (float) $productoFinal->stock_kardex+ ($increase ? $unidadesFinal : -$unidadesFinal),
+            $productoFinal->stock_kardex = round(
+                (float) $productoFinal->stock_kardex + ($increase ? $unidadesFinal : -$unidadesFinal),
                 4
             );
             $productoFinal->save();
@@ -224,7 +222,9 @@ class Producto extends Model
                 ->firstOrFail();
 
             $kgConsumidos = (float) ($detalle->salida_kg ?? 0);
-            if ($kgConsumidos <= 0) continue;
+            if ($kgConsumidos <= 0) {
+                continue;
+            }
 
             $empaqueInsumo = (float) ($producto->empaque ?? 0); // kg por unidad
             if ($empaqueInsumo <= 0) {

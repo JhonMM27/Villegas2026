@@ -457,7 +457,7 @@ class NucleoPreparadaManager extends CrudManager {
         document.querySelector('#tablaDetalles tbody').innerHTML = '';
         document.querySelector('#tablaNucleos tbody').innerHTML = '';
 
-        document.getElementById('fecha').value = this.obtenerFechaHoraActual();
+        this.setFieldValue('fecha', this.obtenerFechaHoraActual());
         const usuarioNombre = @json(auth()->user()->name);
         document.getElementById('usuario_nombre').textContent = usuarioNombre;
 
@@ -488,17 +488,18 @@ class NucleoPreparadaManager extends CrudManager {
         this.resetForm();
         try {
             const response = await this.fetchData(`${this.baseUrl}/${id}`);
-            
+
             this.isEditing = true;
-            
+
             // Detectar si es rectificación (registro anulado)
             const esRectificacion = response.estado === 'anulada';
-            
+
             if (esRectificacion) {
                 // Modo Rectificación
+                this.isRectifying = true;
                 this.elements.modalTitle.textContent = 'Rectificar Núcleo Preparada: ' + response.id + ' ' + response.nucleo_nombre;
                 this.elements.methodField.value = 'POST';
-                
+
                 // Agregar campos de rectificación
                 let esRectificacionInput = document.getElementById('es_rectificacion');
                 if (!esRectificacionInput) {
@@ -509,7 +510,7 @@ class NucleoPreparadaManager extends CrudManager {
                     this.form.appendChild(esRectificacionInput);
                 }
                 esRectificacionInput.value = '1';
-                
+
                 let preparadaAnuladaIdInput = document.getElementById('preparada_anulada_id');
                 if (!preparadaAnuladaIdInput) {
                     preparadaAnuladaIdInput = document.createElement('input');
@@ -519,17 +520,18 @@ class NucleoPreparadaManager extends CrudManager {
                     this.form.appendChild(preparadaAnuladaIdInput);
                 }
                 preparadaAnuladaIdInput.value = response.id;
-                
+
                 // Enviar a store (sin ID en URL)
                 this.form.action = this.baseUrl;
             } else {
                 // Modo Edición normal
+                this.isRectifying = false;
                 this.elements.modalTitle.textContent = 'Editar Núcleo Preparada: '+ response.id+ ' '+response.nucleo_nombre;
                 this.elements.methodField.value = 'PUT';
                 this.form.action = `${this.baseUrl}/${id}`;
             }
             
-            document.getElementById('fecha').value = response.fecha|| '';
+            this.setFieldValue('fecha', this.formatDateTimeLocal(response.fecha));
             const info = document.getElementById('info_nucleo');
             info.classList.remove('d-none');
 

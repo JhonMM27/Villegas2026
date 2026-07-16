@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class CompraProvisional extends Model
 {
@@ -24,7 +24,7 @@ class CompraProvisional extends Model
         'tipo',
         'importe_p',
         'importe_d',
-        'importe_c'
+        'importe_c',
     ];
 
     protected $casts = [

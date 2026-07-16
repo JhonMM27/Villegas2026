@@ -1,4 +1,16 @@
 @extends('plantilla.app')
+@push('estilos')
+<style>
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
+</style>
+@endpush
 
 @section('contenido')
 <div class="container-fluid">
@@ -381,7 +393,7 @@ class VentaProvisionalManager extends CrudManager {
             this.elements.methodField.value = 'PUT';
 
             // Campos del modal (ajusta IDs según tu action.blade.php)
-            document.getElementById('fecha_provisional').value = (response.fecha_provisional || '').replace(' ', 'T').slice(0,16);
+            this.setFieldValue('fecha_provisional', this.formatDateTimeLocal(response.fecha_provisional));
             //document.getElementById('numero_recibo').value = response.numero_recibo || '';
             document.getElementById('numero_interno').value = response.numero_interno || '';
             document.getElementById('cliente_id').value = response.cliente_id || '';
@@ -487,14 +499,16 @@ class VentaProvisionalManager extends CrudManager {
         document.getElementById('usuario_nombre').textContent = usuarioNombre;
 
         // Defaults (si quieres)
-        document.getElementById('fecha_provisional').value = this.obtenerFechaHoraActual();
+        this.setFieldValue('fecha_provisional', this.obtenerFechaHoraActual());
         this.limpiarTablaVentas();
     }
 
     focusFirstField() {
         const modalEl = this.modal._element;
         modalEl.addEventListener('shown.bs.modal', () => {
-            const input = document.getElementById('fecha_provisional');
+            // Se enfoca 'numero_interno' en lugar de 'fecha_provisional' para evitar
+            // que se abra automáticamente el selector de fecha (calendario).
+            const input = document.getElementById('numero_interno');
             if (input) input.focus();
         }, { once: true });
     }

@@ -13,7 +13,7 @@ class Linea extends Model
 
     protected $fillable = [
         'nombre',
-        'activo'
+        'activo',
     ];
 
     protected $casts = [

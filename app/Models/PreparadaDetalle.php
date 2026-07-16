@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class PreparadaDetalle extends Model
 {
-    //use HasFactory;
+    // use HasFactory;
 
     protected $table = 'preparada_detalles';
-    public $timestamps = false; 
+
+    public $timestamps = false;
 
     protected $fillable = [
         'preparada_id',

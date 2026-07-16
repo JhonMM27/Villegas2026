@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class FormulacionDetalle extends Model
 {
-    //use HasFactory;
+    // use HasFactory;
 
     protected $table = 'formulacion_detalles';
-    public $timestamps = false; 
+
+    public $timestamps = false;
 
     protected $fillable = [
         'formulacion_id',

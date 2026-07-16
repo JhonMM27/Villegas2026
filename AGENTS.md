@@ -242,3 +242,64 @@ DB::transaction(function () use ($data) {
 2. Don't bypass MovimientoService when modifying stock
 3. Always use `$fillable` to protect mass assignment
 4. Use database transactions for operations that modify multiple tables
+
+## 3. Kardex / Inventory Movements
+
+### Core Concept
+
+The kardex (inventory ledger) is maintained via the `movimientos` table. Every stock change is recorded as a `Movimiento` with `stock_anterior` and `stock_nuevo` to maintain a complete chain. All inventory operations MUST go through `MovimientoService` to preserve chain integrity.
+
+### Key Methods
+
+- `MovimientoService::registrarIngreso()` - Records inputs (purchases, prepared outputs)
+- `MovimientoService::registrarSalida()` - Records outputs (sales, prepared inputs)
+- `MovimientoService::recalcularKardexProducto($productoId, $desdeMovimientoId)` - Recalculates from a movement ID (orders by id)
+- `MovimientoService::recalcularKardexProductoDesdeFecha($productoId, $fechaDesde)` - Recalculates from a date (orders by fecha, id)
+- `MovimientoService::recalcularKardexExcluyendo($productoId, $excluirMovIds)` - Recalculates neutralizing excluded movements
+
+### Retroactive Movement Detection (CRITICAL)
+
+`registrarIngreso()` and `registrarSalida()` automatically detect if the new movement's `fecha` is BEFORE the last existing movement for the product. If so:
+
+1. The movement is created normally
+2. `productos.stock_almacen` is NOT updated directly
+3. `recalcularKardexProductoDesdeFecha()` is called automatically to recalculate the entire chain in chronological order
+
+This prevents the "backdated movement" bug where creating a movement with a past fecha would otherwise use the current `stock_almacen` (which already includes future movements) as the `stock_anterior`, corrupting the chain.
+
+### Diagnostic & Repair Commands
+
+```bash
+# Validate kardex chain integrity (detects broken chains)
+php artisan kardex:validar [--producto_id=29]
+
+# Recalculate kardex for a product from a specific date
+php artisan kardex:recalcular {producto_id} {fecha}
+
+# Fix apertura (opening stock) for specific products (CALCIO=29, SAL=39, BICARBONATO=43)
+php artisan kardex:corregir-apertura
+```
+
+### Rectification Flow
+
+`NucleoPreparadaService::rectificarNucleoPreparada()` (and `PreparadaService::rectificarPreparada()`) use `recalcularKardexProductoDesdeFecha()` when the rectification date is in the past. This is critical because:
+
+- `recalcularKardexProducto()` orders by `id` (insertion order)
+- `recalcularKardexProductoDesdeFecha()` orders by `fecha, id` (chronological order)
+
+When rectifying a past-dated record, chronological order MUST be used to maintain chain integrity.
+
+### Stock Units
+
+- `productos.stock_almacen` is stored in **SACOS** (bags/packages), NOT kilograms
+- `nucleo_preparada_detalles.salida_kg` is misleadingly named — it actually stores **SACOS** for these products (despite the column name)
+- Conversion: `sacos = kg / empaque` where `empaque` is per-product (e.g., CALCIO=50kg/saco, BICARBONATO=25kg/saco)
+
+### When Discrepancies Appear
+
+If a user reports stock discrepancies between the Laravel system and an old system:
+
+1. **Run `kardex:validar`** to detect chain breaks
+2. **Check for rectificaciones** — nucleo_preparadas with `estado = 'rectificada'` may explain differences (the old report may show pre-rectification values)
+3. **Check rounding** — Laravel uses 4 decimals, old systems may use 2 decimals (differences of 0.005-0.03 per day are normal)
+4. **DO NOT manually adjust `stock_almacen`** — this breaks the chain. Use `kardex:recalcular` instead.

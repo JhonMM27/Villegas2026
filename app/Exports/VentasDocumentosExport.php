@@ -2,16 +2,18 @@
 
 namespace App\Exports;
 
+use App\Models\Venta;
+use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Illuminate\Support\Carbon;
-use App\Models\Venta;
 
 class VentasDocumentosExport implements FromCollection, WithHeadings, WithMapping
 {
     protected $fechaInicio;
+
     protected $fechaFin;
+
     protected $vendedorId;
 
     public function __construct($fechaInicio = null, $fechaFin = null, $vendedorId = null)
@@ -40,12 +42,12 @@ class VentasDocumentosExport implements FromCollection, WithHeadings, WithMappin
         if ($this->fechaInicio && $this->fechaFin) {
             $query->whereBetween('ventas.fecha_venta', [
                 Carbon::parse($this->fechaInicio)->startOfDay(),
-                Carbon::parse($this->fechaFin)->endOfDay()
+                Carbon::parse($this->fechaFin)->endOfDay(),
             ]);
         }
 
-        if (!empty($this->vendedorId)) {
-            $query->where('ventas.user_id', (int)$this->vendedorId);
+        if (! empty($this->vendedorId)) {
+            $query->where('ventas.user_id', (int) $this->vendedorId);
         }
 
         return $query
@@ -67,7 +69,7 @@ class VentasDocumentosExport implements FromCollection, WithHeadings, WithMappin
             'Ítems',
             'Forma Pago',
             'ID Cliente',
-            'Razón Social'
+            'Razón Social',
         ];
     }
 
@@ -79,12 +81,12 @@ class VentasDocumentosExport implements FromCollection, WithHeadings, WithMappin
             $item->comprobante_tipo_codigo,
             $item->serie,
             $item->correlativo,
-            number_format((float)$item->total, 2, '.', ''),
-            number_format((float)$item->acuenta, 2, '.', ''),
+            number_format((float) $item->total, 2, '.', ''),
+            number_format((float) $item->acuenta, 2, '.', ''),
             $item->items,
             $item->pago_forma_nombre,
             $item->cliente_id,
-            $item->cliente_nombre
+            $item->cliente_nombre,
         ];
     }
 }

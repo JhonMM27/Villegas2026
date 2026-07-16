@@ -15,19 +15,19 @@ return new class extends Migration
             $table->unsignedSmallInteger('id')->primary();
 
             $table->foreign('id')
-              ->references('id')
-              ->on('productos')
-              ->cascadeOnDelete();
+                ->references('id')
+                ->on('productos')
+                ->cascadeOnDelete();
 
             // Campos del SELECT
-            $table->string('nombre',50);
+            $table->string('nombre', 50);
             $table->string('unidad_codigo', 10)->default('SCO');
             $table->string('unidad_nombre', 50)->nullable();
             $table->string('empaque', 50)->nullable();
             $table->decimal('cantidad_porcentaje', 9, 4)->nullable();
             $table->integer('items')->nullable();
             $table->boolean('activo')->default(true);
-            
+
             $table->timestamps();
         });
     }

@@ -3,20 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cliente;
-use Illuminate\Http\Request;
-use Yajra\DataTables\DataTables;
-use Illuminate\Validation\Rule;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Yajra\DataTables\DataTables;
 
 class ClienteController extends Controller
 {
-
-    public function __construct(){
+    public function __construct()
+    {
         $this->middleware('can:clientes_list')->only(['index', 'imprimir']);
         $this->middleware('can:clientes_create')->only(['store']);
         $this->middleware('can:clientes_edit')->only(['show', 'update']);
         $this->middleware('can:clientes_delete')->only(['destroy']);
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -24,8 +25,8 @@ class ClienteController extends Controller
     {
         if ($request->ajax()) {
             $data = Cliente::with('documentoTipo')
-                ->select(['id', 'documento_tipo_codigo', 'documento_numero','razon_social',
-                'direccion', 'telefono', 'email']);
+                ->select(['id', 'documento_tipo_codigo', 'documento_numero', 'razon_social',
+                    'direccion', 'telefono', 'email']);
 
             return DataTables::of($data)
                 ->addColumn('documento_tipo', function ($row) {
@@ -33,16 +34,17 @@ class ClienteController extends Controller
                     return $row->documentoTipo ? $row->documentoTipo->descripcion : '';
                 })
                 ->addColumn('action', function ($row) {
-                    $editButton ='';
-                    if(auth()->user()->can('clientes_edit')){
+                    $editButton = '';
+                    if (auth()->user()->can('clientes_edit')) {
                         $editButton = view('components.button-edit', ['id' => $row->id])->render();
                     }
                     $deleteButton = '';
-                    if(auth()->user()->can('clientes_delete')){
+                    if (auth()->user()->can('clientes_delete')) {
                         $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $row->razon_social])->render();
                     }
+
                     // Combinar ambos botones en una cadena y devolverla
-                    return '<div class="btn-group">' . $editButton . $deleteButton . '</div>';
+                    return '<div class="btn-group">'.$editButton.$deleteButton.'</div>';
                 })
                 ->rawColumns(['action'])
                 ->make(true);
@@ -67,11 +69,11 @@ class ClienteController extends Controller
         $data = $this->validateData($request);
         $data['saldo_credito'] = $request->saldo_credito ?? 0;
         $registro = Cliente::create($data);
-        
+
         return response()->json([
-            'success'=> true,
-            'message'=>'Registro creado satisfactoriamente',
-            'cliente'=> $registro
+            'success' => true,
+            'message' => 'Registro creado satisfactoriamente',
+            'cliente' => $registro,
         ]);
     }
 
@@ -82,6 +84,7 @@ class ClienteController extends Controller
     {
         try {
             $registro = Cliente::findOrFail($id);
+
             return response()->json($registro);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
@@ -107,7 +110,7 @@ class ClienteController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Registro actualizado correctamente'
+            'message' => 'Registro actualizado correctamente',
         ]);
 
     }
@@ -123,11 +126,11 @@ class ClienteController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro'
+                'message' => 'Error al eliminar el registro',
             ], 500);
         }
     }
@@ -163,9 +166,10 @@ class ClienteController extends Controller
             'direccion' => 'nullable|string|max:150',
             'telefono' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:100',
-            'saldo_credito'=>'nullable|numeric|min:0'
+            'saldo_credito' => 'nullable|numeric|min:0',
         ]);
     }
+
     public function buscar(Request $request)
     {
         $q = $request->input('q');
@@ -173,22 +177,23 @@ class ClienteController extends Controller
 
         $query = Cliente::query()->select('id', 'documento_numero', 'razon_social');
 
-        if (!empty($clienteIdsParam)) {
+        if (! empty($clienteIdsParam)) {
             $ids = is_array($clienteIdsParam) ? $clienteIdsParam : explode(',', $clienteIdsParam);
             $query->whereIn('id', array_map('intval', $ids));
         } elseif ($q) {
             if (is_numeric($q)) {
                 $query->where('id', $q);
             } else {
-                $query->where(function($inner) use ($q) {
+                $query->where(function ($inner) use ($q) {
                     $inner->where('razon_social', 'like', "%{$q}%")
-                          ->orWhere('documento_numero', 'like', "%{$q}%");
+                        ->orWhere('documento_numero', 'like', "%{$q}%");
                 });
             }
         }
 
         return $query->limit(20)->get();
     }
+
     /*
     public function exportar(Request $request)
     {
@@ -206,7 +211,7 @@ class ClienteController extends Controller
     public function imprimir(Request $request)
     {
         $query = Cliente::with('documentoTipo')
-                ->select(['id', 'documento_tipo_codigo', 'documento_numero','razon_social',
+            ->select(['id', 'documento_tipo_codigo', 'documento_numero', 'razon_social',
                 'direccion', 'telefono', 'email']);
 
         $reportes = $query
@@ -217,9 +222,10 @@ class ClienteController extends Controller
             'clientes.reporte_pdf',
             compact('reportes')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
+
         return $pdf->stream('clientes.pdf');
     }
 }

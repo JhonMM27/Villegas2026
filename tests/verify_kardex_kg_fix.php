@@ -2,12 +2,12 @@
 
 namespace Tests\Scripts;
 
-use App\Models\Producto;
 use App\Models\Movimiento;
+use App\Models\Producto;
 use App\Models\User;
 use App\Services\MovimientoService;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class VerifyKardexFix
 {
@@ -27,8 +27,8 @@ class VerifyKardexFix
         try {
             // 1. Crear producto de prueba (Base: SACO de 50kg)
             $producto = Producto::create([
-                'nombre' => 'PRODUCTO TEST KG FIX ' . time(),
-                'codigo' => 'TEST-KG-' . time(),
+                'nombre' => 'PRODUCTO TEST KG FIX '.time(),
+                'codigo' => 'TEST-KG-'.time(),
                 'linea_id' => 1,
                 'unidad_codigo' => 'BG', // Saco/Bolsa
                 'afectacion_tipo_codigo' => '10',
@@ -36,7 +36,7 @@ class VerifyKardexFix
                 'stock_almacen' => 0,
                 'stock_kardex' => 0,
                 'costo_unitario' => 0,
-                'activo' => 1
+                'activo' => 1,
             ]);
             echo "1. Producto creado: {$producto->nombre} (ID: {$producto->id}, Empaque: 50kg)\n";
 
@@ -55,7 +55,7 @@ class VerifyKardexFix
                 'cantidad_kg' => 100,
                 'costo_unitario' => 2, // $2 por cada 1 (kg)
                 'empaque' => 1, // La unidad de compra es de 1kg
-                'user_id' => $user ? $user->id : 1
+                'user_id' => $user ? $user->id : 1,
             ];
 
             $mov = $movService->registrarIngreso($paramsIngreso);
@@ -67,7 +67,7 @@ class VerifyKardexFix
 
             if (abs($mov->costo_unitario - 100) > 0.01) {
                 echo "FAIL: El costo unitario en el movimiento es {$mov->costo_unitario}, se esperaba 100\n";
-                throw new \Exception("ERROR: El costo unitario en el movimiento no es $100 (Costo por saco)");
+                throw new \Exception('ERROR: El costo unitario en el movimiento no es $100 (Costo por saco)');
             }
 
             // 3. Simular una venta de 1 saco
@@ -85,28 +85,28 @@ class VerifyKardexFix
 
             echo "   - Costo Unitario de la salida: \${$movSalida->costo_unitario} (Esperado: \$100)\n";
             echo "   - Costo Total de la salida: \${$movSalida->costo_total} (Esperado: \$100)\n";
-            
+
             if (abs($movSalida->costo_total - 100) > 0.01) {
-                 throw new \Exception("ERROR: El costo de salida no es $100");
+                throw new \Exception('ERROR: El costo de salida no es $100');
             }
 
             // 4. Probar recálculo de Kardex
             echo "4. Probando recálculo de Kardex...\n";
             $movService->recalcularKardexProducto($producto->id, $mov->id);
             $producto->refresh();
-            
+
             echo "   - Costo Unitario tras recálculo: \${$producto->costo_unitario} (Esperado: \$100)\n";
-            
+
             if (abs($producto->costo_unitario - 100) > 0.01) {
-                 throw new \Exception("ERROR: El recálculo destruyo el costo unitario");
+                throw new \Exception('ERROR: El recálculo destruyo el costo unitario');
             }
 
             echo "\n--- VERIFICACIÓN EXITOSA ---\n";
 
         } catch (\Exception $e) {
             echo "\n--- ERROR EN VERIFICACIÓN ---\n";
-            echo $e->getMessage() . "\n";
-            echo $e->getTraceAsString() . "\n";
+            echo $e->getMessage()."\n";
+            echo $e->getTraceAsString()."\n";
         } finally {
             DB::rollBack();
             echo "DB Rolled back.\n";
@@ -114,4 +114,4 @@ class VerifyKardexFix
     }
 }
 
-(new VerifyKardexFix())->run();
+(new VerifyKardexFix)->run();

@@ -19,13 +19,13 @@ return new class extends Migration
             $table->unsignedInteger('venta_id')->nullable();
             $table->char('comprobante_tipo_codigo', 2)->nullable(); // tip_docr
             $table->string('serie', 4)->nullable();                 // prefijor
-            $table->integer('correlativo')->nullable();   
+            $table->integer('correlativo')->nullable();
             $table->decimal('monto', 9, 2)->default(0);
             $table->string('comentario', 100)->nullable();
 
             // FK (opcional, si user_id siempre existe en users)
             $table->foreign('venta_provisional_id')->references('id')->on('venta_provisionales')->cascadeOnDelete();
-            $table->foreign('venta_id')->references('id')->on('ventas')->nullOnDelete();;
+            $table->foreign('venta_id')->references('id')->on('ventas')->nullOnDelete();
         });
     }
 

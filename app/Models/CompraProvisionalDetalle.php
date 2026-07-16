@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class CompraProvisionalDetalle extends Model
 {
     use HasFactory;
 
     protected $table = 'compra_provisional_detalles';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -19,7 +20,7 @@ class CompraProvisionalDetalle extends Model
         'serie',
         'correlativo',
         'monto',
-        'comentario'
+        'comentario',
     ];
 
     protected $casts = [
@@ -32,12 +33,12 @@ class CompraProvisionalDetalle extends Model
     |--------------------------------------------------------------------------
     */
 
-     public function compraProvisional()
+    public function compraProvisional()
     {
         return $this->belongsTo(CompraProvisional::class, 'compra_provisional_id');
     }
 
-     public function compra()
+    public function compra()
     {
         return $this->belongsTo(Compra::class, 'compra_id');
     }
@@ -47,7 +48,7 @@ class CompraProvisionalDetalle extends Model
     | SCOPES ÚTILES (opcional pero recomendado)
     |--------------------------------------------------------------------------
     */
-    
+
     public function scopeMonto($query)
     {
         return $query->where('monto', '>', 0);

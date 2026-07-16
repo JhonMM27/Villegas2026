@@ -3,14 +3,15 @@
 namespace App\Exports;
 
 use App\Models\CompraDetalle;
+use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Illuminate\Support\Carbon;
 
 class ComprasDetalladasProductoExport implements FromCollection, WithHeadings, WithMapping
 {
     protected $fechaInicio;
+
     protected $fechaFin;
 
     public function __construct($fechaInicio = null, $fechaFin = null)
@@ -42,7 +43,7 @@ class ComprasDetalladasProductoExport implements FromCollection, WithHeadings, W
         if ($this->fechaInicio && $this->fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($this->fechaInicio)->startOfDay(),
-                Carbon::parse($this->fechaFin)->endOfDay()
+                Carbon::parse($this->fechaFin)->endOfDay(),
             ]);
         }
 
@@ -66,7 +67,7 @@ class ComprasDetalladasProductoExport implements FromCollection, WithHeadings, W
             'Documento',
             'Serie',
             'Correlativo',
-            'Proveedor'
+            'Proveedor',
         ];
     }
 
@@ -77,14 +78,14 @@ class ComprasDetalladasProductoExport implements FromCollection, WithHeadings, W
             $item->producto_nombre,
             $item->producto_empaque,
             $item->fecha_compra ?? '', // si agregas fecha desde la relación compras
-            number_format((float)$item->kg_total, 2, '.', ''),
-            number_format((float)$item->cantidad, 2, '.', ''),
-            number_format((float)$item->precio, 4, '.', ''),
-            number_format((float)$item->total, 2, '.', ''),
+            number_format((float) $item->kg_total, 2, '.', ''),
+            number_format((float) $item->cantidad, 2, '.', ''),
+            number_format((float) $item->precio, 4, '.', ''),
+            number_format((float) $item->total, 2, '.', ''),
             $item->documento,
             $item->serie,
             $item->correlativo,
-            $item->proveedor
+            $item->proveedor,
         ];
     }
 }

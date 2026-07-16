@@ -85,12 +85,12 @@
                             <div class="row g-2 align-items-end mb-2">
                                 <div class="col-12 col-sm-6 col-lg-2">
                                     <label class="form-label mb-0">Desde</label>
-                                    <input type="date" id="fecha_inicio_tab1" class="form-control form-control-sm">
+                                    <input type="text" id="fecha_inicio_tab1" class="form-control form-control-sm date-picker">
                                 </div>
 
                                 <div class="col-12 col-sm-6 col-lg-2">
                                     <label class="form-label mb-0">Hasta</label>
-                                    <input type="date" id="fecha_fin_tab1" class="form-control form-control-sm">
+                                    <input type="text" id="fecha_fin_tab1" class="form-control form-control-sm date-picker">
                                 </div>
 
                                 <div class="col-12 col-lg-4">
@@ -146,11 +146,11 @@
                             <div class="row g-2 align-items-end mb-2">
                                 <div class="col-12 col-sm-6 col-lg-2">
                                     <label class="form-label mb-0">Fecha</label>
-                                    <input type="date" id="fecha_inicio_tab2" class="form-control form-control-sm">
+                                    <input type="text" id="fecha_inicio_tab2" class="form-control form-control-sm date-picker">
                                 </div>
                                 <div class="col-12 col-sm-6 col-lg-2">
                                     <label class="form-label mb-0">Fecha Hasta</label>
-                                    <input type="date" id="fecha_fin_tab2" class="form-control form-control-sm">
+                                    <input type="text" id="fecha_fin_tab2" class="form-control form-control-sm date-picker">
                                 </div>
 
                                 <div class="col-12 col-lg-8">

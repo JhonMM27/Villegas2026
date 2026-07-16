@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\OperacionTipo;
+use Illuminate\Database\Seeder;
 
 class OperacionTipoSeeder extends Seeder
 {
@@ -23,7 +23,7 @@ class OperacionTipoSeeder extends Seeder
                 ['codigo' => $tipo['codigo']],
                 [
                     'descripcion' => $tipo['descripcion'],
-                    'activo' => true
+                    'activo' => true,
                 ]
             );
         }

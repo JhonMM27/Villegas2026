@@ -35,7 +35,7 @@ class GastoCategoriaController extends Controller
                         $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $row->nombre])->render();
                     }
 
-                    return '<div class="btn-group">' . $editButton . $deleteButton . '</div>';
+                    return '<div class="btn-group">'.$editButton.$deleteButton.'</div>';
                 })
                 ->rawColumns(['action', 'activo'])
                 ->editColumn('activo', function ($row) {
@@ -50,14 +50,14 @@ class GastoCategoriaController extends Controller
     public function store(Request $request)
     {
         $request->merge([
-            'activo' => $request->has('activo') ? 1 : 0
+            'activo' => $request->has('activo') ? 1 : 0,
         ]);
         $data = $this->validateData($request);
         GastoCategoria::create($data);
 
         return response()->json([
             'success' => true,
-            'message' => 'Registro creado satisfactoriamente'
+            'message' => 'Registro creado satisfactoriamente',
         ]);
     }
 
@@ -75,7 +75,7 @@ class GastoCategoriaController extends Controller
     public function update(Request $request, $id)
     {
         $request->merge([
-            'activo' => $request->has('activo') ? 1 : 0
+            'activo' => $request->has('activo') ? 1 : 0,
         ]);
         $data = $this->validateData($request, $id);
         $registro = GastoCategoria::where('id', $id)->firstOrFail();
@@ -83,7 +83,7 @@ class GastoCategoriaController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Registro actualizado correctamente'
+            'message' => 'Registro actualizado correctamente',
         ]);
     }
 
@@ -95,11 +95,11 @@ class GastoCategoriaController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro'
+                'message' => 'Error al eliminar el registro',
             ], 500);
         }
     }
@@ -108,7 +108,7 @@ class GastoCategoriaController extends Controller
     {
         $rules = [
             'nombre' => ['required', 'string', 'max:50', Rule::unique('categoria_gastos', 'nombre')->ignore($id)],
-            'activo' => 'sometimes|boolean'
+            'activo' => 'sometimes|boolean',
         ];
 
         return $request->validate($rules);

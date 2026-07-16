@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\ComprobanteSerie;
+use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Yajra\DataTables\DataTables;
 
 class ComprobanteSerieController extends Controller
 {
-    public function __construct(){
+    public function __construct()
+    {
         $this->middleware('can:comprobante_tipos_list')->only(['index']);
         $this->middleware('can:comprobante_tipos_create')->only(['store']);
         $this->middleware('can:comprobante_tipos_edit')->only(['show', 'update']);
@@ -23,20 +24,21 @@ class ComprobanteSerieController extends Controller
     {
         if ($request->ajax()) {
             $data = ComprobanteSerie::with(['tipo'])
-                ->select(['id', 'comprobante_tipo_codigo','serie','correlativo']);
+                ->select(['id', 'comprobante_tipo_codigo', 'serie', 'correlativo']);
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
-                    $editButton ='';
-                    if(auth()->user()->can('comprobante_tipos_edit')){
+                    $editButton = '';
+                    if (auth()->user()->can('comprobante_tipos_edit')) {
                         $editButton = view('components.button-edit', ['id' => $row->id])->render();
                     }
                     $deleteButton = '';
-                    if(auth()->user()->can('comprobante_tipos_delete')){
-                        $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $row->serie." - ".$row->correlativo])->render();
+                    if (auth()->user()->can('comprobante_tipos_delete')) {
+                        $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $row->serie.' - '.$row->correlativo])->render();
                     }
+
                     // Combinar ambos botones en una cadena y devolverla
-                    return '<div class="btn-group">' . $editButton . $deleteButton . '</div>';
+                    return '<div class="btn-group">'.$editButton.$deleteButton.'</div>';
                 })
                 ->addColumn('tipo', function ($row) {
                     return optional($row->tipo)->descripcion;
@@ -63,10 +65,10 @@ class ComprobanteSerieController extends Controller
     {
         $data = $this->validateData($request);
         ComprobanteSerie::create($data);
-        
+
         return response()->json([
-            'success'=> true,
-            'message'=>'Registro creado satisfactoriamente'
+            'success' => true,
+            'message' => 'Registro creado satisfactoriamente',
         ]);
     }
 
@@ -77,6 +79,7 @@ class ComprobanteSerieController extends Controller
     {
         try {
             $registro = ComprobanteSerie::where('id', $id)->firstOrFail();
+
             return response()->json($registro);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
@@ -102,7 +105,7 @@ class ComprobanteSerieController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Registro actualizado correctamente'
+            'message' => 'Registro actualizado correctamente',
         ]);
 
     }
@@ -118,11 +121,11 @@ class ComprobanteSerieController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro'
+                'message' => 'Error al eliminar el registro',
             ], 500);
         }
     }
@@ -134,7 +137,7 @@ class ComprobanteSerieController extends Controller
                 'required',
                 'string',
                 'max:2',
-                Rule::exists('comprobante_tipos', 'codigo')
+                Rule::exists('comprobante_tipos', 'codigo'),
             ],
             'serie' => 'required|string|max:4',
             'correlativo' => 'required|integer|min:0',

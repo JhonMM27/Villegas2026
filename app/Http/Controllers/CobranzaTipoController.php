@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\CobranzaTipo;
-use Illuminate\Validation\Rule;
+use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
 
 class CobranzaTipoController extends Controller
 {
-    public function __construct(){
+    public function __construct()
+    {
         $this->middleware('can:cobranza_tipos_list')->only(['index']);
         $this->middleware('can:cobranza_tipos_create')->only(['store']);
         $this->middleware('can:cobranza_tipos_edit')->only(['show', 'update']);
@@ -22,22 +22,23 @@ class CobranzaTipoController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $data = CobranzaTipo::select(['id', 'nombre','activo']);
+            $data = CobranzaTipo::select(['id', 'nombre', 'activo']);
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
-                    $editButton ='';
-                    if(auth()->user()->can('cobranza_tipos_edit')){
+                    $editButton = '';
+                    if (auth()->user()->can('cobranza_tipos_edit')) {
                         $editButton = view('components.button-edit', ['id' => $row->id])->render();
                     }
                     $deleteButton = '';
-                    if(auth()->user()->can('cobranza_tipos_delete')){
+                    if (auth()->user()->can('cobranza_tipos_delete')) {
                         $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $row->nombre])->render();
                     }
+
                     // Combinar ambos botones en una cadena y devolverla
-                    return '<div class="btn-group">' . $editButton . $deleteButton . '</div>';
+                    return '<div class="btn-group">'.$editButton.$deleteButton.'</div>';
                 })
-                ->rawColumns(['action','activo'])
+                ->rawColumns(['action', 'activo'])
                 ->editColumn('activo', function ($row) {
                     return $row->activo ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-danger">Inactivo</span>';
                 })
@@ -61,14 +62,14 @@ class CobranzaTipoController extends Controller
     public function store(Request $request)
     {
         $request->merge([
-            'activo' => $request->has('activo') ? 1 : 0
+            'activo' => $request->has('activo') ? 1 : 0,
         ]);
         $data = $this->validateData($request);
         CobranzaTipo::create($data);
-        
+
         return response()->json([
-            'success'=> true,
-            'message'=>'Registro creado satisfactoriamente'
+            'success' => true,
+            'message' => 'Registro creado satisfactoriamente',
         ]);
     }
 
@@ -79,6 +80,7 @@ class CobranzaTipoController extends Controller
     {
         try {
             $registro = CobranzaTipo::where('id', $id)->firstOrFail();
+
             return response()->json($registro);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
@@ -99,7 +101,7 @@ class CobranzaTipoController extends Controller
     public function update(Request $request, $id)
     {
         $request->merge([
-            'activo' => $request->has('activo') ? 1 : 0
+            'activo' => $request->has('activo') ? 1 : 0,
         ]);
         $data = $this->validateData($request, $id);
         $registro = CobranzaTipo::where('id', $id)->firstOrFail();
@@ -107,7 +109,7 @@ class CobranzaTipoController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Registro actualizado correctamente'
+            'message' => 'Registro actualizado correctamente',
         ]);
 
     }
@@ -123,11 +125,11 @@ class CobranzaTipoController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro'
+                'message' => 'Error al eliminar el registro',
             ], 500);
         }
     }
@@ -136,7 +138,7 @@ class CobranzaTipoController extends Controller
     {
         return $request->validate([
             'nombre' => 'required|string|max:50',
-            'activo' => 'sometimes|boolean'
+            'activo' => 'sometimes|boolean',
         ]);
     }
 
@@ -147,5 +149,4 @@ class CobranzaTipoController extends Controller
 
         return response()->json($query->get());
     }
-
 }

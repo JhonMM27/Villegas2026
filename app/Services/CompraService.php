@@ -85,7 +85,27 @@ class CompraService
                 ]);
             }
 
+            // ────────────────────────────────────────────────────────────
+            // NOTA: Recálculo retroactivo en cascada
+            // ────────────────────────────────────────────────────────────
+            // El recálculo del kardex para movimientos con fecha pasada
+            // (ej: registrar una compra de la mañana después de ventas
+            // de la tarde) se hace automáticamente dentro de
+            // MovimientoService::registrarIngreso() cuando detecta que
+            // la fecha del movimiento es anterior al último movimiento
+            // del producto.
+            //
+            // Antes este bloque hacía un recálculo extra cuando la
+            // fecha era < today(). Era redundante: el recalc ya se
+            // ejecutó al insertar el movimiento. Eliminado para:
+            //   1. Evitar doble recálculo (costo en performance).
+            //   2. Tener un solo punto de recálculo retroactivo.
+            //   3. No depender de la fecha actual: la detección ya
+            //      usa el último movimiento del producto.
+            // ────────────────────────────────────────────────────────────
             // 3.1) Recalcular en cascada si la fecha de compra es anterior a hoy
+            // IMPORTANTE: se pasa datetime completo (Y-m-d H:i:s) para que el punto de partida
+            // sea el último movimiento ANTES de la hora exacta, no antes del día completo.
             $fechaCompra = $compra->fecha_compra instanceof \Carbon\Carbon
                 ? $compra->fecha_compra
                 : \Carbon\Carbon::parse($compra->fecha_compra);
@@ -94,11 +114,10 @@ class CompraService
                 foreach ($detallesCreados as $detalle) {
                     $this->movimientoService->recalcularKardexProductoDesdeFecha(
                         $detalle->producto_id,
-                        $fechaCompra->format('Y-m-d')
+                        $fechaCompra->format('Y-m-d H:i:s')
                     );
                 }
             }
-
             // 4) Incrementar correlativo solo para Notas de Compra (NC)
             if ($comprobanteTipoCodigo === 'NC') {
                 ComprobanteSerie::where('comprobante_tipo_codigo', $comprobanteTipoCodigo)
@@ -163,51 +182,64 @@ class CompraService
             $compraAnulada->detalles()->delete();
             $detallesCreados = $compraAnulada->detalles()->createMany($compraData['detalles']);
 
+            // ────────────────────────────────────────────────────────────
+            // BLOQUE: Reconstrucción de movimientos del kardex
+            // ────────────────────────────────────────────────────────────
+            // ¿Qué hace?: Tras reemplazar los detalles de la compra, cada
+            //              línea debe quedar representada en el kardex.
+            //              Para cada detalle:
+            //                1. Busca un movimiento neutralizado previo
+            //                   (de cuando se anuló la compra) para el
+            //                   mismo producto y lo restaura con los
+            //                   nuevos valores.
+            //                2. Si no existe, crea uno nuevo desde cero.
+            //
+            // ¿Por qué $movimientosUsados?:  Una compra puede tener
+            //   dos líneas con el mismo producto (lotes distintos en
+            //   la misma factura). Sin este tracking, ambas líneas
+            //   encontrarían el mismo movimiento neutralizado y lo
+            //   sobrescribirían, dejando una línea sin restaurar.
+            //
+            // ¿Por qué salida=0 explícito al restaurar?:  Aunque el
+            //   movimiento ya quedó con salida=0 tras la neutralización,
+            //   dejarlo explícito en el update protege contra datos
+            //   históricos inconsistentes y deja la intención clara.
+            // ────────────────────────────────────────────────────────────
             $productosAfectados = [];
+            $movimientosUsados = [];
 
-            // 3) Actualizar movimientos: buscamos los neutralizados (entrada=0)
             foreach ($detallesCreados as $detalle) {
-                // Buscar movimiento neutralizado (que pusimos en 0 al anular) de esta misma transacción
                 $movNeutralizado = Movimiento::where('transaccion_tipo', 'compras')
                     ->where('transaccion_id', $compraAnuladaId)
                     ->where('producto_id', $detalle->producto_id)
-                    ->where('entrada', 0)
+                    ->where('cantidad', 0)
+                    ->where('cantidad_kg', 0)
+                    ->whereNotIn('id', $movimientosUsados)
+                    ->orderBy('id', 'asc')
                     ->first();
 
-                $empaqueDetalle = (float) $detalle->producto_empaque;
-                $producto = Producto::find($detalle->producto_id);
-                $empaqueProducto = (float) $producto->empaque;
-
-                $cantidadStock = ($empaqueDetalle == $empaqueProducto)
-                    ? (float) $detalle->cantidad
-                    : round((float) $detalle->cantidad * ($empaqueDetalle / $empaqueProducto), 4);
-
-                $costoCompletoPorUnidad = (float) $detalle->costo_unitario + (float) $detalle->costo_unitario_servicio;
-
-                $costoTotalCompra = (float) $detalle->cantidad * $costoCompletoPorUnidad;
-
-                $costoUnitarioBase = $cantidadStock > 0
-                    ? round($costoTotalCompra / $cantidadStock, 4)
-                    : round($costoCompletoPorUnidad, 4);
+                $costos = $this->calcularCostoMovimientoCompra($detalle);
 
                 if ($movNeutralizado) {
-                    // Restauramos el movimiento original neutralizado
+                    // Restauramos el movimiento original neutralizado.
                     $movNeutralizado->update([
                         'detalle_id' => $detalle->id,
                         'fecha' => $compraAnulada->fecha_compra,
-                        'empaque' => $empaqueDetalle,
+                        'empaque' => $costos['empaque'],
                         'unidad_codigo' => $detalle->unidad_codigo,
                         'cantidad' => $detalle->cantidad,
                         'cantidad_kg' => $detalle->cantidad_kgm,
-                        'entrada' => $cantidadStock,
-                        'costo_unitario' => round($costoUnitarioBase, 4),
-                        'costo_total' => round($costoTotalCompra, 4),
+                        'entrada' => $costos['cantidad_stock'],
+                        'salida' => 0,
+                        'costo_unitario' => $costos['costo_unitario_base'],
+                        'costo_total' => $costos['costo_total'],
                         'comentario' => 'Rectificación de compra (restaurado)',
                     ]);
-                    $productosAfectados[] = $detalle->producto_id;
+                    $movimientosUsados[] = $movNeutralizado->id;
                 } else {
-                    // Si por alguna razón no hay neutralizado (ej: producto nuevo en rectificación), creamos uno
-                    // registrarIngreso calculará el CPP real automáticamente
+                    // Sin mov neutralizado previo (ej: producto nuevo
+                    // en la rectificación). registrarIngreso() calcula
+                    // el CPP real automáticamente.
                     $this->movimientoService->registrarIngreso([
                         'tipo' => MovimientoService::TIPO_COMPRA,
                         'fecha' => $compraAnulada->fecha_compra,
@@ -220,10 +252,10 @@ class CompraService
                         'unidad_codigo' => $detalle->unidad_codigo,
                         'cantidad' => $detalle->cantidad,
                         'cantidad_kg' => $detalle->cantidad_kgm,
-                        'costo_unitario' => $costoCompletoPorUnidad,
+                        'costo_unitario' => $costos['costo_completo_por_unidad'],
                     ]);
-                    $productosAfectados[] = $detalle->producto_id;
                 }
+                $productosAfectados[] = $detalle->producto_id;
             }
 
             // Recalcular Kardex para productos afectados
@@ -233,10 +265,12 @@ class CompraService
 
             foreach (array_unique($productosAfectados) as $productoId) {
                 if ($fechaCompra->lt(today())) {
-                    // Fecha pasada: recalcular en cascada desde la fecha de la compra
+                    // Fecha pasada: recalcular en cascada desde la fecha+hora de la compra
+                    // IMPORTANTE: se pasa datetime completo (Y-m-d H:i:s) para que el punto de
+                    // partida sea el último movimiento ANTES de la hora exacta de la compra.
                     $this->movimientoService->recalcularKardexProductoDesdeFecha(
                         $productoId,
-                        $fechaCompra->format('Y-m-d')
+                        $fechaCompra->format('Y-m-d H:i:s')
                     );
                 } else {
                     // Fecha actual o futura: recalcular desde el primer movimiento
@@ -456,9 +490,9 @@ class CompraService
             'importe_p' => $data['principal'] ?? 0,
             'importe_d' => $data['deposito'] ?? 0,
             'importe_c' => $data['consorcio'] ?? 0,
-            'acuenta' => $data['total_cobranza'] ?? '',
+            'acuenta' => (float) ($data['total_cobranza'] ?? 0),
             'abonos' => $abonos,
-            'saldo' => round($totales['total'], 2) - ($data['total_cobranza'] ?? 0) - $abonos,
+            'saldo' => round($totales['total'], 2) - (float) ($data['total_cobranza'] ?? 0) - $abonos,
             'fecha_compra' => $data['fecha_compra'] ?? now(),
             'fecha_vencimiento' => $data['fecha_vencimiento'] ?? null,
         ];
@@ -517,6 +551,63 @@ class CompraService
             'porcentaje_impuesto' => $porcentajeImpuesto,
             'impuesto' => round($detalleImpuesto, 2),
             'total' => round($detalleTotal, 2),
+        ];
+    }
+
+    /**
+     * Calcula las cantidades y costos de un detalle de compra para
+     * registrar o restaurar un movimiento del kardex.
+     *
+     * Composición:
+     *  - empaque                  → empaque del detalle (puede no
+     *                               coincidir con el empaque base del
+     *                               producto; ej: 25kg vs 50kg).
+     *  - cantidad_stock           → unidades en BASE del producto
+     *                               (sacos) que se suman al stock_almacen.
+     *  - costo_completo_por_unidad → costo_unitario + costo_servicio
+     *                               (precio real de compra + flete).
+     *  - costo_total              → costo_completo × cantidad comprada.
+     *  - costo_unitario_base      → costo prorrateado a la unidad base
+     *                               del producto (se usa en kardex).
+     *
+     * Diferencia con calculateDetail(): este helper opera sobre un
+     * CompraDetalle ya persistido y enfocado en IMPACTO KARDEX
+     * (stock + CPP), no en subtotales/impuestos de la factura.
+     *
+     * @param  \App\Models\CompraDetalle  $detalle  Detalle persistido
+     * @return array{
+     *   empaque: float,
+     *   cantidad_stock: float,
+     *   costo_completo_por_unidad: float,
+     *   costo_total: float,
+     *   costo_unitario_base: float
+     * }
+     */
+    private function calcularCostoMovimientoCompra($detalle): array
+    {
+        $empaqueDetalle = (float) $detalle->producto_empaque;
+        $producto = Producto::find($detalle->producto_id);
+        $empaqueProducto = (float) $producto->empaque;
+
+        $cantidadStock = ($empaqueDetalle == $empaqueProducto)
+            ? (float) $detalle->cantidad
+            : round((float) $detalle->cantidad * ($empaqueDetalle / $empaqueProducto), 4);
+
+        $costoCompletoPorUnidad = (float) $detalle->costo_unitario
+            + (float) $detalle->costo_unitario_servicio;
+
+        $costoTotalCompra = (float) $detalle->cantidad * $costoCompletoPorUnidad;
+
+        $costoUnitarioBase = $cantidadStock > 0
+            ? round($costoTotalCompra / $cantidadStock, 4)
+            : round($costoCompletoPorUnidad, 4);
+
+        return [
+            'empaque' => $empaqueDetalle,
+            'cantidad_stock' => $cantidadStock,
+            'costo_completo_por_unidad' => $costoCompletoPorUnidad,
+            'costo_total' => $costoTotalCompra,
+            'costo_unitario_base' => $costoUnitarioBase,
         ];
     }
 }

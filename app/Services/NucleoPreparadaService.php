@@ -258,13 +258,28 @@ class NucleoPreparadaService
             $productosAfectados[] = $preparada->nucleo_id;
 
             // 7) Recalcular Kardex para productos afectados
+            //
+            // IMPORTANTE: se pasa el datetime completo (Y-m-d H:i:s) a recalcularKardexProductoDesdeFecha
+            // para que el punto de partida sea el último movimiento ANTES de la hora exacta de la
+            // preparada, evitando recalcular movimientos del mismo día pero anteriores en hora.
+            $fechaPreparada = $preparada->fecha instanceof \Carbon\Carbon
+                ? $preparada->fecha
+                : \Carbon\Carbon::parse($preparada->fecha);
+
             foreach (array_unique($productosAfectados) as $pId) {
-                $primerMov = Movimiento::where('transaccion_id', $preparada->id)
-                    ->where('producto_id', $pId)
-                    ->orderBy('id', 'asc')
-                    ->first();
-                if ($primerMov) {
-                    $this->movimientoService->recalcularKardexProducto($pId, $primerMov->id);
+                if ($fechaPreparada->lt(today())) {
+                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                        $pId,
+                        $fechaPreparada->format('Y-m-d H:i:s')
+                    );
+                } else {
+                    $primerMov = Movimiento::where('transaccion_id', $preparada->id)
+                        ->where('producto_id', $pId)
+                        ->orderBy('id', 'asc')
+                        ->first();
+                    if ($primerMov) {
+                        $this->movimientoService->recalcularKardexProducto($pId, $primerMov->id);
+                    }
                 }
             }
 

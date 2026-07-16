@@ -49,8 +49,8 @@
                                           placeholder="Cliente Destino"
                                           autocomplete="off">
                                 <input type="hidden" id="cliente_destino_id" name="cliente_destino_id">
-                                <input type="date" id="fecha_inicio" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrar" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <a href="#" id="btnPdf" target="_blank" class="btn btn-danger">PDF</a>
                             </div>
@@ -66,8 +66,8 @@
                                           placeholder="Cliente Origen"
                                           autocomplete="off">
                                 <input type="hidden" id="cliente_origen_id" name="cliente_origen_id">
-                                <input type="date" id="fecha_inicio_origen" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_origen" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_origen" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_origen" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarOrigen" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <a href="#" id="btnPdfOrigen" target="_blank" class="btn btn-danger">PDF</a>
                             </div>
@@ -83,8 +83,8 @@
                                     <option value="PA">Préstamos A (Otorgados)</option>
                                     <option value="PD">Préstamos DE (Recibidos)</option>
                                 </select>
-                                <input type="date" id="fecha_inicio_general" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_general" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_general" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_general" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarGeneral" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <a href="#" id="btnPdfGeneral" target="_blank" class="btn btn-danger">PDF</a>
                             </div>

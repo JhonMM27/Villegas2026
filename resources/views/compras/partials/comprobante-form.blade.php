@@ -6,14 +6,10 @@
             </select>
         </div>
         <div class="col-md-4">
-            <label for="fecha_compra" class="form-label">Fecha Compra <span class="text-danger"></span></label>
-            <input type="datetime-local" id="fecha_compra" name="fecha_compra" class="form-control form-control-sm">
-            <div class="invalid-feedback"></div>
+            <x-datetime-picker id="fecha_compra" label="Fecha Compra" />
         </div>
         <div class="col-md-4">
-            <label for="fecha_vencimiento" class="form-label">Fecha Vencimiento <span class="text-danger"></span></label>
-            <input type="date" id="fecha_vencimiento" name="fecha_vencimiento" class="form-control form-control-sm">
-            <div class="invalid-feedback"></div>
+            <x-date-picker id="fecha_vencimiento" label="Fecha Vencimiento" />
         </div>
         <div class="col-md-4">
             <label for="cobranza_tipo_id" class="form-label">Cobranza Tipo <span class="text-danger">*</span></label>

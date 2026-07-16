@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AfectacionTipoController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CajaIngresoController;
 use App\Http\Controllers\CajaPagoController;
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\CobranzaTipoController;
@@ -21,6 +22,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentoTipoController;
 use App\Http\Controllers\EmpleadoController;
 use App\Http\Controllers\EmpleadoVacacionController;
+use App\Http\Controllers\FormulaAlimentoCerdoController;
+use App\Http\Controllers\FormulaAlimentoController;
 use App\Http\Controllers\FormulacionController;
 use App\Http\Controllers\GastoCategoriaController;
 use App\Http\Controllers\GastoController;
@@ -41,8 +44,6 @@ use App\Http\Controllers\PreparadaController;
 use App\Http\Controllers\PrestamoController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\ProveedorController;
-use App\Http\Controllers\RationFormulationApiController;
-use App\Http\Controllers\RationFormulationController;
 use App\Http\Controllers\ReporteCajaController;
 use App\Http\Controllers\ReporteCompraController;
 use App\Http\Controllers\ReporteFormulacionController;
@@ -131,11 +132,50 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/formulaciones/buscar-formulacion', [FormulacionController::class, 'buscar'])->name('formulaciones.buscar');
     Route::resource('formulaciones', FormulacionController::class)->except(['create', 'edit']);
 
-    Route::get('/ration-formulation', [RationFormulationController::class, 'index'])->name('ration-formulation.index');
-    Route::get('/ration-formulation/data', [RationFormulationApiController::class, 'getData'])->name('ration-formulation.data');
-    Route::post('/ration-formulation/calculate/{tipoRacionId}', [RationFormulationApiController::class, 'calculate'])->name('ration-formulation.calculate');
-    Route::post('/ration-formulation/save', [RationFormulationApiController::class, 'save'])->name('ration-formulation.save');
-    Route::patch('/ration-formulation/ingredients/{id}/price', [RationFormulationApiController::class, 'updatePrice'])->name('ration-formulation.ingredients.price');
+    // Datos Nutricionales (sigue existiendo)
+    Route::get('/ration-formulation/datos', [FormulaAlimentoController::class, 'datos'])->name('ration-formulation.datos');
+    Route::get('/ration-formulation/datos/datatable', [FormulaAlimentoController::class, 'datosDatatable'])->name('ration-formulation.datos.datatable');
+    Route::get('/ration-formulation/datos/list', [FormulaAlimentoController::class, 'datosIndex'])->name('ration-formulation.datos.index');
+    Route::get('/ration-formulation/datos/{id}', [FormulaAlimentoController::class, 'datosShow'])->name('ration-formulation.datos.show');
+    Route::post('/ration-formulation/datos', [FormulaAlimentoController::class, 'datosStore'])->name('ration-formulation.datos.store');
+    Route::put('/ration-formulation/datos/{id}', [FormulaAlimentoController::class, 'datosUpdate'])->name('ration-formulation.datos.update');
+    Route::delete('/ration-formulation/datos/{id}', [FormulaAlimentoController::class, 'datosDestroy'])->name('ration-formulation.datos.destroy');
+
+    // Fórmulas de Alimento (modelo nuevo)
+    Route::prefix('formulas-alimento')->name('formulas-alimento.')->group(function () {
+        Route::get('/', [FormulaAlimentoController::class, 'index'])->name('index');
+        Route::get('/datatable', [FormulaAlimentoController::class, 'datatable'])->name('datatable');
+        Route::post('/', [FormulaAlimentoController::class, 'store'])->name('store');
+        Route::get('/{id}', [FormulaAlimentoController::class, 'show'])->name('show');
+        Route::put('/{id}', [FormulaAlimentoController::class, 'update'])->name('update');
+        Route::delete('/{id}', [FormulaAlimentoController::class, 'destroy'])->name('destroy');
+        Route::get('/{id}/detalles/datatable', [FormulaAlimentoController::class, 'detalleDatatable'])->name('detalles.datatable');
+        Route::post('/{id}/detalles', [FormulaAlimentoController::class, 'detalleStore'])->name('detalles.store');
+        Route::put('/{id}/detalles/{detalleId}', [FormulaAlimentoController::class, 'detalleUpdate'])->name('detalles.update');
+        Route::delete('/{id}/detalles/{detalleId}', [FormulaAlimentoController::class, 'detalleDestroy'])->name('detalles.destroy');
+        Route::get('/-/-/ingredientes/buscar', [FormulaAlimentoController::class, 'ingredientesBuscar'])->name('ingredientes.buscar');
+
+        Route::get('/{id}/export/excel', [FormulaAlimentoController::class, 'exportarExcel'])->name('export.excel');
+        Route::get('/{id}/export/pdf', [FormulaAlimentoController::class, 'exportarPdf'])->name('export.pdf');
+    });
+
+    // Fórmulas de Alimento — Cerdos
+    Route::prefix('formulas-alimento-cerdo')->name('formulas-alimento-cerdo.')->group(function () {
+        Route::get('/', [FormulaAlimentoCerdoController::class, 'index'])->name('index');
+        Route::get('/datatable', [FormulaAlimentoCerdoController::class, 'datatable'])->name('datatable');
+        Route::post('/', [FormulaAlimentoCerdoController::class, 'store'])->name('store');
+        Route::get('/{id}', [FormulaAlimentoCerdoController::class, 'show'])->name('show');
+        Route::put('/{id}', [FormulaAlimentoCerdoController::class, 'update'])->name('update');
+        Route::delete('/{id}', [FormulaAlimentoCerdoController::class, 'destroy'])->name('destroy');
+        Route::get('/{id}/detalles/datatable', [FormulaAlimentoCerdoController::class, 'detalleDatatable'])->name('detalles.datatable');
+        Route::post('/{id}/detalles', [FormulaAlimentoCerdoController::class, 'detalleStore'])->name('detalles.store');
+        Route::put('/{id}/detalles/{detalleId}', [FormulaAlimentoCerdoController::class, 'detalleUpdate'])->name('detalles.update');
+        Route::delete('/{id}/detalles/{detalleId}', [FormulaAlimentoCerdoController::class, 'detalleDestroy'])->name('detalles.destroy');
+        Route::get('/ingredientes/buscar', [FormulaAlimentoCerdoController::class, 'ingredientesBuscar'])->name('ingredientes.buscar');
+
+        Route::get('/{id}/export/excel', [FormulaAlimentoCerdoController::class, 'exportarExcel'])->name('export.excel');
+        Route::get('/{id}/export/pdf', [FormulaAlimentoCerdoController::class, 'exportarPdf'])->name('export.pdf');
+    });
 
     Route::get('/preparadas/{id}/imprimir', [PreparadaController::class, 'printTicket'])->name('preparadas.imprimir');
     Route::get('/preparadas/{id}/ver', [PreparadaController::class, 'view'])->name('preparadas.ver');
@@ -156,6 +196,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/caja-pagos/{id}/ver', [CajaPagoController::class, 'view'])->name('caja-pagos.ver');
     Route::resource('caja-pagos', CajaPagoController::class)->except(['create', 'edit']);
+
+    Route::resource('caja-ingresos', CajaIngresoController::class)->except(['create']);
 
     Route::get('/venta-provisionales/{id}/imprimir', [VentaProvisionalController::class, 'printTicket'])->name('venta-provisionales.imprimir');
     Route::get('/venta-provisionales/{id}/ver', [VentaProvisionalController::class, 'view'])->name('venta-provisionales.ver');
@@ -250,6 +292,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('reportes/costos/resumen/imprimir', [CostoController::class, 'imprimirGeneral'])->name('reportes.costos.resumen.imprimir');
 
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
 
     Route::post('/logout', function () {
         Auth::logout();

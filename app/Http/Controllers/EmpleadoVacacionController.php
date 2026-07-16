@@ -6,9 +6,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Empleado;
 use App\Models\EmpleadoVacacion;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
-use Carbon\Carbon;
 
 class EmpleadoVacacionController extends Controller
 {
@@ -96,6 +96,7 @@ class EmpleadoVacacionController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             $errors = $e->errors();
             $firstError = collect($errors)->flatten()->first();
+
             return response()->json([
                 'success' => false,
                 'message' => $firstError,
@@ -124,6 +125,7 @@ class EmpleadoVacacionController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             $errors = $e->errors();
             $firstError = collect($errors)->flatten()->first();
+
             return response()->json([
                 'success' => false,
                 'message' => $firstError,
@@ -188,17 +190,19 @@ class EmpleadoVacacionController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('nombre', 'like', "%{$search}%")
-                  ->orWhere('dni', 'like', "%{$search}%");
+                    ->orWhere('dni', 'like', "%{$search}%");
             });
         }
 
         $elegibles = $query->get()
-            ->filter(function ($empleado) use ($anioActual) {
+            ->filter(function ($empleado) {
                 $anosServicio = (int) $empleado->fecha_ingreso->diffInYears(now());
+
                 return $anosServicio >= 1;
             })
-            ->map(function ($empleado) use ($anioActual) {
+            ->map(function ($empleado) {
                 $anosServicio = (int) $empleado->fecha_ingreso->diffInYears(now());
+
                 return [
                     'id' => $empleado->id,
                     'nombre' => $empleado->nombre,

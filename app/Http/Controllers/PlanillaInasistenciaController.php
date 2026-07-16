@@ -27,9 +27,16 @@ class PlanillaInasistenciaController extends Controller
         if ($request->ajax()) {
             $data = PlanillaInasistencia::with('empleado')
                 ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
-                ->select(['id', 'empleado_id', 'fecha', 'medio_dia', 'observacion'])
-                ->orderByDesc('fecha')
-                ->orderByDesc('id');
+                ->select(['id', 'empleado_id', 'fecha', 'medio_dia', 'observacion']);
+
+            $mes = $request->get('mes');
+            if ($mes && preg_match('/^(\d{4})-(\d{2})$/', $mes, $m)) {
+                $data->whereYear('fecha', (int) $m[1])
+                     ->whereMonth('fecha', (int) $m[2]);
+            }
+
+            $data->orderByDesc('fecha')
+                 ->orderByDesc('id');
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {

@@ -1,4 +1,11 @@
 <aside class="app-sidebar sidebar-light" data-bs-theme="light">
+    <style>
+        .app-sidebar .sidebar-menu .nav-item .nav-link.active > p,
+        .app-sidebar .sidebar-menu .nav-item.menu-open > .nav-link > p {
+            font-weight: 700;
+        }
+    </style>
+
     {{-- Sidebar Brand --}}
     <div class="sidebar-brand">
         <a href="{{ route('dashboard') }}" class="brand-link d-flex align-items-center">
@@ -417,9 +424,9 @@
                 @endcanany
 
                 {{-- PRODUCCIÓN --}}
-                <li class="nav-header">PRODUCCIÓN</li>
 
                 @canany(['formulaciones_list', 'preparadas_list', 'formulaciones_report', 'preparadas_report'])
+                    <li class="nav-header">PRODUCCIÓN</li>
                     <li class="nav-item" id="mnuProduccion">
                         <a href="#" class="nav-link">
                             <i class="bi bi-box-seam nav-icon"></i>
@@ -434,16 +441,6 @@
                                     <a href="{{ route('formulaciones.index') }}" class="nav-link" id="itemFormulaciones">
                                         <i class="bi bi-journal-text nav-icon"></i>
                                         <p>Formulaciones</p>
-                                    </a>
-                                </li>
-                            @endcan
-
-                            @can('formulaciones_list')
-                                <li class="nav-item">
-                                    <a href="{{ route('ration-formulation.index') }}" class="nav-link"
-                                        id="itemRationFormulation">
-                                        <i class="bi bi-calculator nav-icon"></i>
-                                        <p>Formulación de Raciones</p>
                                     </a>
                                 </li>
                             @endcan
@@ -480,7 +477,50 @@
                     </li>
                 @endcanany
 
+                {{-- NUTRICIÓN --}}
+                @canany(['ration_datos_list', 'formulas_alimento_list', 'formulas_alimento_cerdo_list'])
+                    <li class="nav-header">NUTRICIÓN</li>
+                    <li class="nav-item" id="mnuNutricion">
+                        <a href="#" class="nav-link">
+                            <i class="bi bi-heart-pulse nav-icon"></i>
+                            <p>
+                                Nutrición Animal
+                                <i class="nav-arrow bi bi-chevron-right"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            @can('ration_datos_list')
+                                <li class="nav-item">
+                                    <a href="{{ route('ration-formulation.datos') }}" class="nav-link" id="itemRationDatos">
+                                        <i class="bi bi-table nav-icon"></i>
+                                        <p>Datos Nutricionales</p>
+                                    </a>
+                                </li>
+                            @endcan
+
+                            @can('formulas_alimento_list')
+                                <li class="nav-item">
+                                    <a href="{{ route('formulas-alimento.index') }}" class="nav-link" id="itemFormulasAlimento">
+                                        <i class="bi bi-calculator nav-icon"></i>
+                                        <p>Fórmulas de Alimento (Vacunos)</p>
+                                    </a>
+                                </li>
+                            @endcan
+
+                            @can('formulas_alimento_cerdo_list')
+                                <li class="nav-item">
+                                    <a href="{{ route('formulas-alimento-cerdo.index') }}" class="nav-link" id="itemFormulasAlimentoCerdo">
+                                        <i class="bi bi-piggy-bank nav-icon"></i>
+                                        <p>Fórmulas de Alimento (Cerdos)</p>
+                                    </a>
+                                </li>
+                            @endcan
+                        </ul>
+                    </li>
+                @endcanany
+
                 @canany(['nucleos_list', 'nucleo_preparadas_list', 'nucleos_report'])
+                    <li class="nav-header">NÚCLEOS</li>
                     <li class="nav-item" id="mnuNucleo">
                         <a href="#" class="nav-link">
                             <x-icon name="nucleos" class="nav-icon" />
@@ -523,10 +563,10 @@
                 @endcanany
 
                 {{-- FINANZAS --}}
-                <li class="nav-header">FINANZAS</li>
 
-                @canany(['caja_pagos_list', 'caja_report', 'venta_provisionales_list', 'compra_provisionales_list',
+                @canany(['caja_pagos_list', 'caja_ingresos_list', 'caja_report', 'venta_provisionales_list', 'compra_provisionales_list',
                     'gastos_list', 'costos_list', 'costos_report'])
+                    <li class="nav-header">FINANZAS</li>
                     <li class="nav-item" id="mnuCaja">
                         <a href="#" class="nav-link">
                             <x-icon name="caja" class="nav-icon" />
@@ -536,11 +576,22 @@
                             </p>
                         </a>
                         <ul class="nav nav-treeview">
+                            {{-- 
                             @can('caja_pagos_list')
                                 <li class="nav-item">
                                     <a href="{{ route('caja-pagos.index') }}" class="nav-link" id="itemCajaPagos">
                                         <i class="bi bi-cash-coin nav-icon"></i>
                                         <p>Caja</p>
+                                    </a>
+                                </li>
+                            @endcan
+                            --}}
+
+                            @can('caja_ingresos_list')
+                                <li class="nav-item">
+                                    <a href="{{ route('caja-ingresos.index') }}" class="nav-link" id="itemCajaIngresos">
+                                        <i class="bi bi-plus-circle-fill nav-icon"></i>
+                                        <p>Ingresos Caja</p>
                                     </a>
                                 </li>
                             @endcan
@@ -648,9 +699,9 @@
                 @endcan
 
                 {{-- INVENTARIO --}}
-                <li class="nav-header">INVENTARIO</li>
 
                 @canany(['kardex_report', 'cuadre_stock_list'])
+                    <li class="nav-header">INVENTARIO</li>
                     <li class="nav-item" id="mnuKardex">
                         <a href="#" class="nav-link">
                             <x-icon name="kardex" class="nav-icon" />
@@ -682,10 +733,10 @@
                 @endcanany
 
                 {{-- RECURSOS HUMANOS --}}
-                <li class="nav-header">RECURSOS HUMANOS</li>
 
                 @canany(['empleados_list', 'planilla_adelantos_list', 'planilla_prestamos_list', 'planilla_pagos_list',
-                    'planilla_inasistencias_list', 'planilla_report', 'empleado_vacaciones_list'])
+                    'planilla_inasistencias_list', 'planilla_report', 'empleado_vacaciones_list', 'planilla_list'])
+                    <li class="nav-header">RECURSOS HUMANOS</li>
                     <li class="nav-item" id="mnuPlanilla">
                         <a href="#" class="nav-link">
                             <i class="bi bi-people nav-icon"></i>
@@ -769,6 +820,18 @@
                                     </a>
                                 </li>
                             @endcan
+
+                            {{-- ASISTENCIA BIOMÉTRICA (deshabilitado temporalmente)
+                            <li class="nav-header">ASISTENCIA BIOMÉTRICA</li>
+
+                            <li class="nav-item">
+                                <a href="{{ route('zkteco.marcaciones.view') }}" class="nav-link"
+                                    id="itemZktecoMarcaciones">
+                                    <i class="bi bi-clock-history nav-icon"></i>
+                                    <p>Marcaciones</p>
+                                </a>
+                            </li>
+                            --}}
                         </ul>
                     </li>
                 @endcanany

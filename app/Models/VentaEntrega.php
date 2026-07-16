@@ -25,6 +25,11 @@ class VentaEntrega extends Model
         'fecha_entrega' => 'datetime',
     ];
 
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | RELACIONES

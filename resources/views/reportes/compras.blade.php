@@ -28,8 +28,8 @@
                         </div>
                         <div class="tab-pane fade show active" id="tab1">
                             <div class="d-flex flex-nowrap overflow-auto mb-2">
-                                <input type="date" id="fecha_inicio" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrar" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <button id="btnExportar" class="btn btn-success btn-sm me-2">Exportar Excel</button>
                                 <a href="#" id="btnPdf" target="_blank" class="btn btn-danger">PDF</a>
@@ -41,8 +41,8 @@
                         </div>
                         <div class="tab-pane fade" id="tab2">
                             <div class="d-flex flex-nowrap overflow-auto mb-2">
-                                <input type="date" id="fecha_inicio_fechas" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_fechas" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_fechas" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_fechas" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarFechas" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <button id="btnExportarFechas" class="btn btn-success btn-sm me-2">Exportar Excel</button>
                                 <a href="#" id="btnPdfFechas" target="_blank" class="btn btn-danger">PDF</a>
@@ -54,8 +54,8 @@
                         </div>
                         <div class="tab-pane fade" id="tab3">
                             <div class="d-flex flex-nowrap overflow-auto mb-2">
-                                <input type="date" id="fecha_inicio_proveedor" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_proveedor" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_proveedor" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_proveedor" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarProveedor" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <button id="btnExportarProveedor" class="btn btn-success btn-sm me-2">Exportar Excel</button>
                                 <a href="#" id="btnPdfProveedor" target="_blank" class="btn btn-danger">PDF</a>
@@ -67,8 +67,8 @@
                         </div>
                         <div class="tab-pane fade" id="tab4">
                             <div class="d-flex flex-nowrap overflow-auto mb-2">
-                                <input type="date" id="fecha_inicio_producto" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_producto" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_producto" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_producto" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarProducto" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <button id="btnExportarProducto" class="btn btn-success btn-sm me-2">Exportar Excel</button>
                                 <a href="#" id="btnPdfProducto" target="_blank" class="btn btn-danger">PDF</a>
@@ -80,8 +80,8 @@
                         </div>
                         <div class="tab-pane fade" id="tab5">
                             <div class="d-flex flex-nowrap overflow-auto mb-2">
-                                <input type="date" id="fecha_inicio_proveedordeta" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_proveedordeta" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_proveedordeta" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_proveedordeta" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarProveedorDeta" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <button id="btnExportarProveedorDeta" class="btn btn-success btn-sm me-2">Exportar Excel</button>
                                 <a href="#" id="btnPdfProveedorDeta" target="_blank" class="btn btn-danger">PDF</a>
@@ -93,8 +93,8 @@
                         </div>
                         <div class="tab-pane fade" id="tab6">
                             <div class="d-flex flex-nowrap overflow-auto mb-2">
-                                <input type="date" id="fecha_inicio_fechadeta" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_fechadeta" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_fechadeta" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_fechadeta" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarFechaDeta" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <button id="btnExportarFechaDeta" class="btn btn-success btn-sm me-2">Exportar Excel</button>
                                 <a href="#" id="btnPdfFechaDeta" target="_blank" class="btn btn-danger">PDF</a>

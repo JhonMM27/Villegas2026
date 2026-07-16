@@ -39,7 +39,7 @@
     <div class="row g-1 mt-1">
         <div class="col-8"></div>
         <div class="col-4">
-            <input type="text" name="total_caja" id="total_caja"
+            <input type="text" name="total_cobranza" id="total_cobranza"
                 class="form-control form-control-sm py-0 text-end fw-bold" value="0.00" readonly>
         </div>
     </div>

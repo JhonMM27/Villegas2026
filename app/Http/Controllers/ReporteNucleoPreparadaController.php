@@ -2,20 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\User;
 use App\Models\NucleoPreparada;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
-
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ReporteNucleoPreparadaController extends Controller
 {
-    public function __construct(){
+    public function __construct()
+    {
         $this->middleware('can:preparadas_list')->only(
-                ['index','nucleoPreparadasAcumuladas','imprimirNucleoPreparadasAcumuladas']);
+            ['index', 'nucleoPreparadasAcumuladas', 'imprimirNucleoPreparadasAcumuladas']);
     }
 
     public function index(Request $request)
@@ -24,18 +23,17 @@ class ReporteNucleoPreparadaController extends Controller
         return view('reportes.nucleo-preparadas');
     }
 
-    
     public function nucleoPreparadasAcumuladas(Request $request)
     {
         $fechaInicio = $request->fecha_inicio;
-        $fechaFin    = $request->fecha_fin;
+        $fechaFin = $request->fecha_fin;
 
         $reportes = NucleoPreparada::query()
             ->join('productos', 'nucleo_preparadas.nucleo_id', '=', 'productos.id')
             ->join('lineas', 'productos.linea_id', '=', 'lineas.id')
             ->whereBetween('nucleo_preparadas.fecha', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ])
             ->groupBy(
                 'nucleo_preparadas.nucleo_id',
@@ -66,14 +64,14 @@ class ReporteNucleoPreparadaController extends Controller
     public function imprimirNucleoPreparadasAcumuladas(Request $request)
     {
         $fechaInicio = $request->fecha_inicio;
-        $fechaFin    = $request->fecha_fin;
+        $fechaFin = $request->fecha_fin;
 
         $reportes = NucleoPreparada::query()
             ->join('productos', 'nucleo_preparadas.nucleo_id', '=', 'productos.id')
             ->join('lineas', 'productos.linea_id', '=', 'lineas.id')
             ->whereBetween('nucleo_preparadas.fecha', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ])
             ->groupBy(
                 'nucleo_preparadas.nucleo_id',
@@ -95,14 +93,13 @@ class ReporteNucleoPreparadaController extends Controller
             ->orderBy('nucleo_preparadas.nucleo_nombre')
             ->get();
 
-
         $pdf = Pdf::loadView(
             'reportes.nucleo-preparadas.nucleo_preparadas_acumuladas_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('nucleo_preparadas_acumuladas.pdf');
     }
@@ -112,7 +109,7 @@ class ReporteNucleoPreparadaController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-        $fileName = 'nucleo_preparadas_acumuladas_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'nucleo_preparadas_acumuladas_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new \App\Exports\NucleoPreparadasAcumuladasExport($fechaInicio, $fechaFin),
@@ -122,7 +119,7 @@ class ReporteNucleoPreparadaController extends Controller
 
     public function nucleoPreparadasFechas(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
@@ -130,26 +127,26 @@ class ReporteNucleoPreparadaController extends Controller
         $fechaFin = $request->input('fecha_fin');
 
         $reportes = NucleoPreparada::query()
-        ->select([
-            'id',
-            'fecha',
-            'nucleo_id',
-            'nucleo_nombre',
-            'producto_empaque',
-            'ingreso_kg',
-            'ingreso_saco',
-            'ingreso_soles',
-            'items',
-        ])
-        ->whereBetween('fecha', [
-            Carbon::parse($fechaInicio)->startOfDay(),
-            Carbon::parse($fechaFin)->endOfDay()
-        ])
-        ->where('estado', '!=', 'anulada')
-        ->orderBy('nucleo_nombre') 
-        ->orderBy('fecha')
-        ->orderBy('id')
-        ->get();
+            ->select([
+                'id',
+                'fecha',
+                'nucleo_id',
+                'nucleo_nombre',
+                'producto_empaque',
+                'ingreso_kg',
+                'ingreso_saco',
+                'ingreso_soles',
+                'items',
+            ])
+            ->whereBetween('fecha', [
+                Carbon::parse($fechaInicio)->startOfDay(),
+                Carbon::parse($fechaFin)->endOfDay(),
+            ])
+            ->where('estado', '!=', 'anulada')
+            ->orderBy('nucleo_nombre')
+            ->orderBy('fecha')
+            ->orderBy('id')
+            ->get();
 
         return view(
             'reportes.nucleo-preparadas.nucleo_preparadas_fechas',
@@ -166,7 +163,7 @@ class ReporteNucleoPreparadaController extends Controller
             ->join('productos', 'nucleo_preparadas.nucleo_id', '=', 'productos.id')
             ->whereBetween('nucleo_preparadas.fecha', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ])
             ->where('nucleo_preparadas.estado', '!=', 'anulada')
             ->orderBy('nucleo_preparadas.nucleo_nombre')
@@ -188,11 +185,11 @@ class ReporteNucleoPreparadaController extends Controller
             'reportes.nucleo-preparadas.nucleo_preparadas_fechas_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'landscape') // 👈 landscape porque tiene más columnas
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
-        return $pdf->stream('nucleo_preparadas_fechas_' . now()->format('Ymd_His') . '.pdf');
+        return $pdf->stream('nucleo_preparadas_fechas_'.now()->format('Ymd_His').'.pdf');
     }
 
     public function exportarNucleoPreparadasFechas(Request $request)
@@ -200,11 +197,11 @@ class ReporteNucleoPreparadaController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-        $fileName = 'nucleo_preparadas_fecha_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'nucleo_preparadas_fecha_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new \App\Exports\NucleoPreparadasFechaExport($fechaInicio, $fechaFin),
             $fileName
         );
-    }     
+    }
 }

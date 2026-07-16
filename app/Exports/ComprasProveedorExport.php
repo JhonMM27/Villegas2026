@@ -2,15 +2,15 @@
 
 namespace App\Exports;
 
-use App\Models\CompraDetalle;
+use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Illuminate\Support\Carbon;
 
 class ComprasProveedorExport implements FromCollection, WithHeadings, WithMapping
 {
     protected $fechaInicio;
+
     protected $fechaFin;
 
     public function __construct($fechaInicio = null, $fechaFin = null)
@@ -40,7 +40,7 @@ class ComprasProveedorExport implements FromCollection, WithHeadings, WithMappin
         if ($this->fechaInicio && $this->fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($this->fechaInicio)->startOfDay(),
-                Carbon::parse($this->fechaFin)->endOfDay()
+                Carbon::parse($this->fechaFin)->endOfDay(),
             ]);
         }
 
@@ -58,7 +58,7 @@ class ComprasProveedorExport implements FromCollection, WithHeadings, WithMappin
             )
             ->orderBy('proveedores.razon_social', 'asc') // primero por proveedor
             ->orderBy('compras.fecha_compra', 'asc')     // luego por fecha
-            ->orderBy('compras.correlativo', 'asc') 
+            ->orderBy('compras.correlativo', 'asc')
             ->get();
     }
 
@@ -74,7 +74,7 @@ class ComprasProveedorExport implements FromCollection, WithHeadings, WithMappin
             'Ítems',
             'Total',
             'ID Proveedor',
-            'Razón Social'
+            'Razón Social',
         ];
     }
 
@@ -88,9 +88,9 @@ class ComprasProveedorExport implements FromCollection, WithHeadings, WithMappin
             $item->correlativo,
             $item->pago_forma_codigo,
             $item->total_items,
-            number_format((float)$item->total, 2, '.', ''), // Total con 2 decimales
+            number_format((float) $item->total, 2, '.', ''), // Total con 2 decimales
             $item->proveedor_id,
-            $item->razon_social
+            $item->razon_social,
         ];
     }
 }

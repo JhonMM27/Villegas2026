@@ -37,6 +37,27 @@ class Compra extends Model
         'rectificacion_count',
     ];
 
+    protected $casts = [
+        'fecha_compra' => 'datetime',
+        'fecha_vencimiento' => 'datetime',
+        'op_gravada' => 'decimal:2',
+        'op_exonerada' => 'decimal:2',
+        'op_inafecta' => 'decimal:2',
+        'impuesto' => 'decimal:2',
+        'total' => 'decimal:2',
+        'importe_p' => 'decimal:2',
+        'importe_d' => 'decimal:2',
+        'importe_c' => 'decimal:2',
+        'acuenta' => 'decimal:2',
+        'abonos' => 'decimal:2',
+        'saldo' => 'decimal:2',
+    ];
+
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
+
     /*
     protected $casts = [
         'fecha_venta' => 'datetime:Y-m-d H:i:s',

@@ -80,10 +80,10 @@ class EmpleadoManager extends CrudManager {
             document.getElementById('sueldo_real').value = data.empleado.sueldo_real;
             document.getElementById('estado').value = data.empleado.estado;
             if (data.empleado.fecha_ingreso) {
-                document.getElementById('fecha_ingreso').value = data.empleado.fecha_ingreso;
+                this.setFieldValue('fecha_ingreso', data.empleado.fecha_ingreso);
             }
             if (data.empleado.fecha_salida) {
-                document.getElementById('fecha_salida').value = data.empleado.fecha_salida;
+                this.setFieldValue('fecha_salida', data.empleado.fecha_salida);
             }
         });
         this.isEditing = true;

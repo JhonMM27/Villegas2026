@@ -19,7 +19,7 @@ return new class extends Migration
             // Datos "congelados" del producto al momento de la compra
             $table->string('producto_nombre', 50)->nullable();
             $table->unsignedSmallInteger('producto_empaque')->nullable();
-            $table->char('unidad_codigo', 3)->nullable();        
+            $table->char('unidad_codigo', 3)->nullable();
             $table->decimal('cantidad', 8, 2);
             $table->decimal('precio_unitario', 9, 4);
             $table->decimal('subtotal', 8, 2);

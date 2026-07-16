@@ -33,13 +33,7 @@
                                         </div>
                                     </div>
                                     <div class="col-4">
-                                        <div class="mb-3">
-                                            <label for="fecha" class="form-label">Fecha <span
-                                                    class="text-danger">*</span></label>
-                                            <input type="date" id="fecha" name="fecha"
-                                                class="form-control form-control-sm" required>
-                                            <div class="invalid-feedback"></div>
-                                        </div>
+                                        <x-date-picker id="fecha" label="Fecha" :required="true" />
                                     </div>
                                     <div class="col-4">
                                         <div class="mb-3">

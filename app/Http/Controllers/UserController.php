@@ -2,46 +2,48 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Spatie\Permission\Models\Role;
 use App\Models\User;
-use Yajra\DataTables\DataTables;
-use Illuminate\Validation\Rule;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+use Yajra\DataTables\DataTables;
 
 class UserController extends Controller
 {
-     public function __construct(){
+    public function __construct()
+    {
         $this->middleware('can:users_list')->only(['index']);
         $this->middleware('can:users_create')->only(['store']);
         $this->middleware('can:users_edit')->only(['show', 'update']);
         $this->middleware('can:users_delete')->only(['destroy']);
     }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $data = User::with('roles')->select('id', 'name', 'email','activo');
+            $data = User::with('roles')->select('id', 'name', 'email', 'activo');
 
             return DataTables::of($data)
                 ->addColumn('roles', function ($user) {
                     return $user->roles->pluck('name')->map(function ($role) {
-                        return '<span class="badge bg-primary">' . $role . '</span>';
+                        return '<span class="badge bg-primary">'.$role.'</span>';
                     })->implode(' ');
                 })
                 ->addColumn('action', function ($user) {
-                    $editButton ='';                    
-                    if(auth()->user()->can('users_edit')){
+                    $editButton = '';
+                    if (auth()->user()->can('users_edit')) {
                         $editButton = view('components.button-edit', ['id' => $user->id])->render();
                     }
                     $deleteButton = '';
-                    if(auth()->user()->can('users_delete')){
+                    if (auth()->user()->can('users_delete')) {
                         // Use $user (closure param) instead of undefined $row
                         $deleteButton = view('components.button-delete', ['id' => $user->id, 'texto' => $user->name])->render();
                     }
-                    return '<div class="btn-group">' . $editButton . $deleteButton . '</div>';
+
+                    return '<div class="btn-group">'.$editButton.$deleteButton.'</div>';
                 })
                 ->rawColumns(['roles', 'action', 'activo'])
                 ->editColumn('activo', function ($row) {
@@ -78,7 +80,7 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Registro creado satisfactoriamente'
+            'message' => 'Registro creado satisfactoriamente',
         ]);
     }
 
@@ -89,6 +91,7 @@ class UserController extends Controller
     {
         try {
             $registro = User::with('roles')->findOrFail($id);
+
             return response()->json($registro);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
@@ -109,9 +112,9 @@ class UserController extends Controller
     public function update(Request $request, $id)
     {
         $data = $this->validateData($request, $id);
-        $user = User::findOrFail($id);        
+        $user = User::findOrFail($id);
 
-        if (!empty($data['password'])) {
+        if (! empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
         } else {
             unset($data['password']);
@@ -125,7 +128,7 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Registro actualizado correctamente'
+            'message' => 'Registro actualizado correctamente',
         ]);
     }
 
@@ -140,11 +143,11 @@ class UserController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro'
+                'message' => 'Error al eliminar el registro',
             ], 500);
         }
     }
@@ -155,10 +158,10 @@ class UserController extends Controller
             'name' => 'required|string|max:10',
             'email' => [
                 'required', 'email', 'max:255',
-                Rule::unique('users')->ignore($id)
+                Rule::unique('users')->ignore($id),
             ],
             'password' => $id ? 'nullable|min:6' : 'required|min:6',
-            'activo' => 'required|boolean'
+            'activo' => 'required|boolean',
         ]);
     }
 }

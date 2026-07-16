@@ -2,13 +2,11 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
 use App\Models\User;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -41,6 +39,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'preparadas',
             'cotizaciones',
             'caja_pagos',
+            'caja_ingresos',
             'nucleos',
             'nucleo_preparadas',
             'venta_provisionales',
@@ -51,7 +50,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'empleado_vacaciones',
             'planilla_adelantos',
             'planilla_prestamos',
-            'planilla_pagos'
+            'planilla_pagos',
+            'tipos_racion',
+            'ingredientes',
+            'ingrediente_datos_nutricionales',
         ];
         $actions = ['list', 'create', 'edit', 'delete'];
         $permissions = [];
@@ -63,7 +65,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 $permissions[] = Permission::firstOrCreate(['name' => $permName]);
             }
         }
-        
+
         $permissionsReport = [
             'dashboard_estadisticas',
             'dashboard_productos',
@@ -78,9 +80,26 @@ class RolesAndPermissionsSeeder extends Seeder
             'stock_report',
             'cuenta_corriente_report',
             'caja_report',
+            'gastos_report',
+            'costos_report',
             'rentabilidad_report',
             'super_admin',
-            'planilla_report'
+            'planilla_report',
+            'ration_datos_list',
+            'ration_datos_create',
+            'ration_datos_edit',
+            'ration_datos_delete',
+            'ration_formulacion_list',
+            'ration_formulacion_create',
+            'ration_formulacion_edit',
+            'formulas_alimento_list',
+            'formulas_alimento_create',
+            'formulas_alimento_edit',
+            'formulas_alimento_delete',
+            'formulas_alimento_cerdo_list',
+            'formulas_alimento_cerdo_create',
+            'formulas_alimento_cerdo_edit',
+            'formulas_alimento_cerdo_delete',
         ];
 
         foreach ($permissionsReport as $permission) {
@@ -107,8 +126,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Permisos para operador
         $operadorPerms = collect($permissions)
-            ->filter(fn ($perm) =>
-                str_ends_with($perm->name, '_list') ||
+            ->filter(fn ($perm) => str_ends_with($perm->name, '_list') ||
                 str_ends_with($perm->name, '_create')
             )
             ->pluck('name')

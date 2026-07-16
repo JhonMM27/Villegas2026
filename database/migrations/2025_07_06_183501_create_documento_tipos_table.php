@@ -23,7 +23,7 @@ return new class extends Migration
             ['codigo' => '01', 'descripcion' => 'DNI', 'activo' => true],
             ['codigo' => '04', 'descripcion' => 'Carnet de extranjería', 'activo' => false],
             ['codigo' => '06', 'descripcion' => 'RUC', 'activo' => true],
-            ['codigo' => '07', 'descripcion' => 'Pasaporte', 'activo' => false]
+            ['codigo' => '07', 'descripcion' => 'Pasaporte', 'activo' => false],
         ]);
     }
 

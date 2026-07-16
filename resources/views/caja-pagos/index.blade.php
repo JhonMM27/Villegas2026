@@ -9,11 +9,6 @@
             <div class="card mb-4">
                 <div class="card-header d-flex align-items-center">
                     <h3 class="card-title flex-grow-1">Caja</h3>
-                    @can('caja_pagos_create')
-                    <button type="button" class="btn btn-primary" id="btnCreate">
-                        <i class="bi bi-plus-circle"></i> Nuevo
-                    </button>
-                    @endcan
                 </div>
                 <!-- /.card-header -->
                 <div class="card-body">
@@ -50,9 +45,7 @@
     </div>
     <!--end::Row-->
 </div>
-@canany(['caja_pagos_create', 'caja_pagos_edit'])
-    @include('caja-pagos.action')
-@endcanany
+</div>
 @endsection
 @push('scripts')
 <script>
@@ -99,44 +92,6 @@ class CajaPagoManager extends CrudManager {
             responsive: true,
             order: [[1, 'asc']]
         });
-    }
-
-    async showEditModal(id) {
-        try {
-            const response = await this.fetchData(`${this.baseUrl}/${id}`);
-            
-            this.isEditing = true;
-            this.resetForm();
-            
-            this.elements.modalTitle.textContent = 'Editar Línea: '+ response.nombre;
-            this.elements.methodField.value = 'PUT';
-            
-            document.getElementById('id').value = response.id || '';
-            document.getElementById('nombre').value = response.nombre || '';
-            document.getElementById('activo').checked = response.activo ? true : false;
-
-            this.form.action = `${this.baseUrl}/${id}`;
-            
-            this.modal.show();
-            
-        } catch (error) {
-            this.showNotification('error', 'Error al cargar los datos');
-            console.error('Error al cargar datos:', error);
-        }
-    }
-    focusFirstField() {
-        document.getElementById('nombre').focus();
-        const modalEl = this.modal._element;
-
-        modalEl.addEventListener('shown.bs.modal', () => {
-            const input = document.getElementById('nombre');
-            if (input) input.focus();
-        }, { once: true });
-    }
-
-    showCreateModal(){
-        super.showCreateModal();
-        this.elements.modalTitle.textContent = 'Nueva Línea';
     }
 }
 document.addEventListener('DOMContentLoaded', () => {

@@ -671,7 +671,7 @@
                 document.getElementById('documento_tipo_codigo').value = '01';
                 document.getElementById('cliente_id').value = '';
                 document.getElementById('cliente_razon_social').value = '';
-                document.getElementById('fecha_prestamo').value = this.obtenerFechaHoraActual();
+                this.setFieldValue('fecha_prestamo', this.obtenerFechaHoraActual());
                 const usuarioNombre = @json(auth()->user()->name);
                 document.getElementById('usuario_nombre').textContent = usuarioNombre;
 
@@ -788,7 +788,7 @@
                     document.getElementById('cliente_razon_social').value = razonSocial;
                     document.getElementById('cliente_id').value = clienteId;
 
-                    document.getElementById('fecha_prestamo').value = response.fecha_prestamo || '';
+                    this.setFieldValue('fecha_prestamo', this.formatDateTimeLocal(response.fecha_prestamo));
                     document.getElementById('usuario_nombre').textContent = response.user_nombre || '';
 
                     // Llenar tabla de detalles (productos)
@@ -1089,7 +1089,7 @@
                     document.getElementById('comprobante_tipo_codigo').value = nuevoComprobante;
                     this.getSerie(nuevoComprobante);
 
-                    document.getElementById('fecha_prestamo').value = this.obtenerFechaHoraActual();
+                    this.setFieldValue('fecha_prestamo', this.obtenerFechaHoraActual());
                     document.getElementById('usuario_nombre').textContent = @json(auth()->user()->name);
 
                     // Llenar tabla de detalles (productos)
@@ -1112,25 +1112,19 @@
             async showRectifyModal(id) {
                 try {
                     const response = await this.fetchData(`${this.baseUrl}/${id}`);
-                    
+
                     this.isEditing = false; // Queremos que se comporte como un registro NUEVO
+                    this.isRectifying = true;
                     this.resetForm();
-                    
-                    // Formatear fecha para datetime-local input
-                    const formatDateTimeLocal = (fecha) => {
-                        if (!fecha || fecha.startsWith('-000') || fecha === 'null') return '';
-                        if (typeof fecha !== 'string') return '';
-                        return fecha.replace(' ', 'T').substring(0, 16);
-                    };
-                    
+
                     this.elements.modalTitle.textContent = 'Rectificar Préstamo: '+ response.comprobante_tipo_codigo + ' ' + response.serie + '-' + response.correlativo;
                     this.elements.methodField.value = 'POST';
                     document.getElementById('es_rectificacion').value = '1';
                     document.getElementById('prestamo_anulado_id').value = id;
-                    
+
                     // Asignar tipo movimiento
                     document.getElementById('movimiento_tipo').value = response.movimiento_tipo || '';
-                    document.getElementById('fecha_prestamo').value = formatDateTimeLocal(response.fecha_prestamo);
+                    this.setFieldValue('fecha_prestamo', this.formatDateTimeLocal(response.fecha_prestamo));
 
                     // Llenar cliente
                     document.getElementById('cliente_id').value = response.cliente_origen_id && response.cliente_origen_id !== 11 ? response.cliente_origen_id : (response.cliente_destino_id || '');

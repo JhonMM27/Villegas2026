@@ -6,9 +6,7 @@
             <div class="invalid-feedback"></div>
         </div>
         <div class="col-md-6">
-            <label for="fecha_provisional" class="form-label">Fecha <span class="text-danger"></span></label>
-            <input type="datetime-local" id="fecha_provisional" name="fecha_provisional" class="form-control form-control-sm">
-            <div class="invalid-feedback"></div>
+            <x-datetime-picker id="fecha_provisional" label="Fecha" />
         </div>        
     </div>
 </div>

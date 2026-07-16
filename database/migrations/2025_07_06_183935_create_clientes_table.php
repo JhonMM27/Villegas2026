@@ -23,10 +23,10 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('documento_tipo_codigo')
-                    ->references('codigo')
-                    ->on('documento_tipos')
-                    ->onUpdate('cascade')
-                    ->onDelete('restrict');
+                ->references('codigo')
+                ->on('documento_tipos')
+                ->onUpdate('cascade')
+                ->onDelete('restrict');
         });
     }
 

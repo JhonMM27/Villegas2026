@@ -4,18 +4,18 @@ namespace App\Exports;
 
 use App\Models\NucleoPreparada;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 
 class NucleoPreparadasAcumuladasExport implements FromCollection
 {
     protected $fechaInicio;
+
     protected $fechaFin;
 
     public function __construct($fechaInicio, $fechaFin)
     {
         $this->fechaInicio = $fechaInicio;
-        $this->fechaFin    = $fechaFin;
+        $this->fechaFin = $fechaFin;
     }
 
     /**
@@ -28,7 +28,7 @@ class NucleoPreparadasAcumuladasExport implements FromCollection
             ->join('lineas', 'productos.linea_id', '=', 'lineas.id')
             ->whereBetween('nucleo_preparadas.fecha', [
                 Carbon::parse($this->fechaInicio)->startOfDay(),
-                Carbon::parse($this->fechaFin)->endOfDay()
+                Carbon::parse($this->fechaFin)->endOfDay(),
             ])
             ->where('nucleo_preparadas.estado', '!=', 'anulada')
             ->select([
@@ -52,12 +52,12 @@ class NucleoPreparadasAcumuladasExport implements FromCollection
         $rows[] = [
             'Reporte de Núcleos Preparados (Acumulado)',
             '', '', '', '', '', '', '', '',
-            now()->format('d/m/Y H:i:s')
+            now()->format('d/m/Y H:i:s'),
         ];
         $rows[] = [
-            'Fechas: del ' .
-            Carbon::parse($this->fechaInicio)->format('d/m/Y') .
-            ' al ' .
+            'Fechas: del '.
+            Carbon::parse($this->fechaInicio)->format('d/m/Y').
+            ' al '.
             Carbon::parse($this->fechaFin)->format('d/m/Y'),
         ];
 
@@ -77,7 +77,7 @@ class NucleoPreparadasAcumuladasExport implements FromCollection
             'Soles Total',
         ];
 
-        $totalIngresoKg    = 0.0;
+        $totalIngresoKg = 0.0;
         $totalIngresoSacos = 0.0;
         $totalIngresoSoles = 0.0;
 
@@ -88,15 +88,15 @@ class NucleoPreparadasAcumuladasExport implements FromCollection
                 $item->nucleo_nombre,
                 $item->producto_empaque,
                 $item->linea_nombre,
-                number_format((float)$item->costo_unitario, 4, '.', ''),
-                number_format((float)$item->ingreso_saco, 4, '.', ''),
-                number_format((float)$item->ingreso_kg, 4, '.', ''),
-                number_format((float)$item->ingreso_soles, 4, '.', ''),
+                number_format((float) $item->costo_unitario, 4, '.', ''),
+                number_format((float) $item->ingreso_saco, 4, '.', ''),
+                number_format((float) $item->ingreso_kg, 4, '.', ''),
+                number_format((float) $item->ingreso_soles, 4, '.', ''),
             ];
 
-            $totalIngresoKg    += (float)$item->ingreso_kg;
-            $totalIngresoSacos += (float)$item->ingreso_saco;
-            $totalIngresoSoles += (float)$item->ingreso_soles;
+            $totalIngresoKg += (float) $item->ingreso_kg;
+            $totalIngresoSacos += (float) $item->ingreso_saco;
+            $totalIngresoSoles += (float) $item->ingreso_soles;
         }
 
         // Totales Finales

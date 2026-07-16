@@ -4,11 +4,11 @@ namespace App\Exports;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 
-class StockAlCorteExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
+class StockAlCorteExport implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping
 {
     private Collection $rows;
 
@@ -60,9 +60,9 @@ class StockAlCorteExport implements FromCollection, WithHeadings, WithMapping, S
 
         foreach ($reportes as $r) {
             $linea = $r->linea ?? 'SIN LÍNEA';
-            $stock = (float)$r->stock;
-            $costo = (float)$r->costo_unitario;
-            $valor = (float)$r->valor_total;
+            $stock = (float) $r->stock;
+            $costo = (float) $r->costo_unitario;
+            $valor = (float) $r->valor_total;
 
             // cambio de línea → insertar subtotal
             if ($lineaActual !== null && $linea !== $lineaActual) {
@@ -79,8 +79,12 @@ class StockAlCorteExport implements FromCollection, WithHeadings, WithMapping, S
                 $subValor = 0;
             }
 
-            if ($lineaActual === null) $lineaActual = $linea;
-            if ($linea !== $lineaActual) $lineaActual = $linea;
+            if ($lineaActual === null) {
+                $lineaActual = $linea;
+            }
+            if ($linea !== $lineaActual) {
+                $lineaActual = $linea;
+            }
 
             $subStock += $stock;
             $subValor += $valor;

@@ -53,7 +53,7 @@
                         <div class="row g-3 mb-3">
                             <div class="col-lg-3 col-md-4">
                                 <label for="rectificarFecha" class="form-label form-label-sm small fw-bold">Fecha</label>
-                                <input type="date" id="rectificarFecha" class="form-control form-control-sm" disabled>
+                                <input type="text" id="rectificarFecha" class="form-control form-control-sm date-picker" disabled>
                             </div>
                             <div class="col-lg-5 col-md-4">
                                 <label for="rectificarNotas" class="form-label form-label-sm small fw-bold">Notas</label>
@@ -122,8 +122,9 @@
 @endsection
 @push('scripts')
 <script>
-class CuadreStockManager {
+class CuadreStockManager extends CrudManager {
     constructor() {
+        super();
         this.baseUrl = "{{ url('cuadre-stock') }}";
         this.productos = @json($productos);
         this.initializeDataTable();
@@ -381,7 +382,7 @@ class CuadreStockManager {
     }
 
     showCreateModal() {
-        document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
+        this.setFieldValue('fecha', new Date().toISOString().split('T')[0]);
         document.getElementById('notas').value = '';
         document.getElementById('filtroProductos').value = '';
         document.getElementById('previewContainer').innerHTML = '';

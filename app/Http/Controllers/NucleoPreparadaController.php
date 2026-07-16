@@ -143,7 +143,7 @@ class NucleoPreparadaController extends Controller
             $preparadaAnuladaId = $request->input('preparada_anulada_id');
 
             if ($esRectificacion
-                && !empty($preparadaAnuladaId)
+                && ! empty($preparadaAnuladaId)
                 && NucleoPreparada::where('id', $preparadaAnuladaId)->exists()
             ) {
                 $result = $this->service->rectificarNucleoPreparada(

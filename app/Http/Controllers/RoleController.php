@@ -3,14 +3,15 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
-use Yajra\DataTables\DataTables;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Yajra\DataTables\DataTables;
 
 class RoleController extends Controller
 {
-    public function __construct(){
+    public function __construct()
+    {
         $this->middleware('can:roles_list')->only(['index']);
         $this->middleware('can:roles_create')->only(['store']);
         $this->middleware('can:roles_edit')->only(['show', 'update']);
@@ -28,20 +29,21 @@ class RoleController extends Controller
             return DataTables::of($roles)
                 ->addColumn('permissions', function ($role) {
                     return $role->permissions->map(function ($perm) {
-                        return '<span class="badge bg-info me-1">' . $perm->name . '</span>';
+                        return '<span class="badge bg-info me-1">'.$perm->name.'</span>';
                     })->implode(' ');
                 })
-                ->addColumn('action', function ($role) {                    
-                    $editButton ='';
-                    if(auth()->user()->can('roles_edit')){
+                ->addColumn('action', function ($role) {
+                    $editButton = '';
+                    if (auth()->user()->can('roles_edit')) {
                         $editButton = view('components.button-edit', ['id' => $role->id])->render();
                     }
                     $deleteButton = '';
-                    if(auth()->user()->can('roles_delete')){
+                    if (auth()->user()->can('roles_delete')) {
                         // Use $role (closure param) instead of undefined $row
                         $deleteButton = view('components.button-delete', ['id' => $role->id, 'texto' => $role->name])->render();
                     }
-                    return '<div class="btn-group">' . $editButton . $deleteButton . '</div>';
+
+                    return '<div class="btn-group">'.$editButton.$deleteButton.'</div>';
                 })
                 ->rawColumns(['permissions', 'action'])
                 ->make(true);
@@ -69,9 +71,10 @@ class RoleController extends Controller
         if (isset($data['permissions'])) {
             $role->syncPermissions($data['permissions']);
         }
+
         return response()->json([
             'success' => true,
-            'message' => 'Registro creado satisfactoriamente'
+            'message' => 'Registro creado satisfactoriamente',
         ]);
     }
 
@@ -82,6 +85,7 @@ class RoleController extends Controller
     {
         try {
             $registro = Role::with('permissions')->findOrFail($id);
+
             return response()->json($registro);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
@@ -109,7 +113,7 @@ class RoleController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Registro actualizado correctamente'
+            'message' => 'Registro actualizado correctamente',
         ]);
     }
 
@@ -124,11 +128,11 @@ class RoleController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro'
+                'message' => 'Error al eliminar el registro',
             ], 500);
         }
     }
@@ -140,15 +144,17 @@ class RoleController extends Controller
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('roles', 'name')->ignore($id)
+                Rule::unique('roles', 'name')->ignore($id),
             ],
             'permissions' => 'nullable|array',
             'permissions.*' => 'string|exists:permissions,name',
         ]);
     }
+
     public function roles()
     {
         $roles = Role::select('id', 'name')->get();
+
         return response()->json($roles);
     }
 
@@ -157,7 +163,7 @@ class RoleController extends Controller
         $query = Permission::select('id', 'name')->orderBy('name');
 
         // Si el usuario NO tiene super_admin, no se lo mostramos
-        if (!auth()->user()->can('super_admin')) {
+        if (! auth()->user()->can('super_admin')) {
             $query->where('name', '!=', 'super_admin');
         }
 

@@ -9,12 +9,13 @@ use Maatwebsite\Excel\Concerns\FromArray;
 class FormulacionesRangoExport implements FromArray
 {
     protected $numeroInicial;
+
     protected $numeroFinal;
 
     public function __construct($numeroInicial, $numeroFinal)
     {
         $this->numeroInicial = $numeroInicial;
-        $this->numeroFinal   = $numeroFinal;
+        $this->numeroFinal = $numeroFinal;
     }
 
     public function array(): array
@@ -22,11 +23,11 @@ class FormulacionesRangoExport implements FromArray
         $rows = [];
 
         $formulaciones = Formulacion::with([
-            'detalles:id,formulacion_id,producto_id,producto_nombre,producto_empaque,salida_kg'
+            'detalles:id,formulacion_id,producto_id,producto_nombre,producto_empaque,salida_kg',
         ])
-        ->whereBetween('id', [$this->numeroInicial, $this->numeroFinal])
-        ->orderBy('id')
-        ->get();
+            ->whereBetween('id', [$this->numeroInicial, $this->numeroFinal])
+            ->orderBy('id')
+            ->get();
 
         foreach ($formulaciones as $formulacion) {
 
@@ -41,8 +42,8 @@ class FormulacionesRangoExport implements FromArray
             $rows[] = [
                 $formulacion->producto_nombre,
                 $formulacion->producto_empaque,
-                number_format((float)$formulacion->salida_kg, 2, '.', ''),
-                $formulacion->detalles->count()
+                number_format((float) $formulacion->salida_kg, 2, '.', ''),
+                $formulacion->detalles->count(),
             ];
 
             $rows[] = ['']; // línea en blanco
@@ -53,18 +54,18 @@ class FormulacionesRangoExport implements FromArray
             $totalKg = 0;
 
             foreach ($formulacion->detalles as $detalle) {
-                $totalKg += (float)$detalle->salida_kg;
+                $totalKg += (float) $detalle->salida_kg;
 
                 $rows[] = [
                     $detalle->producto_id,
                     $detalle->producto_nombre,
                     $detalle->producto_empaque,
-                    number_format((float)$detalle->salida_kg, 2, '.', ''),
+                    number_format((float) $detalle->salida_kg, 2, '.', ''),
                 ];
             }
 
             /* TOTALES */
-            $rows[] = ['', 'TOTALES', '', number_format((float)$totalKg, 2, '.', '')];
+            $rows[] = ['', 'TOTALES', '', number_format((float) $totalKg, 2, '.', '')];
 
             $rows[] = [''];
             $rows[] = [''];

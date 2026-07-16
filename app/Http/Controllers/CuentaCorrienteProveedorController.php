@@ -115,6 +115,7 @@ class CuentaCorrienteProveedorController extends Controller
                 '),
             ])
             ->whereBetween('c.fecha_compra', [$ini, $fin])
+            ->where('c.estado', '!=', 'anulada')
             ->when(! empty($proveedorIds), fn ($q) => $q->whereIn('c.proveedor_id', $proveedorIds))
             ->orderBy('compra_detalles.producto_nombre')   // primero por producto
             ->orderBy('c.fecha_compra')                   // luego por fecha
@@ -203,6 +204,7 @@ class CuentaCorrienteProveedorController extends Controller
                 "),
             ])
             ->whereBetween('c.fecha_compra', [$ini, $fin])
+            ->where('c.estado', '!=', 'anulada')
             ->when(!empty($proveedorIds), fn ($q) => $q->whereIn('c.proveedor_id', $proveedorIds))
             ->orderBy('c.fecha_compra')
             ->orderBy('compra_detalles.compra_id')
@@ -239,17 +241,23 @@ class CuentaCorrienteProveedorController extends Controller
             $proveedorNombre = $proveedor ? ($proveedor->id.' - '.$proveedor->razon_social) : null;
         }
 
-        // ✅ Detalle por compra + producto (producto_id/nombre/empaque desde compra_detalles)
         $reportes = CompraDetalle::query()
             ->join('compras as c', 'c.id', '=', 'compra_detalles.compra_id')
-            ->selectRaw('
+            ->leftJoin(DB::raw("(
+                SELECT cpd.compra_id, SUM(cpd.monto) as total_abono
+                FROM compra_provisional_detalles cpd
+                JOIN compra_provisionales cp ON cp.id = cpd.compra_provisional_id
+                WHERE cp.fecha_provisional <= '{$fin->format('Y-m-d H:i:s')}'
+                GROUP BY cpd.compra_id
+            ) as ab"), 'ab.compra_id', '=', 'c.id')
+            ->selectRaw("
                 c.id as compra_id,
                 c.fecha_compra,
                 c.pago_forma_nombre,
-                c.abonos,
-                c.saldo,
+                COALESCE(ab.total_abono, 0) as abonos,
+                GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0) as saldo,
 
-                CONCAT(c.comprobante_tipo_codigo," ",c.serie,"-",c.correlativo) as documento,
+                CONCAT(c.comprobante_tipo_codigo,' ',c.serie,'-',c.correlativo) as documento,
 
                 compra_detalles.producto_id as producto_id,
                 compra_detalles.producto_nombre as producto_nombre,
@@ -263,19 +271,18 @@ class CuentaCorrienteProveedorController extends Controller
                 AVG(compra_detalles.costo_unitario) as precio,
 
                 SUM(compra_detalles.total) as importe
-            ')
+            ")
             ->whereBetween('c.fecha_compra', [$ini, $fin])
+            ->where('c.estado', '!=', 'anulada')
             ->when(! empty($proveedorIds), fn ($q) => $q->whereIn('c.proveedor_id', $proveedorIds))
-
-            // ✅ créditos por pagar
-            ->where('c.saldo', '>', 0)
-
+            ->whereRaw("GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0) > 0")
             ->groupBy(
                 'c.id',
                 'c.fecha_compra',
                 'c.pago_forma_nombre',
-                'c.abonos',
-                'c.saldo',
+                'ab.total_abono',
+                'c.total',
+                'c.acuenta',
                 'c.comprobante_tipo_codigo',
                 'c.serie',
                 'c.correlativo',
@@ -334,6 +341,7 @@ class CuentaCorrienteProveedorController extends Controller
             ')
             ->where('compras.proveedor_id', $proveedorId)
             ->where('compras.saldo', '>', 0)
+            ->where('compras.estado', '!=', 'anulada')
             ->groupBy(
                 'compras.id',
                 'compras.fecha_compra',
@@ -415,27 +423,35 @@ class CuentaCorrienteProveedorController extends Controller
 
         $reportes = Compra::query()
             ->leftJoin('compra_detalles as vd', 'vd.compra_id', '=', 'compras.id')
-            ->selectRaw('
+            ->leftJoin(DB::raw("(
+                SELECT cpd.compra_id, SUM(cpd.monto) as total_abono
+                FROM compra_provisional_detalles cpd
+                JOIN compra_provisionales cp ON cp.id = cpd.compra_provisional_id
+                WHERE cp.fecha_provisional <= '{$fin->format('Y-m-d H:i:s')}'
+                GROUP BY cpd.compra_id
+            ) as ab"), 'ab.compra_id', '=', 'compras.id')
+            ->selectRaw("
                 compras.id,
                 compras.fecha_compra,
                 compras.fecha_vencimiento,
-                CONCAT(compras.comprobante_tipo_codigo," ",compras.serie,"-",compras.correlativo) as documento,
+                CONCAT(compras.comprobante_tipo_codigo,' ',compras.serie,'-',compras.correlativo) as documento,
                 compras.pago_forma_nombre as tipo_venta,
 
                 compras.total,
                 compras.acuenta,
-                compras.abonos,
-                compras.saldo,
+                COALESCE(ab.total_abono, 0) as abonos,
+                GREATEST(compras.total - compras.acuenta - COALESCE(ab.total_abono, 0), 0) as saldo,
 
                 COUNT(vd.id) as items,
 
                 compras.proveedor_id,
                 compras.proveedor_nombre,
                 compras.user_nombre
-            ')
+            ")
             ->whereBetween('compras.fecha_compra', [$ini, $fin])
+            ->where('compras.estado', '!=', 'anulada')
             ->when(! empty($proveedorIds), fn ($q) => $q->whereIn('compras.proveedor_id', $proveedorIds))
-            ->where('compras.saldo', '>', 0) // créditos por pagar
+            ->whereRaw("GREATEST(compras.total - compras.acuenta - COALESCE(ab.total_abono, 0), 0) > 0")
             ->groupBy(
                 'compras.id',
                 'compras.fecha_compra',
@@ -446,8 +462,7 @@ class CuentaCorrienteProveedorController extends Controller
                 'compras.pago_forma_nombre',
                 'compras.total',
                 'compras.acuenta',
-                'compras.abonos',
-                'compras.saldo',
+                'ab.total_abono',
                 'compras.proveedor_id',
                 'compras.proveedor_nombre',
                 'compras.user_nombre'
@@ -498,17 +513,49 @@ class CuentaCorrienteProveedorController extends Controller
             ? ($proveedorData->id.' - '.$proveedorData->razon_social)
             : (string) $proveedorId;
 
-        $saldoInicial = (float) DB::table('compras')
+        // Saldo inicial histórico (compras antes de $ini menos abonos antes de $ini)
+        $comprasAntesIni = DB::table('compras')
             ->where('proveedor_id', $proveedorId)
-            ->where('saldo', '>', 0)
+            ->where('estado', '!=', 'anulada')
             ->where('fecha_compra', '<', $ini)
-            ->sum('saldo');
+            ->select('id', 'total', 'acuenta')
+            ->get();
 
-        $saldoFinal = (float) DB::table('compras')
+        $saldoInicial = 0.0;
+        foreach ($comprasAntesIni as $c) {
+            $compraSaldo = (float) $c->total - (float) $c->acuenta;
+            $abonosAntes = (float) DB::table('compra_provisional_detalles as cpd')
+                ->join('compra_provisionales as cp', 'cp.id', '=', 'cpd.compra_provisional_id')
+                ->where('cpd.compra_id', $c->id)
+                ->where('cp.fecha_provisional', '<', $ini)
+                ->sum('cpd.monto');
+            $compraSaldo -= $abonosAntes;
+            if ($compraSaldo > 0) {
+                $saldoInicial += $compraSaldo;
+            }
+        }
+
+        // Saldo final histórico (compras antes de $fin menos abonos antes o en $fin)
+        $comprasAntesFin = DB::table('compras')
             ->where('proveedor_id', $proveedorId)
-            ->where('saldo', '>', 0)
+            ->where('estado', '!=', 'anulada')
             ->where('fecha_compra', '<=', $fin)
-            ->sum('saldo');
+            ->select('id', 'total', 'acuenta')
+            ->get();
+
+        $saldoFinal = 0.0;
+        foreach ($comprasAntesFin as $c) {
+            $compraSaldo = (float) $c->total - (float) $c->acuenta;
+            $abonosAntes = (float) DB::table('compra_provisional_detalles as cpd')
+                ->join('compra_provisionales as cp', 'cp.id', '=', 'cpd.compra_provisional_id')
+                ->where('cpd.compra_id', $c->id)
+                ->where('cp.fecha_provisional', '<=', $fin)
+                ->sum('cpd.monto');
+            $compraSaldo -= $abonosAntes;
+            if ($compraSaldo > 0) {
+                $saldoFinal += $compraSaldo;
+            }
+        }
 
         $provisionales = DB::table('compra_provisional_detalles as cp')
             ->join('compra_provisionales as c', 'c.id', '=', 'cp.compra_provisional_id')
@@ -551,10 +598,7 @@ class CuentaCorrienteProveedorController extends Controller
             ->where('proveedor_id', $proveedorId)
             ->where('estado', '!=', 'anulada')
             ->where(function ($q) use ($ini, $fin, $compraIdsPagadasEnRango) {
-                $q->where(function ($q2) use ($ini, $fin) {
-                    $q2->whereBetween('fecha_compra', [$ini, $fin])
-                        ->where('saldo', '>', 0);
-                });
+                $q->whereBetween('fecha_compra', [$ini, $fin]);
 
                 if (! empty($compraIdsPagadasEnRango)) {
                     $q->orWhereIn('id', $compraIdsPagadasEnRango);
@@ -704,6 +748,7 @@ class CuentaCorrienteProveedorController extends Controller
             ')
             ->whereBetween('compras.fecha_compra', [$ini, $fin])
             ->when(! empty($proveedorIds), fn ($q) => $q->whereIn('compras.proveedor_id', $proveedorIds))
+            ->where('compras.estado', '!=', 'anulada')
             ->groupBy(
                 'compras.id',
                 'compras.fecha_compra',
@@ -785,6 +830,7 @@ class CuentaCorrienteProveedorController extends Controller
             ')
             ->where('compras.proveedor_id', $proveedorId)
             ->where('compras.saldo', '>', 0)
+            ->where('compras.estado', '!=', 'anulada')
             ->groupBy(
                 'compras.id',
                 'compras.fecha_compra',
@@ -843,25 +889,33 @@ class CuentaCorrienteProveedorController extends Controller
         $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
         $fin = Carbon::parse($data['fecha_fin'])->endOfDay();
 
-        $reportes = DB::table('compras')
-            ->join('proveedores', 'proveedores.id', '=', 'compras.proveedor_id')
-            ->selectRaw('
-                compras.proveedor_id,
-                compras.proveedor_nombre,
-                SUM(compras.saldo) as saldo,
-                COUNT(compras.id) as items,
-                proveedores.direccion as domicilio,
-                proveedores.telefono
-            ')
-            ->where('compras.saldo', '>', 0)
-            ->whereBetween('compras.fecha_compra', [$ini, $fin])
+        $reportes = DB::table('compras as c')
+            ->join('proveedores as p', 'p.id', '=', 'c.proveedor_id')
+            ->leftJoin(DB::raw("(
+                SELECT cpd.compra_id, SUM(cpd.monto) as total_abono
+                FROM compra_provisional_detalles cpd
+                JOIN compra_provisionales cp ON cp.id = cpd.compra_provisional_id
+                WHERE cp.fecha_provisional <= '{$fin->format('Y-m-d H:i:s')}'
+                GROUP BY cpd.compra_id
+            ) as ab"), 'ab.compra_id', '=', 'c.id')
+            ->selectRaw("
+                c.proveedor_id,
+                c.proveedor_nombre,
+                SUM(GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0)) as saldo,
+                COUNT(c.id) as items,
+                p.direccion as domicilio,
+                p.telefono
+            ")
+            ->where('c.estado', '!=', 'anulada')
+            ->whereBetween('c.fecha_compra', [$ini, $fin])
             ->groupBy(
-                'compras.proveedor_id',
-                'compras.proveedor_nombre',
-                'proveedores.direccion',
-                'proveedores.telefono'
+                'c.proveedor_id',
+                'c.proveedor_nombre',
+                'p.direccion',
+                'p.telefono'
             )
-            ->orderBy('compras.proveedor_nombre', 'asc')
+            ->havingRaw("SUM(GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0)) > 0")
+            ->orderBy('c.proveedor_nombre', 'asc')
             ->get();
 
         // Totales generales
@@ -907,6 +961,7 @@ class CuentaCorrienteProveedorController extends Controller
                 compras.user_nombre
             ')
             ->where('compras.saldo', '>', 0)
+            ->where('compras.estado', '!=', 'anulada')
             ->whereNotNull('compras.fecha_vencimiento')
             ->whereRaw('DATEDIFF(CURDATE(), compras.fecha_compra) >= ?', [$dias])
             ->groupBy(
@@ -978,10 +1033,10 @@ class CuentaCorrienteProveedorController extends Controller
             ')
             ->withCount(['detalles as items'])
             ->where('compras.saldo', '>', 0)
+            ->where('compras.estado', '!=', 'anulada')
             ->whereNotNull('compras.fecha_vencimiento')
             // equivalente a >= días, pero sin funciones sobre la columna
-            ->whereDate('compras.fecha_compra', '<=', DB::raw('DATE_SUB(CURDATE(), INTERVAL ? DAY)'))
-            ->addBinding($dias, 'where')
+            ->whereRaw('DATE(compras.fecha_compra) <= DATE_SUB(CURDATE(), INTERVAL ? DAY)', [$dias])
             ->orderBy('compras.proveedor_nombre')
             ->orderBy('compras.fecha_compra')
             ->get();
@@ -1039,9 +1094,9 @@ class CuentaCorrienteProveedorController extends Controller
             ')
             // si quieres SOLO créditos por pagar:
             ->where('compras.saldo', '>', 0)
+            ->where('compras.estado', '!=', 'anulada')
             // >= 30 días de antigüedad desde la fecha_compra:
-            ->whereDate('compras.fecha_compra', '<=', DB::raw('DATE_SUB(CURDATE(), INTERVAL ? DAY)'))
-            ->addBinding($dias, 'where')
+            ->whereRaw('DATE(compras.fecha_compra) <= DATE_SUB(CURDATE(), INTERVAL ? DAY)', [$dias])
             ->groupBy(
                 'compras.proveedor_id',
                 'compras.proveedor_nombre',
@@ -1075,27 +1130,35 @@ class CuentaCorrienteProveedorController extends Controller
         $mostrarColProveedor = true;
 
         $reportes = Compra::query()
-            ->selectRaw('
+            ->leftJoin(DB::raw("(
+                SELECT cpd.compra_id, SUM(cpd.monto) as total_abono
+                FROM compra_provisional_detalles cpd
+                JOIN compra_provisionales cp ON cp.id = cpd.compra_provisional_id
+                WHERE cp.fecha_provisional <= '{$fin->format('Y-m-d H:i:s')}'
+                GROUP BY cpd.compra_id
+            ) as ab"), 'ab.compra_id', '=', 'compras.id')
+            ->selectRaw("
                 compras.id,
                 compras.fecha_compra,
                 compras.fecha_vencimiento,
-                DATE_FORMAT(compras.fecha_compra, "%d/%m/%Y") as fecha_compra_fmt,
-                DATE_FORMAT(compras.fecha_vencimiento, "%d/%m/%Y") as fecha_vencimiento_fmt,
-                CONCAT(compras.comprobante_tipo_codigo," ",compras.serie,"-",compras.correlativo) as documento,
+                DATE_FORMAT(compras.fecha_compra, '%d/%m/%Y') as fecha_compra_fmt,
+                DATE_FORMAT(compras.fecha_vencimiento, '%d/%m/%Y') as fecha_vencimiento_fmt,
+                CONCAT(compras.comprobante_tipo_codigo,' ',compras.serie,'-',compras.correlativo) as documento,
                 compras.pago_forma_nombre as tipo_venta,
 
                 compras.total,
                 compras.acuenta,
-                compras.abonos,
-                compras.saldo,
+                COALESCE(ab.total_abono, 0) as abonos,
+                GREATEST(compras.total - compras.acuenta - COALESCE(ab.total_abono, 0), 0) as saldo,
 
                 compras.proveedor_id,
                 compras.proveedor_nombre,
                 compras.user_nombre
-            ')
+            ")
             ->withCount(['detalles as items'])
             ->whereBetween('compras.fecha_compra', [$ini, $fin])
-            ->where('compras.saldo', '>', 0)
+            ->where('compras.estado', '!=', 'anulada')
+            ->whereRaw("GREATEST(compras.total - compras.acuenta - COALESCE(ab.total_abono, 0), 0) > 0")
             ->orderBy('compras.proveedor_nombre', 'asc')
             ->orderBy('compras.fecha_compra', 'asc')
             ->get();
@@ -1147,6 +1210,7 @@ class CuentaCorrienteProveedorController extends Controller
                 COUNT(CASE WHEN c.saldo > 0 THEN 1 END) as total_docs
             ')
             ->where('c.saldo', '>', 0)
+            ->where('c.estado', '!=', 'anulada')
             ->groupBy('c.user_nombre')
             ->orderBy('c.user_nombre')
             ->get();
@@ -1169,17 +1233,23 @@ class CuentaCorrienteProveedorController extends Controller
         $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
         $fin = Carbon::parse($data['fecha_fin'])->endOfDay();
 
-        // ✅ Detalle por compra + producto (producto_id/nombre/empaque desde compra_detalles)
         $reportes = CompraDetalle::query()
             ->join('compras as c', 'c.id', '=', 'compra_detalles.compra_id')
-            ->selectRaw('
+            ->leftJoin(DB::raw("(
+                SELECT cpd.compra_id, SUM(cpd.monto) as total_abono
+                FROM compra_provisional_detalles cpd
+                JOIN compra_provisionales cp ON cp.id = cpd.compra_provisional_id
+                WHERE cp.fecha_provisional <= '{$fin->format('Y-m-d H:i:s')}'
+                GROUP BY cpd.compra_id
+            ) as ab"), 'ab.compra_id', '=', 'c.id')
+            ->selectRaw("
                 c.id as compra_id,
                 c.fecha_compra,
                 c.pago_forma_nombre,
-                c.abonos,
-                c.saldo,
+                COALESCE(ab.total_abono, 0) as abonos,
+                GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0) as saldo,
 
-                CONCAT(c.comprobante_tipo_codigo," ",c.serie,"-",c.correlativo) as documento,
+                CONCAT(c.comprobante_tipo_codigo,' ',c.serie,'-',c.correlativo) as documento,
 
                 compra_detalles.producto_id as producto_id,
                 compra_detalles.producto_nombre as producto_nombre,
@@ -1193,18 +1263,17 @@ class CuentaCorrienteProveedorController extends Controller
                 AVG(compra_detalles.costo_unitario) as precio,
 
                 SUM(compra_detalles.total) as importe
-            ')
+            ")
             ->whereBetween('c.fecha_compra', [$ini, $fin])
-
-            // ✅ créditos por pagar
-            ->where('c.saldo', '>', 0)
-
+            ->where('c.estado', '!=', 'anulada')
+            ->whereRaw("GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0) > 0")
             ->groupBy(
                 'c.id',
                 'c.fecha_compra',
                 'c.pago_forma_nombre',
-                'c.abonos',
-                'c.saldo',
+                'ab.total_abono',
+                'c.total',
+                'c.acuenta',
                 'c.comprobante_tipo_codigo',
                 'c.serie',
                 'c.correlativo',

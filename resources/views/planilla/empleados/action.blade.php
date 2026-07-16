@@ -46,16 +46,10 @@
                                     <div class="invalid-feedback"></div>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="fecha_ingreso" class="form-label">Fecha de Ingreso</label>
-                                    <input type="date" id="fecha_ingreso" name="fecha_ingreso"
-                                        class="form-control form-control-sm">
-                                    <div class="invalid-feedback"></div>
+                                    <x-date-picker id="fecha_ingreso" label="Fecha de Ingreso" />
                                 </div>
                                 <div class="mb-3">
-                                    <label for="fecha_salida" class="form-label">Fecha de Salida</label>
-                                    <input type="date" id="fecha_salida" name="fecha_salida"
-                                        class="form-control form-control-sm">
-                                    <div class="invalid-feedback"></div>
+                                    <x-date-picker id="fecha_salida" label="Fecha de Salida" />
                                 </div>
                             </div>
                         </div>

@@ -58,9 +58,10 @@ class Empleado extends Model
 
     public function getAnosServicioAttribute(): int
     {
-        if (!$this->fecha_ingreso) {
+        if (! $this->fecha_ingreso) {
             return 0;
         }
+
         return (int) $this->fecha_ingreso->diffInYears(now());
     }
 
@@ -94,8 +95,4 @@ class Empleado extends Model
         return $query->where('nombre', 'like', "%{$termino}%")
             ->orWhere('dni', 'like', "%{$termino}%");
     }
-
-
-    
-
 }

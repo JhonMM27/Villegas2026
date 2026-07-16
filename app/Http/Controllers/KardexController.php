@@ -50,7 +50,7 @@ class KardexController extends Controller
 
         $fecha = Carbon::parse($request->fecha)->endOfDay();
 
-        $reportes = $this->getStockAlCorteReportes($fecha, true, false);
+        $reportes = $this->getStockAlCorteReportes($fecha, true, true);
 
         return view('kardex.reportes.stock_general', compact('reportes', 'fecha'));
     }
@@ -63,7 +63,7 @@ class KardexController extends Controller
 
         $fecha = Carbon::parse($request->fecha)->endOfDay();
 
-        $reportes = $this->getStockAlCorteReportes($fecha, true, false);
+        $reportes = $this->getStockAlCorteReportes($fecha, true, true);
 
         $fileName = 'stock_alcorte_'.now()->format('Ymd_His').'.xlsx';
 
@@ -81,7 +81,7 @@ class KardexController extends Controller
 
         $fecha = Carbon::parse($request->fecha)->endOfDay();
 
-        $reportes = $this->getStockAlCorteReportes($fecha, true, false);
+        $reportes = $this->getStockAlCorteReportes($fecha, true, true);
 
         $pdf = Pdf::loadView('kardex.reportes.stock_general_pdf', [
             'reportes' => $reportes,
@@ -296,16 +296,18 @@ class KardexController extends Controller
             ")
             ->where('c.estado', '!=', 'anulada');
 
+        // ────────────────────────────────────────────────────────────
+        // VENTA: Solo descuenta lo ENTREGADO al momento de la venta,
+        // no la cantidad total vendida. Las entregas posteriores se
+        // registran como VENTA_ENTREGA (ver subconsulta siguiente).
+        // ────────────────────────────────────────────────────────────
         $venta = DB::table('venta_detalles as vd')
             ->join('ventas as v', 'v.id', '=', 'vd.venta_id')
             ->join('productos as p', 'p.id', '=', 'vd.producto_id')
             ->leftJoin('lineas as l', 'l.id', '=', 'p.linea_id')
             ->whereBetween('v.fecha_venta', [$ini, $hasta])
             ->where('v.estado', '!=', 'anulada')
-            ->where(function ($q) {
-                $q->where('vd.salida_kg', '>', 0)
-                    ->orWhere('vd.cantidad', '>', 0);
-            })
+            ->where('vd.entregado', '>', 0)
             ->when(! empty($productoIds), fn ($q) => $q->whereIn('p.id', $productoIds))
             ->selectRaw("
                 v.fecha_venta as fecha,
@@ -319,14 +321,44 @@ class KardexController extends Controller
                 COALESCE(vd.unidad_codigo, p.unidad_codigo) as unidad,
                 CONCAT(v.comprobante_tipo_codigo,' ',v.serie,'-',v.correlativo) as documento,
                 0 as entrada_und,
-                CASE
-                    WHEN COALESCE(vd.salida_kg,0) > 0
-                        THEN (COALESCE(vd.salida_kg,0) / NULLIF(p.empaque,0))
-                    ELSE (COALESCE(vd.cantidad,0) * (COALESCE(NULLIF(vd.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0)))
-                END as salida_und,
+                (COALESCE(vd.entregado,0) * (COALESCE(NULLIF(vd.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0))) as salida_und,
                 COALESCE(vd.precio_unitario, 0) as precio_unitario,
                 v.cliente_nombre as referencia,
                 20 as sort
+            ");
+
+        // ────────────────────────────────────────────────────────────
+        // VENTA_ENTREGA: Entregas parciales posteriores a la venta.
+        // Cada entrega parcial genera su propia línea en el kardex
+        // con la fecha real de entrega, no la fecha de la venta.
+        // ────────────────────────────────────────────────────────────
+        $ventaEntrega = DB::table('venta_entrega_detalles as ved')
+            ->join('venta_entregas as ve', 've.id', '=', 'ved.venta_entrega_id')
+            ->join('venta_detalles as vd', 'vd.id', '=', 'ved.venta_detalle_id')
+            ->join('ventas as v', 'v.id', '=', 've.venta_id')
+            ->join('productos as p', 'p.id', '=', 'ved.producto_id')
+            ->leftJoin('lineas as l', 'l.id', '=', 'p.linea_id')
+            ->whereBetween('ve.fecha_entrega', [$ini, $hasta])
+            ->where('ve.estado', '!=', 'ANULADO')
+            ->where('v.estado', '!=', 'anulada')
+            ->where('ved.cantidad', '>', 0)
+            ->when(! empty($productoIds), fn ($q) => $q->whereIn('p.id', $productoIds))
+            ->selectRaw("
+                ve.fecha_entrega as fecha,
+                'VENTA_ENTREGA' as operacion,
+                ve.id as op_id,
+                ved.id as det_id,
+                p.id as producto_id,
+                p.nombre as producto,
+                p.empaque as empaque,
+                l.nombre as linea,
+                COALESCE(vd.unidad_codigo, p.unidad_codigo) as unidad,
+                CONCAT(v.comprobante_tipo_codigo,' ',v.serie,'-',v.correlativo, ' [E-', ve.numero_recibo, ']') as documento,
+                0 as entrada_und,
+                (COALESCE(ved.cantidad,0) * (COALESCE(NULLIF(ved.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0))) as salida_und,
+                COALESCE(vd.precio_unitario, 0) as precio_unitario,
+                v.cliente_nombre as referencia,
+                21 as sort
             ");
 
         $prepIn = DB::table('preparadas as pr')
@@ -473,6 +505,7 @@ class KardexController extends Controller
 
         return $compra
             ->unionAll($venta)
+            ->unionAll($ventaEntrega)
             ->unionAll($prepIn)
             ->unionAll($prepOut)
             ->unionAll($npIn)
@@ -497,24 +530,36 @@ class KardexController extends Controller
                 (COALESCE(cd.cantidad,0) * (COALESCE(NULLIF(cd.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0))) as delta
             ');
 
+        // ────────────────────────────────────────────────────────────
+        // VENTA (delta stock): Solo resta lo entregado al momento
+        // de la venta, no la cantidad total vendida.
+        // ────────────────────────────────────────────────────────────
         $venta = DB::table('venta_detalles as vd')
             ->join('ventas as v', 'v.id', '=', 'vd.venta_id')
             ->join('productos as p', 'p.id', '=', 'vd.producto_id')
-            ->where(function ($q) {
-                $q->where('vd.salida_kg', '>', 0)
-                    ->orWhere('vd.cantidad', '>', 0);
-            })
+            ->where('vd.entregado', '>', 0)
             ->where('v.estado', '!=', 'anulada')
             ->selectRaw('
                 vd.producto_id,
                 v.fecha_venta as fecha,
-                -(
-                    CASE
-                        WHEN COALESCE(vd.salida_kg,0) > 0
-                            THEN (COALESCE(vd.salida_kg,0) / NULLIF(p.empaque,0))
-                        ELSE (COALESCE(vd.cantidad,0) * (COALESCE(NULLIF(vd.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0)))
-                    END
-                ) as delta
+                -(COALESCE(vd.entregado,0) * (COALESCE(NULLIF(vd.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0))) as delta
+            ');
+
+        // ────────────────────────────────────────────────────────────
+        // VENTA_ENTREGA (delta stock): Entregas parciales posteriores.
+        // Cada entrega descuenta stock en su propia fecha.
+        // ────────────────────────────────────────────────────────────
+        $ventaEntrega = DB::table('venta_entrega_detalles as ved')
+            ->join('venta_entregas as ve', 've.id', '=', 'ved.venta_entrega_id')
+            ->join('ventas as v', 'v.id', '=', 've.venta_id')
+            ->join('productos as p', 'p.id', '=', 'ved.producto_id')
+            ->where('ved.cantidad', '>', 0)
+            ->where('ve.estado', '!=', 'ANULADO')
+            ->where('v.estado', '!=', 'anulada')
+            ->selectRaw('
+                ved.producto_id,
+                ve.fecha_entrega as fecha,
+                -(COALESCE(ved.cantidad,0) * (COALESCE(NULLIF(ved.producto_empaque,0), p.empaque) / NULLIF(p.empaque,0))) as delta
             ');
 
         $prepIn = DB::table('preparadas as pr')
@@ -578,6 +623,7 @@ class KardexController extends Controller
 
         return $compra
             ->unionAll($venta)
+            ->unionAll($ventaEntrega)
             ->unionAll($prepIn)
             ->unionAll($prepOut)
             ->unionAll($npIn)
@@ -618,26 +664,38 @@ class KardexController extends Controller
             ->where('rn', 1)
             ->selectRaw('producto_id, costo_nuevo');
 
+        // Calcular el stock al corte como subconsulta para poder filtrar en WHERE
+        $stockCalculado = DB::query()
+            ->from('productos as p2')
+            ->leftJoinSub($movPostCorte, 's2', fn ($j) => $j->on('s2.producto_id', '=', 'p2.id'))
+            ->selectRaw('p2.id, (COALESCE(p2.stock_almacen, 0) - COALESCE(s2.delta_post, 0)) as stock_calculado');
+
         $q = DB::table('productos as p')
             ->leftJoin('lineas as l', 'l.id', '=', 'p.linea_id')
             ->leftJoinSub($movPostCorte, 's', fn ($j) => $j->on('s.producto_id', '=', 'p.id'))
             ->leftJoinSub($cppSubquery, 'cpp', fn ($j) => $j->on('cpp.producto_id', '=', 'p.id'))
+            ->leftJoinSub($stockCalculado, 'sc', fn ($j) => $j->on('sc.id', '=', 'p.id'))
             ->selectRaw('
                 p.id as producto_id,
                 p.nombre as producto,
                 p.empaque,
                 l.nombre as linea,
-                (COALESCE(p.stock_almacen, 0) - COALESCE(s.delta_post, 0)) as stock,
+                COALESCE(sc.stock_calculado, COALESCE(p.stock_almacen, 0) - COALESCE(s.delta_post, 0)) as stock,
                 COALESCE(cpp.costo_nuevo, p.costo_unitario, 0) as costo_unitario,
-                ((COALESCE(p.stock_almacen, 0) - COALESCE(s.delta_post, 0)) * COALESCE(cpp.costo_nuevo, p.costo_unitario, 0)) as valor_total
+                COALESCE(sc.stock_calculado, COALESCE(p.stock_almacen, 0) - COALESCE(s.delta_post, 0)) * COALESCE(cpp.costo_nuevo, p.costo_unitario, 0) as valor_total
             ');
 
         if ($soloActivos) {
             $q->where('p.activo', 1);
         }
 
+        // Excluir siempre el servicio de mezclado (producto ID 77) - no es un producto físico
+        $q->where('p.id', '!=', 77);
+
         if ($soloConStock) {
-            $q->havingRaw('(COALESCE(p.stock_almacen, 0) - COALESCE(s.delta_post, 0)) > 0');
+            // Filtrar en WHERE usando la subconsulta de stock calculado
+            // (evita el error de HAVING con sql_mode estricto)
+            $q->where('sc.stock_calculado', '!=', 0);
         }
 
         return $q->orderBy('l.nombre')
@@ -660,7 +718,7 @@ class KardexController extends Controller
         array $productoIds = [],
         array $operaciones = []
     ) {
-        $todasOps = ['COMPRA', 'VENTA', 'PREPARADA', 'PREPARADA_NUCLEO', 'PRESTAMO'];
+        $todasOps = ['COMPRA', 'VENTA', 'VENTA_ENTREGA', 'PREPARADA', 'PREPARADA_NUCLEO', 'PRESTAMO'];
 
         $productoIds = array_values(array_filter((array) $productoIds));
         $operaciones = array_values(array_filter((array) $operaciones));

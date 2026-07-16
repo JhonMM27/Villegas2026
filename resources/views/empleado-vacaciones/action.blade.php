@@ -61,18 +61,10 @@
                                 <h6 class="text-success mb-3"><i class="bi bi-calendar me-2"></i>Período de Vacaciones</h6>
                                 <div class="row">
                                     <div class="col-6">
-                                        <div class="mb-3">
-                                            <label for="fecha_inicio" class="form-label">Fecha Inicio</label>
-                                            <input type="date" id="fecha_inicio" name="fecha_inicio" class="form-control form-control-sm">
-                                            <div class="invalid-feedback"></div>
-                                        </div>
+                                        <x-date-picker id="fecha_inicio" label="Fecha Inicio" />
                                     </div>
                                     <div class="col-6">
-                                        <div class="mb-3">
-                                            <label for="fecha_fin" class="form-label">Fecha Fin</label>
-                                            <input type="date" id="fecha_fin" name="fecha_fin" class="form-control form-control-sm">
-                                            <div class="invalid-feedback"></div>
-                                        </div>
+                                        <x-date-picker id="fecha_fin" label="Fecha Fin" />
                                     </div>
                                 </div>
                             </div>

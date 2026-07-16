@@ -36,8 +36,8 @@
                                         <option value="{{ $vendedor->id }}">{{ $vendedor->name }}</option>
                                     @endforeach
                                 </select>
-                                <input type="date" id="fecha_inicio" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrar" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <button id="btnExportar" class="btn btn-success btn-sm me-2">Exportar Excel</button>
                                 <a href="#" id="btnPdf" target="_blank" class="btn btn-danger">PDF</a>
@@ -55,8 +55,8 @@
                                     <option value="03">Boleta</option>
                                     <option value="NP">Nota de Pedido</option>
                                 </select>
-                                <input type="date" id="fecha_inicio_documentos" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_documentos" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_documentos" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_documentos" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarDocumentos" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <button id="btnExportarDocumentos" class="btn btn-success btn-sm me-2">Exportar Excel</button>
                                 <a href="#" id="btnPdfDocumentos" target="_blank" class="btn btn-danger">PDF</a>
@@ -68,8 +68,8 @@
                         </div>
                         <div class="tab-pane fade" id="tab3">
                             <div class="d-flex flex-nowrap overflow-auto mb-2">
-                                <input type="date" id="fecha_inicio_producto" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_producto" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_producto" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_producto" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarProducto" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <button id="btnExportarProducto" class="btn btn-success btn-sm me-2">Exportar Excel</button>
                                 <a href="#" id="btnPdfProducto" target="_blank" class="btn btn-danger">PDF</a>
@@ -81,8 +81,8 @@
                         </div>
                         <div class="tab-pane fade" id="tab4">
                             <div class="d-flex flex-nowrap overflow-auto mb-2">
-                                <input type="date" id="fecha_inicio_productoAgrupado" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_productoAgrupado" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_productoAgrupado" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_productoAgrupado" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarProductoAgrupado" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <!--<button id="btnExportarProductoAgrupado" class="btn btn-success btn-sm me-2">Exportar Excel</button>-->
                                 <a href="#" id="btnPdfProductoAgrupado" target="_blank" class="btn btn-danger">PDF</a>
@@ -100,8 +100,8 @@
                                         <option value="{{ $vendedor->id }}">{{ $vendedor->name }}</option>
                                     @endforeach
                                 </select>
-                                <input type="date" id="fecha_inicio_entregar" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_entregar" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_entregar" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_entregar" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarEntregar" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <!--<button id="btnExportarProductoAgrupado" class="btn btn-success btn-sm me-2">Exportar Excel</button>-->
                                 <a href="#" id="btnPdfEntregar" target="_blank" class="btn btn-danger">PDF</a>
@@ -118,8 +118,8 @@
                                      <input type="hidden" id="cliente_id_entregar" value="">
                                      <ul id="cliente_suggestions_entregar" class="list-group position-absolute w-100" style="z-index: 1001; display:none; top:100%; left:0;"></ul>
                                  </div>
-                                 <input type="date" id="fecha_inicio_entregar_cliente" class="form-control form-control-sm me-2">
-                                 <input type="date" id="fecha_fin_entregar_cliente" class="form-control form-control-sm me-2">
+                                 <input type="text" id="fecha_inicio_entregar_cliente" class="form-control form-control-sm me-2 date-picker">
+                                 <input type="text" id="fecha_fin_entregar_cliente" class="form-control form-control-sm me-2 date-picker">
                                  <div class="btn-group btn-group-sm me-2" role="group">
                                      <input type="radio" class="btn-check" name="filtro_entrega" id="filtro_todos" value="todos" checked>
                                      <label class="btn btn-outline-secondary btn-sm pt-1" for="filtro_todos">Todos</label>

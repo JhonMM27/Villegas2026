@@ -51,7 +51,10 @@ class CrudManager {
             this.elements.btnCreate.addEventListener('click', () => this.showCreateModal());
         }
         if (this.elements.form) {
-            this.elements.form.addEventListener('submit', (e) => this.handleSubmit(e));
+            if (!this.elements.form.dataset.submitBound) {
+                this.elements.form.addEventListener('submit', (e) => this.handleSubmit(e));
+                this.elements.form.dataset.submitBound = 'true';
+            }
             // Prevenir submit con Enter (excepto en textarea)
             this.elements.form.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
@@ -62,20 +65,22 @@ class CrudManager {
         }
         
         // Delegación de eventos para botones dinámicos
-        this.elements.table.addEventListener('click', (e) => {
-            const target = e.target.closest('[data-action]');
-            if (!target) return;
-            
-            const action = target.dataset.action;
-            const id = target.dataset.id;
-            const texto = target.dataset.texto;
-            
-            if (action === 'edit') {
-                this.showEditModal(id);
-            } else if (action === 'delete') {
-                this.confirmDelete(id, texto);
-            }
-        });
+        if (this.elements.table) {
+            this.elements.table.addEventListener('click', (e) => {
+                const target = e.target.closest('[data-action]');
+                if (!target) return;
+
+                const action = target.dataset.action;
+                const id = target.dataset.id;
+                const texto = target.dataset.texto;
+
+                if (action === 'edit') {
+                    this.showEditModal(id);
+                } else if (action === 'delete') {
+                    this.confirmDelete(id, texto);
+                }
+            });
+        }
 
         // Eventos del modal
         if (this.elements.modal) {
@@ -84,9 +89,17 @@ class CrudManager {
                 if (focusedElement) focusedElement.blur();
             });
 
+            this.elements.modal.addEventListener('shown.bs.modal', () => {
+                const showNow = !this.isRectifying;
+                this.elements.modal.querySelectorAll('.btn-now').forEach(btn => {
+                    btn.style.display = showNow ? '' : 'none';
+                });
+            });
+
             this.elements.modal.addEventListener('hidden.bs.modal', () => {
                 this.resetForm();
                 this.isEditing = false;
+                this.isRectifying = false;
                 if (typeof this.onModalHidden === 'function') {
                     this.onModalHidden();
                 }
@@ -511,6 +524,40 @@ class CrudManager {
             .catch(error => {
                 console.error(`Error al poblar select "${selectId}":`, error);
             });
+    }
+
+    /**
+     * Convierte un string de fecha/hora del backend al formato
+     * aceptado por inputs `datetime-local` (YYYY-MM-DDTHH:MM).
+     * Robusto a los 3 formatos posibles que puede entregar el backend:
+     *   - "2025-12-29 09:58:00"
+     *   - "2025-12-29T09:58:00.000000-05:00"
+     *   - "2025-12-29T09:58"
+     * @param {string} fecha
+     * @returns {string}
+     */
+    formatDateTimeLocal(fecha) {
+        if (!fecha || fecha === 'null') return '';
+        if (typeof fecha !== 'string') return '';
+        if (fecha.startsWith('-000')) return '';
+        return fecha.substring(0, 16);
+    }
+
+    /**
+     * Asigna un valor a un input. Si el input tiene Flatpickr
+     * inicializado, usa `setDate` para que el calendario reconozca
+     * el nuevo valor. Si no, asigna `value` directamente.
+     * @param {string} id
+     * @param {string} value
+     */
+    setFieldValue(id, value) {
+        const input = document.getElementById(id);
+        if (!input) return;
+        if (input._flatpickr) {
+            input._flatpickr.setDate(value || '', false);
+        } else {
+            input.value = value || '';
+        }
     }
 
 

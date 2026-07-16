@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Formulacion extends Model
 {
-    //use HasFactory;
+    // use HasFactory;
 
     protected $table = 'formulaciones';
 
@@ -24,7 +24,7 @@ class Formulacion extends Model
     ];
 
     protected $casts = [
-        //'fecha' => 'datetime',
+        // 'fecha' => 'datetime',
         'activo' => 'boolean',
         'salida_kg' => 'decimal:2',
     ];

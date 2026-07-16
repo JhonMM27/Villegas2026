@@ -22,11 +22,11 @@
                             <div class="row g-2 align-items-end mb-2">
                                 <div class="col-12 col-sm-4 col-lg-2">
                                     <label class="form-label mb-0">Fecha Inicio</label>
-                                    <input type="date" id="fecha_inicio" class="form-control form-control-sm">
+                                    <input type="text" id="fecha_inicio" class="form-control form-control-sm date-picker">
                                 </div>
                                 <div class="col-12 col-sm-4 col-lg-2">
                                     <label class="form-label mb-0">Fecha Fin</label>
-                                    <input type="date" id="fecha_fin" class="form-control form-control-sm">
+                                    <input type="text" id="fecha_fin" class="form-control form-control-sm date-picker">
                                 </div>
                                 <div class="col-12 col-sm-4 col-lg-2">
                                     <label class="form-label mb-0">Categoría</label>
@@ -57,11 +57,11 @@
                             <div class="row g-2 align-items-end mb-2">
                                 <div class="col-12 col-sm-4 col-lg-2">
                                     <label class="form-label mb-0">Fecha Inicio</label>
-                                    <input type="date" id="fecha_inicio_2" class="form-control form-control-sm">
+                                    <input type="text" id="fecha_inicio_2" class="form-control form-control-sm date-picker">
                                 </div>
                                 <div class="col-12 col-sm-4 col-lg-2">
                                     <label class="form-label mb-0">Fecha Fin</label>
-                                    <input type="date" id="fecha_fin_2" class="form-control form-control-sm">
+                                    <input type="text" id="fecha_fin_2" class="form-control form-control-sm date-picker">
                                 </div>
                                 <div class="col-12 col-sm-4 col-lg-2">
                                     <label class="form-label mb-0">Categoría</label>

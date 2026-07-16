@@ -7,13 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 class Unidad extends Model
 {
     protected $table = 'unidades';
+
     protected $primaryKey = 'codigo';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
+
     protected $fillable = [
         'codigo',
         'descripcion',
-        'activo'
+        'activo',
     ];
 
     protected $casts = [

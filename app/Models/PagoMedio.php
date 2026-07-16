@@ -12,7 +12,7 @@ class PagoMedio extends Model
         'codigo',
         'nombre',
         'descripcion',
-        'activo'
+        'activo',
     ];
 
     protected $casts = [

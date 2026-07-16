@@ -2,37 +2,28 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cotizacion;
-use App\Models\CotizacionDetalle;
-use App\Models\Cliente;
-use App\Models\ComprobanteTipo;
-use App\Models\ComprobanteSerie;
-use App\Models\PagoForma;
-use Illuminate\Http\Request;
-use Yajra\DataTables\DataTables;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\DB;
-use App\Models\Producto;
-use App\Models\Unidad;
-
-use Barryvdh\DomPDF\Facade\Pdf;
-
-use BaconQrCode\Renderer\ImageRenderer;
-use BaconQrCode\Renderer\Image\ImagickImageBackEnd;
-use BaconQrCode\Renderer\Image\SvgImageBackEnd;
-use BaconQrCode\Renderer\RendererStyle\RendererStyle;
-use BaconQrCode\Writer;
 use App\Helpers\NumeroALetras;
+use App\Models\Cliente;
+use App\Models\ComprobanteSerie;
+use App\Models\ComprobanteTipo;
+use App\Models\Cotizacion;
+use App\Models\PagoForma;
+use App\Models\Producto;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Yajra\DataTables\DataTables;
 
 class CotizacionController extends Controller
 {
-
-    public function __construct(){
-        $this->middleware('can:cotizaciones_list')->only(['index', 'view','printTicket']);
+    public function __construct()
+    {
+        $this->middleware('can:cotizaciones_list')->only(['index', 'view', 'printTicket']);
         $this->middleware('can:cotizaciones_create')->only(['store']);
         $this->middleware('can:cotizaciones_edit')->only(['show', 'update']);
         $this->middleware('can:cotizaciones_delete')->only(['destroy']);
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -40,54 +31,54 @@ class CotizacionController extends Controller
     {
         if ($request->ajax()) {
             $data = Cotizacion::select([
-                    'id','user_nombre','cliente_nombre','comprobante_tipo_nombre',
-                    'pago_forma_nombre','serie','correlativo',
-                    DB::raw('DATE(fecha_cotizacion) as fecha_cotizacion'),'moneda','op_gravada',
-                    'op_exonerada','op_inafecta','impuesto','total','estado','venta_id'
-                ])->orderBy('id','desc');
+                'id', 'user_nombre', 'cliente_nombre', 'comprobante_tipo_nombre',
+                'pago_forma_nombre', 'serie', 'correlativo',
+                DB::raw('DATE(fecha_cotizacion) as fecha_cotizacion'), 'moneda', 'op_gravada',
+                'op_exonerada', 'op_inafecta', 'impuesto', 'total', 'estado', 'venta_id',
+            ])->orderBy('id', 'desc');
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
-                    $editButton ='';
-                    if(auth()->user()->can('cotizaciones_edit')){
+                    $editButton = '';
+                    if (auth()->user()->can('cotizaciones_edit')) {
                         $editButton = view('components.button-edit', ['id' => $row->id])->render();
                     }
                     $deleteButton = '';
-                    if(auth()->user()->can('cotizaciones_delete')){
+                    if (auth()->user()->can('cotizaciones_delete')) {
                         $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $row->correlativo])->render();
                     }
-                    $ticketButton= '<a href="' . route('cotizaciones.imprimir', $row->id) . '" 
+                    $ticketButton = '<a href="'.route('cotizaciones.imprimir', $row->id).'" 
                         target="_blank" 
                         class="btn btn-sm btn-secondary" 
                         title="Ver Comprobante">
                         <i class="bi bi-printer"></i>
                      </a>';
-                     $ver='<button class="btn btn-sm btn-primary btn-view-cotizacion" data-id="'.$row->id.'" title="Ver Cotización">
+                    $ver = '<button class="btn btn-sm btn-primary btn-view-cotizacion" data-id="'.$row->id.'" title="Ver Cotización">
                         <i class="bi bi-eye"></i>
                      </button>';
-                     // Botón para generar venta desde cotización
-                     $generarVentaButton = '';
-                     if (is_null($row->venta_id)) {
-                         // Si no tiene venta_id, mostrar botón para generar venta
-                         $generarVentaButton = '<a href="' . route('ventas.index') . '?cotizacion_id=' . $row->id . '" 
+                    // Botón para generar venta desde cotización
+                    $generarVentaButton = '';
+                    if (is_null($row->venta_id)) {
+                        // Si no tiene venta_id, mostrar botón para generar venta
+                        $generarVentaButton = '<a href="'.route('ventas.index').'?cotizacion_id='.$row->id.'" 
                             class="btn btn-sm btn-success" 
                             title="Generar Venta">
                             <i class="bi bi-cart-plus"></i>
                          </a>';
-                     } else {
-                         // Si ya tiene venta_id, mostrar botón para ver la venta
-                         $generarVentaButton = '<button 
+                    } else {
+                        // Si ya tiene venta_id, mostrar botón para ver la venta
+                        $generarVentaButton = '<button 
                             class="btn btn-sm btn-info btn-view-venta" 
-                            data-id="' . $row->venta_id . '" 
+                            data-id="'.$row->venta_id.'" 
                             title="Ver Venta Generada">
                             <i class="bi bi-receipt"></i>
                          </button>';
-                     }
+                    }
 
                     // Combinar ambos botones en una cadena y devolverla
-                    return '<div class="btn-group">' . $editButton . $deleteButton. $ver.$ticketButton.$generarVentaButton. '</div>';
+                    return '<div class="btn-group">'.$editButton.$deleteButton.$ver.$ticketButton.$generarVentaButton.'</div>';
                 })
-                //->addColumn('usuario', fn($row) => optional($row->user)->name)
+                // ->addColumn('usuario', fn($row) => optional($row->user)->name)
                 ->rawColumns(['action', 'estado'])
                 ->editColumn('estado', function ($row) {
                     return '<span class="badge bg-primary">'.$row->estado.'</span>';
@@ -116,7 +107,7 @@ class CotizacionController extends Controller
     {
         if ($request->filled('fecha_cotizacion')) {
             $request->merge([
-                'fecha_cotizacion' => str_replace('T', ' ', $request->fecha_cotizacion) . ':00'
+                'fecha_cotizacion' => str_replace('T', ' ', $request->fecha_cotizacion).':00',
             ]);
         }
 
@@ -155,7 +146,7 @@ class CotizacionController extends Controller
 
             // ✅ incrementar correlativo (todavía dentro de la misma transacción)
             $serieConfig->update([
-                'correlativo' => $correlativo + 1
+                'correlativo' => $correlativo + 1,
             ]);
 
             DB::commit();
@@ -164,44 +155,47 @@ class CotizacionController extends Controller
                 'success' => true,
                 'message' => 'Registro creado satisfactoriamente',
                 'cotizacion_id' => $cotizacion->id,
-                'correlativo' => $correlativo
+                'correlativo' => $correlativo,
             ]);
 
         } catch (\Illuminate\Database\QueryException $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'No se pudo reservar correlativo. Intente nuevamente.'
+                'message' => 'No se pudo reservar correlativo. Intente nuevamente.',
             ], 409);
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error al crear el registro: ' . $e->getMessage()
+                'message' => 'Error al crear el registro: '.$e->getMessage(),
             ], 500);
         }
     }
+
     /**
      * Display the specified resource.
      */
     public function show($id)
     {
         try {
-            //$registro = Venta::with(['detalles.producto.afectacionTipo', 'cliente'])->findOrFail($id);
+            // $registro = Venta::with(['detalles.producto.afectacionTipo', 'cliente'])->findOrFail($id);
             $registro = Cotizacion::with([
                 'detalles.producto' => function ($query) {
-                    $query->select('id', 'afectacion_tipo_codigo', 'codigo', 'nombre', 'costo_unitario','unidad_codigo','stock_almacen');
+                    $query->select('id', 'afectacion_tipo_codigo', 'codigo', 'nombre', 'costo_unitario', 'unidad_codigo', 'stock_almacen');
                 },
                 'detalles.producto.afectacionTipo' => function ($query) {
                     $query->select('codigo', 'descripcion', 'porcentaje');
                 },
                 'detalles.producto.fracciones' => function ($query) {
-                    $query->select('producto_id','unidad_codigo', 'empaque', 'precio_lista');
+                    $query->select('producto_id', 'unidad_codigo', 'empaque', 'precio_lista');
                 },
                 'cliente' => function ($query) {
                     $query->select('id', 'razon_social');
-                }
+                },
             ])->findOrFail($id);
 
             return response()->json($registro);
@@ -226,7 +220,7 @@ class CotizacionController extends Controller
         $cotizacion = Cotizacion::findOrFail($id);
         if ($request->filled('fecha_cotizacion')) {
             $request->merge([
-                'fecha_cotizacion' => str_replace('T', ' ', $request->fecha_cotizacion) . ':00'
+                'fecha_cotizacion' => str_replace('T', ' ', $request->fecha_cotizacion).':00',
             ]);
         }
 
@@ -247,22 +241,23 @@ class CotizacionController extends Controller
         DB::beginTransaction();
         try {
             $cotizacionData = $this->processCotizacionData($data, false);
-            
+
             $cotizacion->update($cotizacionData['cotizacion']);
             $cotizacion->detalles()->delete();
             $cotizacion->detalles()->createMany($cotizacionData['detalles']);
 
             DB::commit();
-            
+
             return response()->json([
                 'success' => true,
-                'message' => 'Registro actualizado satisfactoriamente'
+                'message' => 'Registro actualizado satisfactoriamente',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error al actualizar el registro: ' . $e->getMessage()
+                'message' => 'Error al actualizar el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -278,24 +273,25 @@ class CotizacionController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro'
+                'message' => 'Error al eliminar el registro',
             ], 500);
         }
-    }   
+    }
+
     private function processCotizacionData(array $data, bool $isNew = true)
     {
-        $productos = Producto::with('afectacionTipo','unidad')
+        $productos = Producto::with('afectacionTipo', 'unidad')
             ->whereIn('id', collect($data['detalles'])->pluck('producto_id'))
             ->get()
             ->keyBy('id');
 
         $totales = [
-            'salida_kg'    => 0.00,
-            'ingreso_kg'   => 0.00,
+            'salida_kg' => 0.00,
+            'ingreso_kg' => 0.00,
             'ingreso_saco' => 0.00,
         ];
 
@@ -306,8 +302,8 @@ class CotizacionController extends Controller
         $totalItems = count($data['detalles']);
 
         $cotizacionData = [
-            'cliente_id'        => $data['cliente_id'],
-            'cliente_nombre'    => $data['cliente_nombre'] ?? '',
+            'cliente_id' => $data['cliente_id'],
+            'cliente_nombre' => $data['cliente_nombre'] ?? '',
             'items' => $totalItems,
             'comprobante_tipo_codigo' => $data['comprobante_tipo_codigo'],
             'comprobante_tipo_nombre' => $data['comprobante_tipo_nombre'] ?? '',
@@ -320,15 +316,15 @@ class CotizacionController extends Controller
             'pago_forma_nombre' => $data['pago_forma_nombre'] ?? '',
 
             'moneda' => $data['moneda'],
-            'op_gravada'   => round($data['op_gravada'] ?? 0, 2),
+            'op_gravada' => round($data['op_gravada'] ?? 0, 2),
             'op_exonerada' => round($data['op_exonerada'] ?? 0, 2),
-            'op_inafecta'  => round($data['op_inafecta'] ?? 0, 2),
-            'impuesto'     => round($data['impuesto'] ?? 0, 2),
-            'total'        => round($data['total'] ?? 0, 2),
+            'op_inafecta' => round($data['op_inafecta'] ?? 0, 2),
+            'impuesto' => round($data['impuesto'] ?? 0, 2),
+            'total' => round($data['total'] ?? 0, 2),
         ];
 
         if ($isNew) {
-            //$cotizacionData['fecha_venta'] = now();
+            // $cotizacionData['fecha_venta'] = now();
             $cotizacionData['estado'] = 'registrado';
             $cotizacionData['user_id'] = auth()->id();
             $cotizacionData['user_nombre'] = auth()->user()->name;
@@ -336,7 +332,7 @@ class CotizacionController extends Controller
 
         return [
             'cotizacion' => $cotizacionData,
-            'detalles' => $detallesCalculados
+            'detalles' => $detallesCalculados,
         ];
     }
 
@@ -348,7 +344,7 @@ class CotizacionController extends Controller
         $porcentajeImpuesto = optional($producto->afectacionTipo)->porcentaje ?? 0;
         $valor_unitario = $porcentajeImpuesto > 0 ? $precio_unitario / (1 + $porcentajeImpuesto) : $precio_unitario;
         // Usar el total enviado desde la vista si está disponible
-        $detalleTotal = isset($detalle['total']) ? (float)$detalle['total'] : round($precio_unitario * $cantidad, 2);
+        $detalleTotal = isset($detalle['total']) ? (float) $detalle['total'] : round($precio_unitario * $cantidad, 2);
         $subtotal = $porcentajeImpuesto > 0 ? $detalleTotal / (1 + $porcentajeImpuesto) : $detalleTotal;
         $detalleImpuesto = $detalleTotal - $subtotal;
         $empaque = $detalle['empaque'];
@@ -361,15 +357,15 @@ class CotizacionController extends Controller
 
         return [
             'producto_id' => $producto->id,
-            'producto_nombre'    => $producto->nombre,
-            'producto_empaque'   => $empaque ?? 0,
-            'unidad_codigo'      => $unidad_codigo ?? '',
+            'producto_nombre' => $producto->nombre,
+            'producto_empaque' => $empaque ?? 0,
+            'unidad_codigo' => $unidad_codigo ?? '',
             'cantidad' => $cantidad,
             'precio_unitario' => round($precio_unitario, 4),
             'subtotal' => round($subtotal, 2),
             'porcentaje_impuesto' => $porcentajeImpuesto,
             'impuesto' => round($detalleImpuesto, 2),
-            'total' => round($detalleTotal, 2)
+            'total' => round($detalleTotal, 2),
         ];
     }
 
@@ -386,11 +382,11 @@ class CotizacionController extends Controller
             'fecha_cotizacion' => 'required|date_format:Y-m-d H:i:s',
 
             // Totales enviados desde la vista
-            'total'         => 'nullable|numeric|min:0',
-            'op_gravada'    => 'nullable|numeric|min:0',
-            'op_exonerada'  => 'nullable|numeric|min:0',
-            'op_inafecta'   => 'nullable|numeric|min:0',
-            'impuesto'      => 'nullable|numeric|min:0',
+            'total' => 'nullable|numeric|min:0',
+            'op_gravada' => 'nullable|numeric|min:0',
+            'op_exonerada' => 'nullable|numeric|min:0',
+            'op_inafecta' => 'nullable|numeric|min:0',
+            'impuesto' => 'nullable|numeric|min:0',
 
             // Detalles
             'detalles' => 'required|array|min:1',
@@ -403,10 +399,10 @@ class CotizacionController extends Controller
         ]);
     }
 
-     public function getSerie(Request $request)
+    public function getSerie(Request $request)
     {
         $request->validate([
-            'comprobante_tipo_codigo' => 'required|exists:comprobante_tipos,codigo'
+            'comprobante_tipo_codigo' => 'required|exists:comprobante_tipos,codigo',
         ]);
 
         $codigo = $request->comprobante_tipo_codigo;
@@ -415,20 +411,22 @@ class CotizacionController extends Controller
         $serieConfig = ComprobanteSerie::where('comprobante_tipo_codigo', $codigo)->first();
 
         // Si no existe, devolver null
-        if (!$serieConfig) {
+        if (! $serieConfig) {
             return response()->json([
                 'serie' => null,
-                'numero' => null
+                'numero' => null,
             ]);
         }
+
         // Devolver los valores almacenados en la tabla
         return response()->json([
             'serie' => $serieConfig->serie,
-            'numero' => $serieConfig->correlativo
+            'numero' => $serieConfig->correlativo,
         ]);
     }
 
-    public function printTicket($id){
+    public function printTicket($id)
+    {
         $cotizacion = Cotizacion::with(['cliente', 'detalles'])->findOrFail($id);
 
         $correlativoFormateado = str_pad($cotizacion->correlativo, 8, '0', STR_PAD_LEFT);
@@ -456,11 +454,11 @@ class CotizacionController extends Controller
         try {
             $cotizacion = Cotizacion::with([
                 'detalles.producto' => function ($query) {
-                    $query->select('id','nombre','afectacion_tipo_codigo','codigo','costo_unitario');
+                    $query->select('id', 'nombre', 'afectacion_tipo_codigo', 'codigo', 'costo_unitario');
                 },
-                'cliente' => function($query) {
-                    $query->select('id','razon_social','documento_numero');
-                }
+                'cliente' => function ($query) {
+                    $query->select('id', 'razon_social', 'documento_numero');
+                },
             ])->findOrFail($id);
 
             // Devolver vista parcial

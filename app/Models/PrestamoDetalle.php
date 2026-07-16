@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class PrestamoDetalle extends Model
 {
     protected $table = 'prestamo_detalles';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -23,10 +24,10 @@ class PrestamoDetalle extends Model
     ];
 
     protected $casts = [
-        'cantidad'             => 'decimal:2',
-        'cantidad_kgm'         => 'decimal:2',
-        'valor_unitario'       => 'decimal:4',
-        'total'                => 'decimal:2',
+        'cantidad' => 'decimal:2',
+        'cantidad_kgm' => 'decimal:2',
+        'valor_unitario' => 'decimal:4',
+        'total' => 'decimal:2',
     ];
 
     /*

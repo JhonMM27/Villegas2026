@@ -25,7 +25,7 @@ return new class extends Migration
 
             $table->unsignedSmallInteger('cliente_id');
             $table->string('cliente_nombre', 200)->nullable();
-                     
+
             $table->decimal('ingreso_saco', 9, 4);
             $table->decimal('ingreso_kg', 9, 4);
             $table->decimal('ingreso_soles', 10, 4);
@@ -39,7 +39,7 @@ return new class extends Migration
             $table->foreign('user_id')->references('id')->on('users');
             $table->foreign('producto_id')->references('id')->on('productos');
             $table->foreign('cliente_id')->references('id')->on('clientes');
-            //$table->foreign('formulacion_id')->references('id')->on('formulaciones');
+            // $table->foreign('formulacion_id')->references('id')->on('formulaciones');
         });
     }
 

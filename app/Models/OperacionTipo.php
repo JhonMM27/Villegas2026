@@ -10,18 +10,21 @@ class OperacionTipo extends Model
     use HasFactory;
 
     protected $table = 'operacion_tipos';
+
     protected $primaryKey = 'codigo';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [
         'codigo',
         'descripcion',
-        'activo'
+        'activo',
     ];
 
     protected $casts = [
-        'activo' => 'boolean'
+        'activo' => 'boolean',
     ];
 
     /**

@@ -11,7 +11,7 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class MovimientosExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
+class MovimientosExport implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStyles
 {
     public function __construct(
         private Collection $reportes
@@ -52,22 +52,22 @@ class MovimientosExport implements FromCollection, WithHeadings, WithMapping, Sh
         return [
             Carbon::parse($r->fecha)->format('d/m/Y H:i'),
             $r->tipo,
-            $r->transaccion_tipo . ' #' . $r->transaccion_id,
+            $r->transaccion_tipo.' #'.$r->transaccion_id,
             $r->producto_nombre,
-            (float)$r->empaque,
+            (float) $r->empaque,
             $r->unidad_codigo,
-            (float)$r->cantidad,
-            (float)$r->cantidad_kg,
-            (float)$r->entrada,
-            (float)$r->salida,
-            (float)$r->costo_unitario,
-            (float)$r->costo_total,
-            (float)$r->stock_anterior,
-            (float)$r->costo_actual,
-            (float)$r->valor_anterior,
-            (float)$r->stock_nuevo,
-            (float)$r->costo_nuevo,
-            (float)$r->valor_nuevo,
+            (float) $r->cantidad,
+            (float) $r->cantidad_kg,
+            (float) $r->entrada,
+            (float) $r->salida,
+            (float) $r->costo_unitario,
+            (float) $r->costo_total,
+            (float) $r->stock_anterior,
+            (float) $r->costo_actual,
+            (float) $r->valor_anterior,
+            (float) $r->stock_nuevo,
+            (float) $r->costo_nuevo,
+            (float) $r->valor_nuevo,
             $r->comentario,
         ];
     }

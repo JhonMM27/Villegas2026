@@ -2,14 +2,15 @@
 
 namespace App\Exports;
 
+use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Illuminate\Support\Carbon;
 
 class FormulacionesFechaExport implements FromCollection, WithHeadings, WithMapping
 {
     protected $fechaInicio;
+
     protected $fechaFin;
 
     public function __construct($fechaInicio = null, $fechaFin = null)
@@ -42,7 +43,7 @@ class FormulacionesFechaExport implements FromCollection, WithHeadings, WithMapp
         if ($this->fechaInicio && $this->fechaFin) {
             $query->whereBetween('formulaciones.fecha', [
                 Carbon::parse($this->fechaInicio)->startOfDay(),
-                Carbon::parse($this->fechaFin)->endOfDay()
+                Carbon::parse($this->fechaFin)->endOfDay(),
             ]);
         }
 
@@ -61,7 +62,6 @@ class FormulacionesFechaExport implements FromCollection, WithHeadings, WithMapp
             ->get();
     }
 
-
     // Encabezados del Excel
     public function headings(): array
     {
@@ -72,7 +72,7 @@ class FormulacionesFechaExport implements FromCollection, WithHeadings, WithMapp
             'Salida Kg',
             'Producto',
             'Empaque',
-            'Cliente'
+            'Cliente',
         ];
     }
 
@@ -86,7 +86,7 @@ class FormulacionesFechaExport implements FromCollection, WithHeadings, WithMapp
             $item->salida_kg,
             $item->producto_nombre,
             $item->producto_empaque,
-            $item->cliente_nombre
+            $item->cliente_nombre,
         ];
     }
 }

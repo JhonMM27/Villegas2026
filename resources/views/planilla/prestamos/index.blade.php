@@ -13,6 +13,24 @@
                     @endcan
                 </div>
                 <div class="card-body">
+                    @php
+                        $defaultFin = date('Y-m-d');
+                        $defaultInicio = date('Y-m-d', strtotime('-30 days'));
+                    @endphp
+                    <div id="filtrosWrapper" class="d-flex align-items-center gap-2 mb-2">
+                        <label for="filtroFechaInicio" class="form-label mb-0 text-muted small">Desde:</label>
+                        <input type="text" id="filtroFechaInicio"
+                               class="form-control form-control-sm date-picker" style="width: 160px"
+                               value="{{ request('fecha_inicio', $defaultInicio) }}">
+                        <label for="filtroFechaFin" class="form-label mb-0 text-muted small">Hasta:</label>
+                        <input type="text" id="filtroFechaFin"
+                               class="form-control form-control-sm date-picker" style="width: 160px"
+                               value="{{ request('fecha_fin', $defaultFin) }}">
+                        <button type="button" class="btn btn-secondary btn-sm" id="btnLimpiarFiltro"
+                                title="Limpiar filtros">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    </div>
                     <div class="table-responsive">
                         <table id="listadoTable" class="table table-striped table-hover table-sm">
                             <thead>
@@ -42,8 +60,9 @@
 @endsection
 @push('scripts')
 <script>
-class PrestamoManager {
+class PrestamoManager extends CrudManager {
     constructor(baseUrl) {
+        super(baseUrl);
         this.baseUrl = baseUrl;
         this.tabla = null;
         this.prestamoActual = null;
@@ -57,7 +76,26 @@ class PrestamoManager {
         this.tabla = $('#listadoTable').DataTable({
             processing: true,
             serverSide: true,
-            ajax: { url: this.baseUrl, type: 'GET' },
+            ajax: {
+                url: this.baseUrl,
+                type: 'GET',
+                data: (d) => {
+                    d.fecha_inicio = $('#filtroFechaInicio').val() || '';
+                    d.fecha_fin = $('#filtroFechaFin').val() || '';
+                }
+            },
+            language: {
+                emptyTable: "No hay préstamos en este rango de fechas.",
+                zeroRecords: "No se encontraron préstamos que coincidan con el filtro.",
+                info: "Mostrando _START_ a _END_ de _TOTAL_ préstamos",
+                infoEmpty: "Mostrando 0 préstamos",
+                infoFiltered: "(filtrado de _MAX_ préstamos totales)",
+                lengthMenu: "Mostrar _MENU_ registros",
+                loadingRecords: "Cargando...",
+                processing: "Procesando...",
+                search: "Buscar:",
+                paginate: { first: "Primero", last: "Último", next: "Siguiente", previous: "Anterior" }
+            },
             columns: [
                 { data: 'action', name: 'action', orderable: false, searchable: false },
                 { data: 'numero_interno', name: 'numero_interno' },
@@ -75,9 +113,27 @@ class PrestamoManager {
         if (modalEl) {
             this.modal = new bootstrap.Modal(modalEl);
             this.form = document.getElementById('formUpdate');
-            this.form.addEventListener('submit', (e) => this.handleSubmit(e));
         }
         document.getElementById('btnCreate')?.addEventListener('click', () => this.showCreateModal());
+
+        const inputInicio = document.getElementById('filtroFechaInicio');
+        const inputFin = document.getElementById('filtroFechaFin');
+        inputInicio?.addEventListener('change', () => {
+            this.syncQueryString();
+            this.tabla.ajax.reload();
+        });
+        inputFin?.addEventListener('change', () => {
+            this.syncQueryString();
+            this.tabla.ajax.reload();
+        });
+
+        document.getElementById('btnLimpiarFiltro')?.addEventListener('click', () => {
+            inputInicio.value = '';
+            inputFin.value = '';
+            this.syncQueryString();
+            this.tabla.ajax.reload();
+        });
+
         this.setupLiveSearch();
         this.setupCajaListeners();
         document.getElementById('monto_original')?.addEventListener('input', (e) => {
@@ -87,6 +143,30 @@ class PrestamoManager {
             }
             this.recalcularTotalCaja();
         });
+    }
+
+    /**
+     * Sincroniza los filtros de fecha con la URL (query string)
+     * sin recargar la página, para que se pueda compartir/refrescar.
+     */
+    syncQueryString() {
+        const params = new URLSearchParams(window.location.search);
+        const inicio = document.getElementById('filtroFechaInicio')?.value || '';
+        const fin = document.getElementById('filtroFechaFin')?.value || '';
+
+        if (inicio) {
+            params.set('fecha_inicio', inicio);
+        } else {
+            params.delete('fecha_inicio');
+        }
+        if (fin) {
+            params.set('fecha_fin', fin);
+        } else {
+            params.delete('fecha_fin');
+        }
+
+        const newUrl = `${location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+        window.history.replaceState({}, '', newUrl);
     }
 
     setupCajaListeners() {
@@ -246,7 +326,7 @@ class PrestamoManager {
         this.form.action = this.baseUrl;
         this.form.reset();
         document.getElementById('numero_interno').value = '';
-        document.getElementById('fecha_prestamo').value = new Date().toISOString().split('T')[0];
+        this.setFieldValue('fecha_prestamo', new Date().toISOString().split('T')[0]);
         document.getElementById('empleado_id').value = '';
         document.getElementById('empleado_nombre').value = '';
         document.getElementById('monto_original').value = '';
@@ -269,7 +349,7 @@ class PrestamoManager {
             document.getElementById('numero_interno').value = response.prestamo.numero_interno;
             document.getElementById('empleado_id').value = response.prestamo.empleado_id;
             document.getElementById('empleado_nombre').value = response.prestamo.empleado?.nombre || '';
-            document.getElementById('fecha_prestamo').value = response.prestamo.fecha_prestamo;
+            this.setFieldValue('fecha_prestamo', response.prestamo.fecha_prestamo);
             document.getElementById('monto_original').value = response.prestamo.monto_original;
             document.getElementById('estado').value = response.prestamo.estado;
             document.getElementById('observaciones').value = response.prestamo.observaciones || '';
@@ -510,7 +590,7 @@ class PrestamoManager {
                             </div>
                             <div class="mb-3">
                                 <label for="fecha_pago" class="form-label">Fecha</label>
-                                <input type="date" id="fecha_pago" name="fecha_pago" class="form-control form-control-sm" value="${new Date().toISOString().split('T')[0]}" required>
+                                <input type="text" id="fecha_pago" name="fecha_pago" class="form-control form-control-sm date-picker" value="${new Date().toISOString().split('T')[0]}" required>
                                 <div class="invalid-feedback"></div>
                             </div>
                             <div class="mb-3">
@@ -528,6 +608,7 @@ class PrestamoManager {
         </div>`;
 
         document.getElementById('modalPagoContainer').innerHTML = pagoHtml;
+        if (typeof window.reinitFlatpickr === 'function') window.reinitFlatpickr();
         const modal = new bootstrap.Modal(document.getElementById('modalPagoPrestamo'));
         modal.show();
 

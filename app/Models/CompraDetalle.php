@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class CompraDetalle extends Model
 {
     protected $table = 'compra_detalles';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -22,9 +23,9 @@ class CompraDetalle extends Model
         'subtotal',
         'porcentaje_impuesto',
         'impuesto',
-        'total'
+        'total',
     ];
-    
+
     // Relaciones
     public function compra()
     {

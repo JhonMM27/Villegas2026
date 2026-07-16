@@ -33,11 +33,11 @@ class Cotizacion extends Model
 
     protected $casts = [
         'fecha_cotizacion' => 'datetime:Y-m-d H:i:s',
-        'op_gravada'        => 'decimal:2',
-        'op_exonerada'      => 'decimal:2',
-        'op_inafecta'       => 'decimal:2',
-        'impuesto'          => 'decimal:2',
-        'total'             => 'decimal:2'
+        'op_gravada' => 'decimal:2',
+        'op_exonerada' => 'decimal:2',
+        'op_inafecta' => 'decimal:2',
+        'impuesto' => 'decimal:2',
+        'total' => 'decimal:2',
     ];
 
     public function user()

@@ -16,11 +16,16 @@ class SunatCertificado extends Model
         'certificado_path',
         'password',
         'activo',
-        'expires_at'
+        'expires_at',
     ];
 
     protected $casts = [
         'activo' => 'boolean',
         'expires_at' => 'datetime',
     ];
+
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
 }

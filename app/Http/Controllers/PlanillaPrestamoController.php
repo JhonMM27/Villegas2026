@@ -8,6 +8,9 @@ use App\Models\PlanillaPrestamo;
 use App\Services\PlanillaPrestamoService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Yajra\DataTables\DataTables;
 
 class PlanillaPrestamoController extends Controller
@@ -24,7 +27,9 @@ class PlanillaPrestamoController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $data = $this->prestamoService->getAll();
+            $fechaInicio = $request->get('fecha_inicio');
+            $fechaFin = $request->get('fecha_fin');
+            $data = $this->prestamoService->getAll($fechaInicio, $fechaFin);
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
@@ -370,7 +375,7 @@ class PlanillaPrestamoController extends Controller
 
     protected function validateData(Request $request, $id = null)
     {
-        $uniqueRule = $id 
+        $uniqueRule = $id
             ? "unique:planilla_prestamos,numero_interno,{$id},id"
             : 'unique:planilla_prestamos,numero_interno';
 
@@ -386,7 +391,21 @@ class PlanillaPrestamoController extends Controller
             'consorcio' => 'nullable|numeric|min:0',
         ];
 
-        return $request->validate($rules);
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            Log::warning('Validacion fallo en PlanillaPrestamo', [
+                'id' => $id,
+                'errors' => $validator->errors()->toArray(),
+                'data' => $request->only([
+                    'empleado_id', 'numero_interno', 'monto_original', 'fecha_prestamo', 'estado',
+                    'principal', 'deposito', 'consorcio',
+                ]),
+            ]);
+            throw new ValidationException($validator);
+        }
+
+        return $validator->validated();
     }
 
     public function printTicket($id)

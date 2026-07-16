@@ -2,22 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\User;
-use App\Models\Preparada;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
-use Barryvdh\DomPDF\Facade\Pdf;
-
-use App\Exports\PreparadasFechaExport;
 use App\Exports\PreparadasAcumuladasExport;
+use App\Exports\PreparadasFechaExport;
+use App\Models\Preparada;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ReportePreparadaController extends Controller
 {
-    public function __construct(){
+    public function __construct()
+    {
         $this->middleware('can:preparadas_list')->only(
-                ['index','preparadasFechas','exportarPreparadasFechas','preparadasAcumuladas','exportarPreparadasAcumuladas','imprimirPreparadasFechas','imprimirPreparadasAcumuladas']);
+            ['index', 'preparadasFechas', 'exportarPreparadasFechas', 'preparadasAcumuladas', 'exportarPreparadasAcumuladas', 'imprimirPreparadasFechas', 'imprimirPreparadasAcumuladas']);
     }
 
     public function index(Request $request)
@@ -28,7 +27,7 @@ class ReportePreparadaController extends Controller
 
     public function preparadasFechas(Request $request)
     {
-        if (!$request->ajax()) {
+        if (! $request->ajax()) {
             abort(403, 'Acceso no autorizado');
         }
 
@@ -36,27 +35,27 @@ class ReportePreparadaController extends Controller
         $fechaFin = $request->input('fecha_fin');
 
         $reportes = Preparada::query()
-        ->select([
-            'id',
-            'fecha',
-            'formulacion_id',
-            'producto_nombre',
-            'producto_empaque',
-            'cliente_nombre',
-            'ingreso_kg',
-            'ingreso_saco',
-            'ingreso_soles',
-            'items',
-        ])
-        ->whereBetween('fecha', [
-            Carbon::parse($fechaInicio)->startOfDay(),
-            Carbon::parse($fechaFin)->endOfDay()
-        ])
-        ->where('estado', '!=', 'anulada')
-        ->orderBy('producto_nombre') 
-        ->orderBy('fecha')
-        ->orderBy('id')
-        ->get();
+            ->select([
+                'id',
+                'fecha',
+                'formulacion_id',
+                'producto_nombre',
+                'producto_empaque',
+                'cliente_nombre',
+                'ingreso_kg',
+                'ingreso_saco',
+                'ingreso_soles',
+                'items',
+            ])
+            ->whereBetween('fecha', [
+                Carbon::parse($fechaInicio)->startOfDay(),
+                Carbon::parse($fechaFin)->endOfDay(),
+            ])
+            ->where('estado', '!=', 'anulada')
+            ->orderBy('producto_nombre')
+            ->orderBy('fecha')
+            ->orderBy('id')
+            ->get();
 
         return view(
             'reportes.preparadas.preparadas_fechas',
@@ -64,7 +63,7 @@ class ReportePreparadaController extends Controller
         );
     }
 
-     public function imprimirPreparadasFechas(Request $request)
+    public function imprimirPreparadasFechas(Request $request)
     {
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
@@ -73,7 +72,7 @@ class ReportePreparadaController extends Controller
             ->join('productos', 'preparadas.producto_id', '=', 'productos.id')
             ->whereBetween('preparadas.fecha', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ])
             ->orderBy('preparadas.producto_nombre')
             ->orderBy('preparadas.fecha')
@@ -95,11 +94,11 @@ class ReportePreparadaController extends Controller
             'reportes.preparadas.preparadas_fechas_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'landscape') // 👈 landscape porque tiene más columnas
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
-        return $pdf->stream('preparadas_fechas_' . now()->format('Ymd_His') . '.pdf');
+        return $pdf->stream('preparadas_fechas_'.now()->format('Ymd_His').'.pdf');
     }
 
     public function exportarPreparadasFechas(Request $request)
@@ -107,7 +106,7 @@ class ReportePreparadaController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-        $fileName = 'preparadas_fecha_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'preparadas_fecha_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new PreparadasFechaExport($fechaInicio, $fechaFin),
@@ -118,14 +117,14 @@ class ReportePreparadaController extends Controller
     public function preparadasAcumuladas(Request $request)
     {
         $fechaInicio = $request->fecha_inicio;
-        $fechaFin    = $request->fecha_fin;
+        $fechaFin = $request->fecha_fin;
 
         $reportes = Preparada::query()
             ->join('productos', 'preparadas.producto_id', '=', 'productos.id')
             ->join('lineas', 'productos.linea_id', '=', 'lineas.id')
             ->whereBetween('preparadas.fecha', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ])
             ->groupBy(
                 'preparadas.producto_id',
@@ -153,13 +152,12 @@ class ReportePreparadaController extends Controller
         );
     }
 
-
     public function exportarPreparadasAcumuladas(Request $request)
     {
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
 
-        $fileName = 'preparadas_acumuladas_' . now()->format('Ymd_His') . '.xlsx';
+        $fileName = 'preparadas_acumuladas_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
             new PreparadasAcumuladasExport($fechaInicio, $fechaFin),
@@ -170,14 +168,14 @@ class ReportePreparadaController extends Controller
     public function imprimirPreparadasAcumuladas(Request $request)
     {
         $fechaInicio = $request->fecha_inicio;
-        $fechaFin    = $request->fecha_fin;
+        $fechaFin = $request->fecha_fin;
 
         $reportes = Preparada::query()
             ->join('productos', 'preparadas.producto_id', '=', 'productos.id')
             ->join('lineas', 'productos.linea_id', '=', 'lineas.id')
             ->whereBetween('preparadas.fecha', [
                 Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
+                Carbon::parse($fechaFin)->endOfDay(),
             ])
             ->orderBy('lineas.nombre')
             ->orderBy('preparadas.producto_nombre')
@@ -204,13 +202,10 @@ class ReportePreparadaController extends Controller
             'reportes.preparadas.preparadas_acumuladas_pdf',
             compact('reportes', 'fechaInicio', 'fechaFin')
         )->setPaper('letter', 'portrait')
-        ->setOptions([
-            'defaultFont' => 'Courier',
-        ]);
+            ->setOptions([
+                'defaultFont' => 'Courier',
+            ]);
 
         return $pdf->stream('preparadas_acumuladas.pdf');
     }
-
-   
-       
 }

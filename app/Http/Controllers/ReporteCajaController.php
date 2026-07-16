@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CajaIngreso;
 use App\Models\Compra;
 use App\Models\CompraProvisional;
+use App\Models\Costo;
 use App\Models\Gasto;
 use App\Models\PlanillaAdelanto;
 use App\Models\PlanillaPago;
@@ -102,6 +104,18 @@ class ReporteCajaController extends Controller
             ->first();
 
         // ======================
+        // COSTOS (se restan del neto de caja)
+        // ======================
+        $costos = Costo::whereBetween('fecha_costo', [$ini, $fin])
+            ->selectRaw('
+                COALESCE(SUM(monto),0) as total,
+                COALESCE(SUM(importe_p),0) as importe_p,
+                COALESCE(SUM(importe_d),0) as importe_d,
+                COALESCE(SUM(importe_c),0) as importe_c
+            ')
+            ->first();
+
+        // ======================
         // PLANILLA - ADELANTOS
         // ======================
         $adelantos = PlanillaAdelanto::whereBetween('fecha', [$ini, $fin])
@@ -137,24 +151,52 @@ class ReporteCajaController extends Controller
             ')
             ->first();
 
+        // ======================
+        // PLANILLA - PAGOS DE PRESTAMOS (pagos de loans - van a consortium)
+        // ======================
+        $pagosPrestamos = PlanillaPrestamoPago::whereBetween('fecha_pago', [$ini, $fin])
+            ->selectRaw('
+                COALESCE(SUM(monto_pagado),0) as total,
+                COALESCE(SUM(importe_p),0) as importe_p,
+                COALESCE(SUM(importe_d),0) as importe_d,
+                COALESCE(SUM(importe_c),0) as importe_c
+            ')
+            ->first();
+
+        // ======================
+        // INGRESOS MANUALES A CAJA
+        // ======================
+        $ingresosCaja = CajaIngreso::whereBetween('fecha', [$ini, $fin])
+            ->selectRaw('
+                COALESCE(SUM(CASE WHEN caja_destino = "P" THEN monto ELSE 0 END),0) AS importe_p,
+                COALESCE(SUM(CASE WHEN caja_destino = "D" THEN monto ELSE 0 END),0) AS importe_d,
+                COALESCE(SUM(CASE WHEN caja_destino = "C" THEN monto ELSE 0 END),0) AS importe_c,
+                COALESCE(SUM(monto),0) AS total
+            ')
+            ->first();
+
+        $ingIC = (float) ($ingresosCaja->importe_p ?? 0);
+        $ingID = (float) ($ingresosCaja->importe_d ?? 0);
+        $ingCC = (float) ($ingresosCaja->importe_c ?? 0);
+
         $resumen = [
-            // ingresos: ventas + provisionales
-            'ing_p' => (float) $ventas->importe_p + (float) $ventaProvisionales->importe_p,
-            'ing_d' => (float) $ventas->importe_d + (float) $ventaProvisionales->importe_d,
-            'ing_c' => (float) $ventas->importe_c + (float) $ventaProvisionales->importe_c,
+            // ingresos: ventas + provisionales + ingresos manuales a caja
+            'ing_p' => (float) $ventas->importe_p + (float) $ventaProvisionales->importe_p + $ingIC,
+            'ing_d' => (float) $ventas->importe_d + (float) $ventaProvisionales->importe_d + $ingID,
+            'ing_c' => (float) $ventas->importe_c + (float) $ventaProvisionales->importe_c + $ingCC,
 
-            // egresos: compras + gastos + planilla
-            'egr_p' => (float) $compras->importe_p + (float) $compraProvisionales->importe_p + (float) $gastos->importe_p + (float) $adelantos->importe_p + (float) $prestamos->importe_p + (float) $pagosPlanilla->importe_p,
-            'egr_d' => (float) $compras->importe_d + (float) $compraProvisionales->importe_d + (float) $gastos->importe_d + (float) $adelantos->importe_d + (float) $prestamos->importe_d + (float) $pagosPlanilla->importe_d,
-            'egr_c' => (float) $compras->importe_c + (float) $compraProvisionales->importe_c + (float) $gastos->importe_c + (float) $adelantos->importe_c + (float) $prestamos->importe_c + (float) $pagosPlanilla->importe_c,
+            // egresos: compras + provisionales + gastos + planilla + costos
+            'egr_p' => (float) $compras->importe_p + (float) $compraProvisionales->importe_p + (float) $gastos->importe_p + (float) $adelantos->importe_p + (float) $prestamos->importe_p + (float) $pagosPrestamos->importe_p + (float) $pagosPlanilla->importe_p + (float) $costos->importe_p,
+            'egr_d' => (float) $compras->importe_d + (float) $compraProvisionales->importe_d + (float) $gastos->importe_d + (float) $adelantos->importe_d + (float) $prestamos->importe_d + (float) $pagosPrestamos->importe_d + (float) $pagosPlanilla->importe_d + (float) $costos->importe_d,
+            'egr_c' => (float) $compras->importe_c + (float) $compraProvisionales->importe_c + (float) $gastos->importe_c + (float) $adelantos->importe_c + (float) $prestamos->importe_c + (float) $pagosPrestamos->importe_c + (float) $pagosPlanilla->importe_c + (float) $costos->importe_c,
 
-            // neto por caja
-            'net_p' => ((float) $ventas->importe_p + (float) $ventaProvisionales->importe_p) - (float) $compras->importe_p - (float) $compraProvisionales->importe_p - (float) $gastos->importe_p - (float) $adelantos->importe_p - (float) $prestamos->importe_p - (float) $pagosPlanilla->importe_p,
-            'net_d' => ((float) $ventas->importe_d + (float) $ventaProvisionales->importe_d) - (float) $compras->importe_d - (float) $compraProvisionales->importe_d - (float) $gastos->importe_d - (float) $adelantos->importe_d - (float) $prestamos->importe_d - (float) $pagosPlanilla->importe_d,
-            'net_c' => ((float) $ventas->importe_c + (float) $ventaProvisionales->importe_c) - (float) $compras->importe_c - (float) $compraProvisionales->importe_c - (float) $gastos->importe_c - (float) $adelantos->importe_c - (float) $prestamos->importe_c - (float) $pagosPlanilla->importe_c,
+            // neto por caja: ingresos − egresos (Costos ya está sumado en Egresos)
+            'net_p' => ((float) $ventas->importe_p + (float) $ventaProvisionales->importe_p + $ingIC) - (float) $compras->importe_p - (float) $compraProvisionales->importe_p - (float) $gastos->importe_p - (float) $adelantos->importe_p - (float) $prestamos->importe_p - (float) $pagosPrestamos->importe_p - (float) $pagosPlanilla->importe_p - (float) $costos->importe_p,
+            'net_d' => ((float) $ventas->importe_d + (float) $ventaProvisionales->importe_d + $ingID) - (float) $compras->importe_d - (float) $compraProvisionales->importe_d - (float) $gastos->importe_d - (float) $adelantos->importe_d - (float) $prestamos->importe_d - (float) $pagosPrestamos->importe_d - (float) $pagosPlanilla->importe_d - (float) $costos->importe_d,
+            'net_c' => ((float) $ventas->importe_c + (float) $ventaProvisionales->importe_c + $ingCC) - (float) $compras->importe_c - (float) $compraProvisionales->importe_c - (float) $gastos->importe_c - (float) $adelantos->importe_c - (float) $prestamos->importe_c - (float) $pagosPrestamos->importe_c - (float) $pagosPlanilla->importe_c - (float) $costos->importe_c,
         ];
 
-        // totales generales (opcional para mostrar)
+        // totales generales
         $resumen['ingresos_totales'] = $resumen['ing_p'] + $resumen['ing_d'] + $resumen['ing_c'];
         $resumen['egresos_totales'] = $resumen['egr_p'] + $resumen['egr_d'] + $resumen['egr_c'];
         $resumen['saldo_neto'] = $resumen['ingresos_totales'] - $resumen['egresos_totales'];
@@ -165,10 +207,13 @@ class ReporteCajaController extends Controller
             'ventaProvisionales' => $ventaProvisionales,
             'compraProvisionales' => $compraProvisionales,
             'gastos' => $gastos,
+            'costos' => $costos,
             'adelantos' => $adelantos,
             'prestamos' => $prestamos,
+            'pagosPrestamos' => $pagosPrestamos,
             'pagosPlanilla' => $pagosPlanilla,
             'resumen' => $resumen,
+            'ingresosCaja' => $ingresosCaja,
             'fechaInicio' => $ini,
             'fechaFin' => $fin,
         ]);
@@ -243,8 +288,20 @@ class ReporteCajaController extends Controller
                 COALESCE(SUM(importe_c),0) as importe_c
             ')
             ->where('planilla_mes', null)
-            ->where('planilla_anio', null)  
+            ->where('planilla_anio', null)
             // ->where('estado', '!=', 'anulada')
+            ->first();
+
+        // ======================
+        // COSTOS (se restan del neto de caja)
+        // ======================
+        $costos = Costo::whereBetween('fecha_costo', [$ini, $fin])
+            ->selectRaw('
+                COALESCE(SUM(monto),0) as total,
+                COALESCE(SUM(importe_p),0) as importe_p,
+                COALESCE(SUM(importe_d),0) as importe_d,
+                COALESCE(SUM(importe_c),0) as importe_c
+            ')
             ->first();
 
         // ======================
@@ -299,21 +356,42 @@ class ReporteCajaController extends Controller
             ')
             ->first();
 
+        // ======================
+        // INGRESOS MANUALES A CAJA (nuevo módulo)
+        // ======================
+        $ingresosCaja = CajaIngreso::whereBetween('fecha', [$ini, $fin])
+            ->selectRaw('
+                COALESCE(SUM(CASE WHEN caja_destino = "P" THEN monto ELSE 0 END),0) AS importe_p,
+                COALESCE(SUM(CASE WHEN caja_destino = "D" THEN monto ELSE 0 END),0) AS importe_d,
+                COALESCE(SUM(CASE WHEN caja_destino = "C" THEN monto ELSE 0 END),0) AS importe_c,
+                COALESCE(SUM(monto),0) AS total
+            ')
+            ->first();
+
+        $ingresosCajaList = CajaIngreso::whereBetween('fecha', [$ini, $fin])
+            ->orderBy('fecha', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $ingIC = (float) ($ingresosCaja->importe_p ?? 0);
+        $ingID = (float) ($ingresosCaja->importe_d ?? 0);
+        $ingCC = (float) ($ingresosCaja->importe_c ?? 0);
+
         $resumen = [
-            // ingresos: ventas + provisionales
-            'ing_p' => (float) $ventas->importe_p + (float) $ventaProvisionales->importe_p,
-            'ing_d' => (float) $ventas->importe_d + (float) $ventaProvisionales->importe_d,
-            'ing_c' => (float) $ventas->importe_c + (float) $ventaProvisionales->importe_c,
+            // ingresos: ventas + provisionales + ingresos manuales a caja
+            'ing_p' => (float) $ventas->importe_p + (float) $ventaProvisionales->importe_p + $ingIC,
+            'ing_d' => (float) $ventas->importe_d + (float) $ventaProvisionales->importe_d + $ingID,
+            'ing_c' => (float) $ventas->importe_c + (float) $ventaProvisionales->importe_c + $ingCC,
 
-            // egresos: compras + gastos + planilla
-            'egr_p' => (float) $compras->importe_p + (float) $compraProvisionales->importe_p + (float) $gastos->importe_p + (float) $adelantos->importe_p + (float) $prestamos->importe_p + (float) $pagosPrestamos->importe_p + (float) $pagosPlanilla->importe_p,
-            'egr_d' => (float) $compras->importe_d + (float) $compraProvisionales->importe_d + (float) $gastos->importe_d + (float) $adelantos->importe_d + (float) $prestamos->importe_d + (float) $pagosPrestamos->importe_d + (float) $pagosPlanilla->importe_d,
-            'egr_c' => (float) $compras->importe_c + (float) $compraProvisionales->importe_c + (float) $gastos->importe_c + (float) $adelantos->importe_c + (float) $prestamos->importe_c + (float) $pagosPrestamos->importe_c + (float) $pagosPlanilla->importe_c,
+            // egresos: compras + provisionales + gastos + planilla + costos
+            'egr_p' => (float) $compras->importe_p + (float) $compraProvisionales->importe_p + (float) $gastos->importe_p + (float) $adelantos->importe_p + (float) $prestamos->importe_p + (float) $pagosPrestamos->importe_p + (float) $pagosPlanilla->importe_p + (float) $costos->importe_p,
+            'egr_d' => (float) $compras->importe_d + (float) $compraProvisionales->importe_d + (float) $gastos->importe_d + (float) $adelantos->importe_d + (float) $prestamos->importe_d + (float) $pagosPrestamos->importe_d + (float) $pagosPlanilla->importe_d + (float) $costos->importe_d,
+            'egr_c' => (float) $compras->importe_c + (float) $compraProvisionales->importe_c + (float) $gastos->importe_c + (float) $adelantos->importe_c + (float) $prestamos->importe_c + (float) $pagosPrestamos->importe_c + (float) $pagosPlanilla->importe_c + (float) $costos->importe_c,
 
-            // neto por caja
-            'net_p' => ((float) $ventas->importe_p + (float) $ventaProvisionales->importe_p) - (float) $compras->importe_p - (float) $compraProvisionales->importe_p - (float) $gastos->importe_p - (float) $adelantos->importe_p - (float) $prestamos->importe_p - (float) $pagosPrestamos->importe_p - (float) $pagosPlanilla->importe_p,
-            'net_d' => ((float) $ventas->importe_d + (float) $ventaProvisionales->importe_d) - (float) $compras->importe_d - (float) $compraProvisionales->importe_d - (float) $gastos->importe_d - (float) $adelantos->importe_d - (float) $prestamos->importe_d - (float) $pagosPrestamos->importe_d - (float) $pagosPlanilla->importe_d,
-            'net_c' => ((float) $ventas->importe_c + (float) $ventaProvisionales->importe_c) - (float) $compras->importe_c - (float) $compraProvisionales->importe_c - (float) $gastos->importe_c - (float) $adelantos->importe_c - (float) $prestamos->importe_c - (float) $pagosPrestamos->importe_c - (float) $pagosPlanilla->importe_c,
+            // neto por caja: ingresos − egresos (Costos ya está sumado en Egresos)
+            'net_p' => ((float) $ventas->importe_p + (float) $ventaProvisionales->importe_p + $ingIC) - (float) $compras->importe_p - (float) $compraProvisionales->importe_p - (float) $gastos->importe_p - (float) $adelantos->importe_p - (float) $prestamos->importe_p - (float) $pagosPrestamos->importe_p - (float) $pagosPlanilla->importe_p - (float) $costos->importe_p,
+            'net_d' => ((float) $ventas->importe_d + (float) $ventaProvisionales->importe_d + $ingID) - (float) $compras->importe_d - (float) $compraProvisionales->importe_d - (float) $gastos->importe_d - (float) $adelantos->importe_d - (float) $prestamos->importe_d - (float) $pagosPrestamos->importe_d - (float) $pagosPlanilla->importe_d - (float) $costos->importe_d,
+            'net_c' => ((float) $ventas->importe_c + (float) $ventaProvisionales->importe_c + $ingCC) - (float) $compras->importe_c - (float) $compraProvisionales->importe_c - (float) $gastos->importe_c - (float) $adelantos->importe_c - (float) $prestamos->importe_c - (float) $pagosPrestamos->importe_c - (float) $pagosPlanilla->importe_c - (float) $costos->importe_c,
         ];
 
         // totales generales (opcional para mostrar)
@@ -321,6 +399,8 @@ class ReporteCajaController extends Controller
         $resumen['egresos_totales'] = $resumen['egr_p'] + $resumen['egr_d'] + $resumen['egr_c'];
         $resumen['saldo_neto'] = $resumen['ingresos_totales'] - $resumen['egresos_totales'];
 
+        // ======================
+        // LISTAS (detalle)
         // ======================
         // LISTAS (detalle)
         // ======================
@@ -411,6 +491,27 @@ class ReporteCajaController extends Controller
             ->get();
 
         // ======================
+        // COSTOS LISTA
+        // ======================
+        $costosList = Costo::whereBetween('fecha_costo', [$ini, $fin])
+            ->with(['costoTipo', 'categoriaCosto'])
+            ->select([
+                'id',
+                'fecha_costo',
+                'descripcion',
+                'responsable',
+                'monto',
+                'importe_p',
+                'importe_d',
+                'importe_c',
+                'costo_tipo_id',
+                'categoria_costo_id',
+                'numero_recibo',
+            ])
+            ->orderBy('fecha_costo')
+            ->get();
+
+        // ======================
         // PLANILLA LISTAS
         // ======================
         $adelantosList = PlanillaAdelanto::whereBetween('fecha', [$ini, $fin])
@@ -479,6 +580,7 @@ class ReporteCajaController extends Controller
             'ventaProvisionales' => $ventaProvisionales,
             'compraProvisionales' => $compraProvisionales,
             'gastos' => $gastos,
+            'costos' => $costos,
             'adelantos' => $adelantos,
             'prestamos' => $prestamos,
             'pagosPrestamos' => $pagosPrestamos,
@@ -489,10 +591,13 @@ class ReporteCajaController extends Controller
             'ventaProvisionalesList' => $ventaProvisionalesList,
             'compraProvisionalesList' => $compraProvisionalesList,
             'gastosList' => $gastosList,
+            'costosList' => $costosList,
             'adelantosList' => $adelantosList,
             'prestamosList' => $prestamosList,
             'pagosPrestamosList' => $pagosPrestamosList,
             'pagosPlanillaList' => $pagosPlanillaList,
+            'ingresosCaja' => $ingresosCaja,
+            'ingresosCajaList' => $ingresosCajaList,
             'fechaInicio' => $ini,
             'fechaFin' => $fin,
         ]);
@@ -563,6 +668,18 @@ class ReporteCajaController extends Controller
             ->first();
 
         // ======================
+        // COSTOS (se restan del neto de caja)
+        // ======================
+        $costos = Costo::whereBetween('fecha_costo', [$ini, $fin])
+            ->selectRaw('
+                COALESCE(SUM(monto),0) as total,
+                COALESCE(SUM(importe_p),0) as importe_p,
+                COALESCE(SUM(importe_d),0) as importe_d,
+                COALESCE(SUM(importe_c),0) as importe_c
+            ')
+            ->first();
+
+        // ======================
         // PLANILLA - ADELANTOS
         // ======================
         $adelantos = PlanillaAdelanto::whereBetween('fecha', [$ini, $fin])
@@ -610,21 +727,37 @@ class ReporteCajaController extends Controller
             ')
             ->first();
 
+        // ======================
+        // INGRESOS MANUALES A CAJA
+        // ======================
+        $ingresosCaja = CajaIngreso::whereBetween('fecha', [$ini, $fin])
+            ->selectRaw('
+                COALESCE(SUM(CASE WHEN caja_destino = "P" THEN monto ELSE 0 END),0) AS importe_p,
+                COALESCE(SUM(CASE WHEN caja_destino = "D" THEN monto ELSE 0 END),0) AS importe_d,
+                COALESCE(SUM(CASE WHEN caja_destino = "C" THEN monto ELSE 0 END),0) AS importe_c,
+                COALESCE(SUM(monto),0) AS total
+            ')
+            ->first();
+
+        $ingIC = (float) ($ingresosCaja->importe_p ?? 0);
+        $ingID = (float) ($ingresosCaja->importe_d ?? 0);
+        $ingCC = (float) ($ingresosCaja->importe_c ?? 0);
+
         $resumen = [
-            // ingresos: ventas + provisionales
-            'ing_p' => (float) $ventas->importe_p + (float) $ventaProvisionales->importe_p,
-            'ing_d' => (float) $ventas->importe_d + (float) $ventaProvisionales->importe_d,
-            'ing_c' => (float) $ventas->importe_c + (float) $ventaProvisionales->importe_c,
+            // ingresos: ventas + provisionales + ingresos manuales a caja
+            'ing_p' => (float) $ventas->importe_p + (float) $ventaProvisionales->importe_p + $ingIC,
+            'ing_d' => (float) $ventas->importe_d + (float) $ventaProvisionales->importe_d + $ingID,
+            'ing_c' => (float) $ventas->importe_c + (float) $ventaProvisionales->importe_c + $ingCC,
 
-            // egresos: compras + gastos + planilla
-            'egr_p' => (float) $compras->importe_p + (float) $compraProvisionales->importe_p + (float) $gastos->importe_p + (float) $adelantos->importe_p + (float) $prestamos->importe_p + (float) $pagosPrestamos->importe_p + (float) $pagosPlanilla->importe_p,
-            'egr_d' => (float) $compras->importe_d + (float) $compraProvisionales->importe_d + (float) $gastos->importe_d + (float) $adelantos->importe_d + (float) $prestamos->importe_d + (float) $pagosPrestamos->importe_d + (float) $pagosPlanilla->importe_d,
-            'egr_c' => (float) $compras->importe_c + (float) $compraProvisionales->importe_c + (float) $gastos->importe_c + (float) $adelantos->importe_c + (float) $prestamos->importe_c + (float) $pagosPrestamos->importe_c + (float) $pagosPlanilla->importe_c,
+            // egresos: compras + provisionales + gastos + planilla + costos
+            'egr_p' => (float) $compras->importe_p + (float) $compraProvisionales->importe_p + (float) $gastos->importe_p + (float) $adelantos->importe_p + (float) $prestamos->importe_p + (float) $pagosPrestamos->importe_p + (float) $pagosPlanilla->importe_p + (float) $costos->importe_p,
+            'egr_d' => (float) $compras->importe_d + (float) $compraProvisionales->importe_d + (float) $gastos->importe_d + (float) $adelantos->importe_d + (float) $prestamos->importe_d + (float) $pagosPrestamos->importe_d + (float) $pagosPlanilla->importe_d + (float) $costos->importe_d,
+            'egr_c' => (float) $compras->importe_c + (float) $compraProvisionales->importe_c + (float) $gastos->importe_c + (float) $adelantos->importe_c + (float) $prestamos->importe_c + (float) $pagosPrestamos->importe_c + (float) $pagosPlanilla->importe_c + (float) $costos->importe_c,
 
-            // neto por caja
-            'net_p' => ((float) $ventas->importe_p + (float) $ventaProvisionales->importe_p) - (float) $compras->importe_p - (float) $compraProvisionales->importe_p - (float) $gastos->importe_p - (float) $adelantos->importe_p - (float) $prestamos->importe_p - (float) $pagosPrestamos->importe_p - (float) $pagosPlanilla->importe_p,
-            'net_d' => ((float) $ventas->importe_d + (float) $ventaProvisionales->importe_d) - (float) $compras->importe_d - (float) $compraProvisionales->importe_d - (float) $gastos->importe_d - (float) $adelantos->importe_d - (float) $prestamos->importe_d - (float) $pagosPrestamos->importe_d - (float) $pagosPlanilla->importe_d,
-            'net_c' => ((float) $ventas->importe_c + (float) $ventaProvisionales->importe_c) - (float) $compras->importe_c - (float) $compraProvisionales->importe_c - (float) $gastos->importe_c - (float) $adelantos->importe_c - (float) $prestamos->importe_c - (float) $pagosPrestamos->importe_c - (float) $pagosPlanilla->importe_c,
+            // neto por caja: ingresos − egresos (Costos ya está sumado en Egresos)
+            'net_p' => ((float) $ventas->importe_p + (float) $ventaProvisionales->importe_p + $ingIC) - (float) $compras->importe_p - (float) $compraProvisionales->importe_p - (float) $gastos->importe_p - (float) $adelantos->importe_p - (float) $prestamos->importe_p - (float) $pagosPrestamos->importe_p - (float) $pagosPlanilla->importe_p - (float) $costos->importe_p,
+            'net_d' => ((float) $ventas->importe_d + (float) $ventaProvisionales->importe_d + $ingID) - (float) $compras->importe_d - (float) $compraProvisionales->importe_d - (float) $gastos->importe_d - (float) $adelantos->importe_d - (float) $prestamos->importe_d - (float) $pagosPrestamos->importe_d - (float) $pagosPlanilla->importe_d - (float) $costos->importe_d,
+            'net_c' => ((float) $ventas->importe_c + (float) $ventaProvisionales->importe_c + $ingCC) - (float) $compras->importe_c - (float) $compraProvisionales->importe_c - (float) $gastos->importe_c - (float) $adelantos->importe_c - (float) $prestamos->importe_c - (float) $pagosPrestamos->importe_c - (float) $pagosPlanilla->importe_c - (float) $costos->importe_c,
         ];
 
         $pdf = Pdf::loadView('reportes.caja.general_pdf', [
@@ -633,11 +766,13 @@ class ReporteCajaController extends Controller
             'ventaProvisionales' => $ventaProvisionales,
             'compraProvisionales' => $compraProvisionales,
             'gastos' => $gastos,
+            'costos' => $costos,
             'adelantos' => $adelantos,
             'prestamos' => $prestamos,
             'pagosPrestamos' => $pagosPrestamos,
             'pagosPlanilla' => $pagosPlanilla,
             'resumen' => $resumen,
+            'ingresosCaja' => $ingresosCaja,
             'fechaInicio' => $ini,
             'fechaFin' => $fin,
         ])->setPaper('a4', 'portrait'); // o 'landscape' si quieres

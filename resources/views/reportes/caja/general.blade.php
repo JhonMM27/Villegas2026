@@ -1,4 +1,10 @@
 @php
+    // Ingresos manuales a caja (nuevo módulo)
+    $icP = (float)($ingresosCaja->importe_p ?? 0);
+    $icD = (float)($ingresosCaja->importe_d ?? 0);
+    $icC = (float)($ingresosCaja->importe_c ?? 0);
+    $icTotal = $icP + $icD + $icC;
+
     // Helpers para evitar warnings
     $vTotal   = (float)($ventas->total ?? 0);
     $vAcuenta = (float)($ventas->acuenta ?? 0);
@@ -27,6 +33,12 @@
     $gastoP = (float)($gastos->importe_p ?? 0);
     $gastoD = (float)($gastos->importe_d ?? 0);
     $gastoC = (float)($gastos->importe_c ?? 0);
+
+    // COSTOS (se restan del neto de cada caja, NO se suman a Egresos)
+    $costoTotal = (float)($costos->total ?? 0);
+    $costoP = (float)($costos->importe_p ?? 0);
+    $costoD = (float)($costos->importe_d ?? 0);
+    $costoC = (float)($costos->importe_c ?? 0);
 
     // Planilla - GASTOS EMPLEADOS
     $adelantoTotal = (float)($adelantos->total ?? 0);
@@ -105,6 +117,15 @@
                 <td class="text-end">{{ number_format($cC, 2, '.', '') }}</td>
             </tr>
 
+            <tr class="table-info">
+                <td><strong>Ingresos Caja (manuales)</strong></td>
+                <td class="text-end">{{ number_format($icTotal, 2, '.', '') }}</td>
+                <td class="text-end">—</td>
+                <td class="text-end">{{ number_format($icP, 2, '.', '') }}</td>
+                <td class="text-end">{{ number_format($icD, 2, '.', '') }}</td>
+                <td class="text-end">{{ number_format($icC, 2, '.', '') }}</td>
+            </tr>
+
             <tr>
                 <td><strong>Provisionales Venta</strong></td>
                 <td class="text-end">{{ number_format($pvTotal, 2, '.', '') }}</td>
@@ -141,6 +162,15 @@
                 <td class="text-end">{{ number_format($gastosEmpleadosC, 2, '.', '') }}</td>
             </tr>
 
+            <tr>
+                <td><strong>Costos</strong></td>
+                <td class="text-end">{{ number_format($costoTotal, 2, '.', '') }}</td>
+                <td class="text-end">—</td>
+                <td class="text-end">{{ number_format($costoP, 2, '.', '') }}</td>
+                <td class="text-end">{{ number_format($costoD, 2, '.', '') }}</td>
+                <td class="text-end">{{ number_format($costoC, 2, '.', '') }}</td>
+            </tr>
+
             <tr class="table-secondary fw-bold">
                 <td>Ingresos (Ventas + Provisionales)</td>
                 <td class="text-end" colspan="2"></td>
@@ -150,7 +180,7 @@
             </tr>
 
             <tr class="table-secondary fw-bold">
-                <td>Egresos (Compras + Provisionales + Gastos + Planilla)</td>
+                <td>Egresos (Compras + Provisionales + Gastos + Planilla + Costos)</td>
                 <td class="text-end" colspan="2"></td>
                 <td class="text-end">{{ number_format($egrP, 2, '.', '') }}</td>
                 <td class="text-end">{{ number_format($egrD, 2, '.', '') }}</td>

@@ -118,7 +118,7 @@
 
         <tbody>
             @php
-                $operacionesOrden = ['COMPRA', 'VENTA', 'PREPARADA', 'PREPARADA_NUCLEO', 'PRESTAMO'];
+                $operacionesOrden = ['COMPRA', 'VENTA', 'VENTA_ENTREGA', 'PREPARADA', 'PREPARADA_NUCLEO', 'PRESTAMO'];
                 $agrupado = $reportes->groupBy('operacion');
 
                 $totalEntrada = 0;

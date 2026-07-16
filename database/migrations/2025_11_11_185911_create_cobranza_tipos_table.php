@@ -20,7 +20,7 @@ return new class extends Migration
         DB::table('cobranza_tipos')->insert([
             ['id' => 1, 'nombre' => 'PRINCIPAL'],
             ['id' => 2, 'nombre' => 'DEPOSITO'],
-            ['id' => 3, 'nombre' => 'CONSORCIO']
+            ['id' => 3, 'nombre' => 'CONSORCIO'],
         ]);
     }
 

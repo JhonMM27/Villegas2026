@@ -4,12 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Linea;
 use Illuminate\Http\Request;
-use Yajra\DataTables\DataTables;
 use Illuminate\Validation\Rule;
+use Yajra\DataTables\DataTables;
 
 class LineaController extends Controller
 {
-    public function __construct(){
+    public function __construct()
+    {
         $this->middleware('can:lineas_list')->only(['index']);
         $this->middleware('can:lineas_create')->only(['store']);
         $this->middleware('can:lineas_edit')->only(['show', 'update']);
@@ -24,14 +25,15 @@ class LineaController extends Controller
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
                     $editButton = '';
-                    if(auth()->user()->can('lineas_edit')){
+                    if (auth()->user()->can('lineas_edit')) {
                         $editButton = view('components.button-edit', ['id' => $row->id])->render();
                     }
                     $deleteButton = '';
-                    if(auth()->user()->can('lineas_delete')){
+                    if (auth()->user()->can('lineas_delete')) {
                         $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $row->nombre])->render();
                     }
-                    return '<div class="btn-group">' . $editButton . $deleteButton . '</div>';
+
+                    return '<div class="btn-group">'.$editButton.$deleteButton.'</div>';
                 })
                 ->rawColumns(['action', 'activo'])
                 ->editColumn('activo', function ($row) {
@@ -46,15 +48,15 @@ class LineaController extends Controller
     public function store(Request $request)
     {
         $request->merge([
-            'activo' => $request->has('activo') ? 1 : 0
+            'activo' => $request->has('activo') ? 1 : 0,
         ]);
 
         $data = $this->validateData($request);
         Linea::create($data);
 
         return response()->json([
-            'success'=> true,
-            'message'=>'Registro creado satisfactoriamente'
+            'success' => true,
+            'message' => 'Registro creado satisfactoriamente',
         ]);
     }
 
@@ -62,6 +64,7 @@ class LineaController extends Controller
     {
         try {
             $registro = Linea::where('id', $id)->firstOrFail();
+
             return response()->json($registro);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
@@ -71,7 +74,7 @@ class LineaController extends Controller
     public function update(Request $request, $id)
     {
         $request->merge([
-            'activo' => $request->has('activo') ? 1 : 0
+            'activo' => $request->has('activo') ? 1 : 0,
         ]);
 
         $data = $this->validateData($request, $id);
@@ -80,7 +83,7 @@ class LineaController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Registro actualizado correctamente'
+            'message' => 'Registro actualizado correctamente',
         ]);
     }
 
@@ -92,11 +95,11 @@ class LineaController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro'
+                'message' => 'Error al eliminar el registro',
             ], 500);
         }
     }
@@ -107,16 +110,17 @@ class LineaController extends Controller
             'nombre' => [
                 'required',
                 'string',
-                'max:50', 
-                Rule::unique('lineas', 'nombre')->ignore($id, 'id')
+                'max:50',
+                Rule::unique('lineas', 'nombre')->ignore($id, 'id'),
             ],
-            'activo' => 'sometimes|boolean'
+            'activo' => 'sometimes|boolean',
         ]);
     }
 
     public function select(Request $request)
     {
         $items = Linea::select('id', 'nombre')->where('activo', true)->get();
+
         return response()->json($items);
     }
 }

@@ -101,7 +101,7 @@ class SunatManager extends CrudManager {
             document.getElementById('certificado_path').value = response.certificado_path || '';
             document.getElementById('password').value = response.password || '';
             document.getElementById('activo').checked = response.activo ? true : false;
-            document.getElementById('expires_at').value = response.expires_at || '';
+            this.setFieldValue('expires_at', response.expires_at || '');
 
             this.form.action = `${this.baseUrl}/${id}`;
             

@@ -11,12 +11,19 @@ use Illuminate\Support\Facades\DB;
 
 class PlanillaPrestamoService
 {
-    public function getAll(): Collection
+    public function getAll(?string $fechaInicio = null, ?string $fechaFin = null): Collection
     {
-        return PlanillaPrestamo::with('empleado')
-            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
-            ->orderByDesc('id')
-            ->get();
+        $query = PlanillaPrestamo::with('empleado')
+            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'));
+
+        if ($fechaInicio && $fechaFin) {
+            $query->whereBetween(
+                DB::raw('DATE(fecha_prestamo)'),
+                [$fechaInicio, $fechaFin]
+            );
+        }
+
+        return $query->orderByDesc('id')->get();
     }
 
     public function getActivos(): Collection
@@ -61,6 +68,11 @@ class PlanillaPrestamoService
 
     public function update(PlanillaPrestamo $prestamo, array $data): bool
     {
+        $data['importe_p'] = $data['principal'] ?? $prestamo->importe_p;
+        $data['importe_d'] = $data['deposito'] ?? $prestamo->importe_d;
+        $data['importe_c'] = $data['consorcio'] ?? $prestamo->importe_c;
+        unset($data['principal'], $data['deposito'], $data['consorcio']);
+
         return $prestamo->update($data);
     }
 

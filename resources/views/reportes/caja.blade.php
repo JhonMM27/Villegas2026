@@ -24,8 +24,8 @@
                         </div>
                         <div class="tab-pane fade show active" id="tab1">
                             <div class="d-flex flex-nowrap overflow-auto mb-2">
-                                <input type="date" id="fecha_inicio" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrar" class="btn btn-primary btn-sm me-2">Filtrar</button>
                                 <a href="#" id="btnPdf" target="_blank" class="btn btn-danger">PDF</a>
                             </div>
@@ -36,8 +36,8 @@
                         </div>
                         <div class="tab-pane fade show" id="tab2">
                             <div class="d-flex flex-nowrap overflow-auto mb-2">
-                                <input type="date" id="fecha_inicio_detallado" class="form-control form-control-sm me-2" placeholder="Fecha inicio">
-                                <input type="date" id="fecha_fin_detallado" class="form-control form-control-sm me-2" placeholder="Fecha fin">
+                                <input type="text" id="fecha_inicio_detallado" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha inicio">
+                                <input type="text" id="fecha_fin_detallado" class="form-control form-control-sm me-2 date-picker" placeholder="Fecha fin">
                                 <button id="btnFiltrarDetallado" class="btn btn-primary btn-sm me-2">Filtrar</button>
                             </div>
 

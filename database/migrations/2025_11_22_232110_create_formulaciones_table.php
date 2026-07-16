@@ -15,7 +15,7 @@ return new class extends Migration
             $table->increments('id');
             $table->unsignedSmallInteger('user_id');
             $table->string('user_nombre', 20)->nullable();
-            $table->datetime('fecha'); 
+            $table->datetime('fecha');
             $table->unsignedSmallInteger('producto_id');
             $table->string('producto_nombre', 50)->nullable();
             $table->unsignedSmallInteger('producto_empaque')->nullable();

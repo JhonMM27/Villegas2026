@@ -2,9 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
 use App\Models\Unidad;
+use Illuminate\Database\Seeder;
 
 class UnidadSeeder extends Seeder
 {
@@ -20,9 +19,9 @@ class UnidadSeeder extends Seeder
             ['codigo' => 'BG', 'descripcion' => 'BOLSA'],
             ['codigo' => 'KGM', 'descripcion' => 'KILOGRAMO'],
             ['codigo' => 'LBR', 'descripcion' => 'LIBRAS'],
-            ['codigo' => 'LTR', 'descripcion' => 'LITRO'],          
+            ['codigo' => 'LTR', 'descripcion' => 'LITRO'],
             ['codigo' => 'ZZ',  'descripcion' => 'UNIDAD (SERVICIOS)'],
-            ['codigo' => 'GLL', 'descripcion' => 'US GALÓN (3,7843 L)']
+            ['codigo' => 'GLL', 'descripcion' => 'US GALÓN (3,7843 L)'],
         ];
         foreach ($unidades as $unidad) {
             Unidad::updateOrCreate(

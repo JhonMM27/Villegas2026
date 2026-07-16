@@ -235,32 +235,66 @@ class VentaService
             $venta->detalles()->delete();
             $detallesNuevos = $venta->detalles()->createMany($ventaDataRaw['detalles']);
 
+            // ────────────────────────────────────────────────────────────
+            // BLOQUE: Reconstrucción de movimientos del kardex
+            // ────────────────────────────────────────────────────────────
+            // ¿Qué hace?: Tras reemplazar los detalles de la venta, cada
+            //              línea debe quedar representada en el kardex.
+            //              Para cada detalle:
+            //                1. Busca un movimiento neutralizado previo
+            //                   (de cuando se anuló la venta) para el
+            //                   mismo producto y reutilizarlo.
+            //                2. Si no existe, crea uno nuevo.
+            //
+            // ¿Por qué $movimientosUsados?:  Una venta puede tener dos
+            //   líneas con el mismo producto. Sin este tracking, ambas
+            //   líneas encontrarían el mismo movimiento neutralizado y
+            //   lo sobrescribirían, dejando una línea sin restaurar.
+            //
+            // ¿Por qué criterio cantidad=0 / cantidad_kg=0?:  Es el
+            //   estado que deja `recalcularKardexExcluyendo()` al
+            //   neutralizar movimientos de una venta anulada. Coincide
+            //   con `entrada=0 / salida=0`, pero es más directo.
+            // ────────────────────────────────────────────────────────────
             $productosAfectados = [];
+            $movimientosUsados = [];
+
             foreach ($detallesNuevos as $detalle) {
-                // Buscamos un movimiento neutralizado previo para este producto
+                $cantidades = $this->calcularCantidadMovimientoVenta($detalle);
+
                 $movNeutralizado = Movimiento::where('transaccion_tipo', 'ventas')
                     ->where('transaccion_id', $ventaId)
                     ->where('producto_id', $detalle->producto_id)
                     ->where('cantidad', 0)
                     ->where('cantidad_kg', 0)
+                    ->whereNotIn('id', $movimientosUsados)
+                    ->orderBy('id', 'asc')
                     ->first();
 
                 if ($movNeutralizado) {
+                    // Restauramos el movimiento original neutralizado.
+                    // Nota: aunque entregado=0, igualmente restauramos
+                    // para mantener trazabilidad de la línea.
                     $movNeutralizado->update([
                         'detalle_id' => $detalle->id,
                         'fecha' => $venta->fecha_venta,
-                        'empaque' => $detalle->producto_empaque,
+                        'empaque' => $cantidades['empaque'],
                         'unidad_codigo' => $detalle->unidad_codigo,
-                        'cantidad' => $detalle->cantidad,
-                        'salida' => $detalle->salida_saco,
-                        'cantidad_kg' => $detalle->salida_kg,
+                        'cantidad' => $cantidades['cantidad'],
+                        'cantidad_kg' => $cantidades['cantidad_kg'],
+                        'entrada' => 0,
+                        'salida' => $cantidades['salida'],
                         'costo_unitario' => $detalle->costo_unitario,
                         'costo_total' => $detalle->costo_total,
                         'comentario' => 'Rectificación de venta (Actualizado)',
                     ]);
-                    $productosAfectados[] = $detalle->producto_id;
+                    $movimientosUsados[] = $movNeutralizado->id;
                 } else {
-                    // Si no había movimiento previo, registramos una nueva salida
+                    // Sin mov neutralizado previo: registrar una nueva
+                    // salida. Si entregado=0, MovimientoService
+                    // generará un movimiento neutral (entrada=0,
+                    // salida=0) sin afectar stock pero conservando
+                    // trazabilidad de la línea.
                     $this->movimientoService->registrarSalida([
                         'tipo' => MovimientoService::TIPO_VENTA,
                         'fecha' => $venta->fecha_venta,
@@ -269,24 +303,40 @@ class VentaService
                         'detalle_id' => $detalle->id,
                         'producto_id' => $detalle->producto_id,
                         'producto_nombre' => $detalle->producto_nombre,
-                        'empaque' => $detalle->producto_empaque,
+                        'empaque' => $cantidades['empaque'],
                         'unidad_codigo' => $detalle->unidad_codigo,
-                        'cantidad' => $detalle->cantidad,
-                        'cantidad_kg' => $detalle->salida_kg,
+                        'cantidad' => $cantidades['cantidad'],
+                        'cantidad_kg' => $cantidades['cantidad_kg'],
                     ]);
-                    $productosAfectados[] = $detalle->producto_id;
                 }
+                $productosAfectados[] = $detalle->producto_id;
             }
 
             // 4) Recalcular Kardex para productos afectados
-            foreach (array_unique($productosAfectados) as $productoId) {
-                $primerMov = Movimiento::where('transaccion_id', $venta->id)
-                    ->where('producto_id', $productoId)
-                    ->orderBy('id', 'asc')
-                    ->first();
+            //
+            // IMPORTANTE: se pasa el datetime completo (Y-m-d H:i:s) a recalcularKardexProductoDesdeFecha
+            // para que el punto de partida del recálculo sea el último movimiento ANTES de la hora
+            // exacta de la venta, no simplemente antes del día. Sin esto, todos los movimientos del
+            // mismo día (pero anteriores en hora) también se recalculan con saldo inicial incorrecto.
+            $fechaVenta = $venta->fecha_venta instanceof \Carbon\Carbon
+                ? $venta->fecha_venta
+                : \Carbon\Carbon::parse($venta->fecha_venta);
 
-                if ($primerMov) {
-                    $this->movimientoService->recalcularKardexProducto($productoId, $primerMov->id);
+            foreach (array_unique($productosAfectados) as $productoId) {
+                if ($fechaVenta->lt(today())) {
+                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                        $productoId,
+                        $fechaVenta->format('Y-m-d H:i:s')
+                    );
+                } else {
+                    $primerMov = Movimiento::where('transaccion_id', $venta->id)
+                        ->where('producto_id', $productoId)
+                        ->orderBy('id', 'asc')
+                        ->first();
+
+                    if ($primerMov) {
+                        $this->movimientoService->recalcularKardexProducto($productoId, $primerMov->id);
+                    }
                 }
             }
 
@@ -512,6 +562,48 @@ class VentaService
             'costo_unitario' => round($costo_unitario, 4),
             'costo_total' => round($costo_total, 4),
             'rentabilidad' => round($rentabilidadRed, 4),
+        ];
+    }
+
+    /**
+     * Calcula las cantidades (sacos, kg y stock base) de un detalle de
+     * venta para registrar o restaurar un movimiento del kardex.
+     *
+     * Composición:
+     *  - entregado    → cantidad real entregada al cliente (puede ser
+     *                   menor a la cantidad vendida cuando hay entregas
+     *                   parciales; es lo que DEBE mover el kardex).
+     *  - empaque      → empaque del detalle (puede no coincidir con el
+     *                   empaque base del producto).
+     *  - salida (stock) → cantidad convertida a la unidad base del
+     *                     producto (sacos) que descuenta del stock_almacen.
+     *  - cantidad_kg  → total en kilogramos, derivado del empaque.
+     *
+     * Diferencia con calculateDetail(): este helper opera sobre un
+     * VentaDetalle ya persistido y enfocado en el KARDEX, no en
+     * precios/rentabilidad. Usa el campo `entregado` (no `cantidad`)
+     * para mantener coherencia con createVenta().
+     *
+     * @param  \App\Models\VentaDetalle  $detalle  Detalle persistido
+     * @return array{cantidad: float, cantidad_kg: float, salida: float, empaque: float}
+     */
+    private function calcularCantidadMovimientoVenta($detalle): array
+    {
+        $entregado = (float) $detalle->entregado;
+        $empaqueDetalle = (float) $detalle->producto_empaque;
+        $producto = Producto::find($detalle->producto_id);
+        $empaqueProducto = (float) $producto->empaque;
+
+        $cantidadStock = ($empaqueDetalle == $empaqueProducto)
+            ? $entregado
+            : round($entregado * ($empaqueDetalle / $empaqueProducto), 4);
+        $cantidadKg = round($entregado * $empaqueDetalle, 4);
+
+        return [
+            'cantidad' => $entregado,
+            'cantidad_kg' => $cantidadKg,
+            'salida' => $cantidadStock,
+            'empaque' => $empaqueDetalle,
         ];
     }
 }

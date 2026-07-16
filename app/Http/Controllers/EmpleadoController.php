@@ -76,7 +76,7 @@ class EmpleadoController extends Controller
 
         $data = $this->validateData($request, $id);
 
-        if (isset($data['estado']) && $data['estado'] === 'inactivo' && !$empleado->fecha_salida) {
+        if (isset($data['estado']) && $data['estado'] === 'inactivo' && ! $empleado->fecha_salida) {
             $data['fecha_salida'] = now()->toDateString();
         }
 
@@ -108,7 +108,7 @@ class EmpleadoController extends Controller
                 'fecha_ingreso' => $empleado->fecha_ingreso?->format('Y-m-d'),
                 'fecha_salida' => $empleado->fecha_salida?->format('Y-m-d'),
                 'observaciones' => $empleado->observaciones,
-            ]
+            ],
         ]);
     }
 
@@ -139,6 +139,12 @@ class EmpleadoController extends Controller
 
     public function buscar(Request $request)
     {
+        if ($request->filled('id')) {
+            $empleado = $this->empleadoService->findById((int) $request->get('id'));
+
+            return response()->json($empleado ? [$empleado] : []);
+        }
+
         $termino = $request->get('q', '');
         $empleados = $this->empleadoService->buscar($termino);
 

@@ -5,9 +5,7 @@
             <input name="movimiento_tipo" id="movimiento_tipo" class="form-control form-control-sm" required readonly>
         </div>
         <div class="col-md-4">
-            <label for="fecha_prestamo" class="form-label">Fecha <span class="text-danger"></span></label>
-            <input type="datetime-local" id="fecha_prestamo" name="fecha_prestamo" class="form-control form-control-sm">
-            <div class="invalid-feedback"></div>
+            <x-datetime-picker id="fecha_prestamo" label="Fecha" />
         </div>
         <div class="col-md-4">
             <label for="prestamo_referencia_id" class="form-label">Préstamo referencia<span class="text-danger"></span></label>

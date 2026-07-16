@@ -10,15 +10,18 @@ class PagoForma extends Model
     use HasFactory;
 
     protected $table = 'pago_formas';
+
     protected $primaryKey = 'codigo';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [
         'codigo',
         'descripcion',
         'dias',
-        'activo'
+        'activo',
     ];
 
     protected $casts = [

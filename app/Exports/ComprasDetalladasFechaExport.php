@@ -3,14 +3,15 @@
 namespace App\Exports;
 
 use App\Models\CompraDetalle;
+use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Illuminate\Support\Carbon;
 
 class ComprasDetalladasFechaExport implements FromCollection, WithHeadings, WithMapping
 {
     protected $inicio;
+
     protected $fin;
 
     public function __construct($inicio, $fin)
@@ -41,7 +42,7 @@ class ComprasDetalladasFechaExport implements FromCollection, WithHeadings, With
         if ($this->inicio && $this->fin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($this->inicio)->startOfDay(),
-                Carbon::parse($this->fin)->endOfDay()
+                Carbon::parse($this->fin)->endOfDay(),
             ]);
         }
 
@@ -76,11 +77,11 @@ class ComprasDetalladasFechaExport implements FromCollection, WithHeadings, With
             $item->serie,
             $item->correlativo,
             $item->producto_nombre,
-            number_format((float)$item->ing_kg, 2, '.', ''),
-            number_format((float)$item->cantidad, 2, '.', ''),
-            number_format((float)$item->p_lista, 4, '.', ''),
-            number_format((float)$item->importe, 2, '.', ''),
-            $item->proveedor_nombre
+            number_format((float) $item->ing_kg, 2, '.', ''),
+            number_format((float) $item->cantidad, 2, '.', ''),
+            number_format((float) $item->p_lista, 4, '.', ''),
+            number_format((float) $item->importe, 2, '.', ''),
+            $item->proveedor_nombre,
         ];
     }
 }

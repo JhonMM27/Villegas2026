@@ -3,88 +3,244 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>COTIZACIÓN {{ $cotizacion->serie }}-{{ str_pad($cotizacion->correlativo, 8, '0', STR_PAD_LEFT) }}</title>
+
+    <title>
+        COTIZACION {{ $cotizacion->serie }}-{{ str_pad($cotizacion->correlativo, 8, '0', STR_PAD_LEFT) }}
+    </title>
+
     <style>
         @page {
-            margin: 2mm 0mm 2mm 0mm;
-            size: 76mm auto;
+            margin: 0;
+            size: 302px auto;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 302px;
+            margin: 0;
+            padding: 0;
+            color: #000;
         }
 
         body {
-            font-family: DejaVu Sans, sans-serif;
-            font-size: 10px;
-            margin: 0;
-            padding: 0;
-            line-height: 1.2;
+            font-family: FontA11, Font11, Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            line-height: 1.22;
+            font-weight: normal;
         }
 
         .ticket {
-            width: 72mm;
-            margin: 0 auto;
+            width: 302px;
+            margin: 0;
+            padding-left: 26px;
+            padding-right: 29px;
             text-align: left;
         }
 
-        .center { text-align: center; }
-        .bold { font-weight: bold; }
-        .right { text-align: right; }
-
-        h3 { margin: 0; padding: 0; font-size: 12px; }
-        p { margin: 0; padding: 0; font-size: 9px; }
-
-        .line {
-            border-top: 1px dashed #000;
-            margin: 2px 0;
+        .center {
+            text-align: center;
         }
 
-        .spacer { height: 3px; }
+        .right {
+            text-align: right;
+        }
+
+        .bold,
+        strong,
+        .data-label {
+            font-weight: bold;
+        }
+
+        h3 {
+            width: 247px;
+            margin: 0;
+            padding: 0;
+            font-size: 15px;
+            line-height: 1.15;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        p {
+            width: 247px;
+            margin: 0;
+            padding: 0;
+            font-size: 13px;
+            line-height: 1.22;
+            font-weight: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        table {
+            width: 247px;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin: 0;
+            padding: 0;
+        }
+
+        td,
+        th {
+            padding: 0;
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.22;
+            font-weight: normal;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        th {
+            font-weight: bold;
+        }
+
+        .line {
+            width: 247px;
+            border-top: 1px dashed #000;
+            height: 0;
+            margin: 4px 0;
+        }
+
+        .spacer {
+            height: 5px;
+        }
+
+        .fecha-col {
+            width: 123px;
+            text-align: left;
+        }
+
+        .hora-col {
+            width: 124px;
+            text-align: right;
+        }
+
+        .detail-table {
+            width: 247px;
+        }
+
+        .col-cant {
+            width: 78px;
+            text-align: left;
+        }
+
+        .col-price {
+            width: 75px;
+            text-align: right;
+        }
+
+        .col-total {
+            width: 94px;
+            text-align: right;
+        }
+
+        .product-name {
+            width: 247px;
+            font-size: 14px;
+            line-height: 1.20;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding-top: 5px;
+        }
+
+        .total {
+            width: 247px;
+            text-align: right;
+            font-size: 19px;
+            line-height: 1.20;
+            font-weight: bold;
+        }
+
+        .small {
+            width: 247px;
+            font-size: 12px;
+            line-height: 1.20;
+        }
+
+        .footer-space {
+            height: 25px;
+        }
     </style>
 </head>
 
 <body>
     <div class="ticket">
 
-        {{-- ENCABEZADO EMPRESA --}}
+        @php
+            $numeroCotizacion = $cotizacion->serie . '-' . str_pad($cotizacion->correlativo, 8, '0', STR_PAD_LEFT);
+            $fechaCotizacion = \Carbon\Carbon::parse($cotizacion->fecha_cotizacion);
+        @endphp
+
+        {{-- ENCABEZADO --}}
         <div class="center">
             <h3>CONSORCIOS VILLEGAS E.I.R.L.</h3>
-        </div>
-
-        <div class="center">
             <p>CEL: 967984895 / 978431737</p>
-            <p>COTIZACIÓN: {{ $cotizacion->serie }}-{{ str_pad($cotizacion->correlativo, 8, '0', STR_PAD_LEFT) }}</p>
+            <p>COTIZACION: {{ $numeroCotizacion }}</p>
         </div>
 
         <div class="line"></div>
 
         {{-- FECHA Y HORA --}}
-        <table style="width: 100%;">
+        <table>
             <tr>
-                <td></td>
-                <td class="right">FECHA: {{ \Carbon\Carbon::parse($cotizacion->fecha_cotizacion)->format('d/m/Y') }}</td>
-                <td class="right">HORA: {{ \Carbon\Carbon::parse($cotizacion->fecha_cotizacion)->format('H:i:s') }}</td>
+                <td class="fecha-col">
+                    FECHA: {{ $fechaCotizacion->format('d/m/Y') }}
+                </td>
+                <td class="hora-col">
+                    HORA: {{ $fechaCotizacion->format('H:i:s') }}
+                </td>
             </tr>
         </table>
 
         <div class="spacer"></div>
 
         {{-- DATOS CLIENTE --}}
-        <p><strong>RUC/DNI:</strong> {{ $cotizacion->cliente->documento_numero ?? '-' }}</p>
-        <p><strong>CLIENTE:</strong> {{ $cotizacion->cliente_nombre }}</p>
-        <p><strong>DIRECCION:</strong> {{ $cotizacion->cliente->direccion ?? '-' }}</p>
-        <p><strong>TELEFONO:</strong> {{ $cotizacion->cliente->telefono ?? '-' }}</p>
+        <p>
+            <span class="data-label">RUC/DNI:</span>
+            {{ $cotizacion->cliente->documento_numero ?? '-' }}
+        </p>
+
+        <p>
+            <span class="data-label">CLIENTE:</span>
+            {{ $cotizacion->cliente_nombre ?? '-' }}
+        </p>
+
+        <p>
+            <span class="data-label">DIRECCION:</span>
+            {{ $cotizacion->cliente->direccion ?? '-' }}
+        </p>
+
+        <p>
+            <span class="data-label">TELEFONO:</span>
+            {{ $cotizacion->cliente->telefono ?? '-' }}
+        </p>
 
         <div class="spacer"></div>
 
-        <p><strong>FORMA DE PAGO:</strong> {{ $cotizacion->pago_forma_nombre ?? '-' }}</p>
+        <p>
+            <span class="data-label">FORMA DE PAGO:</span>
+            {{ $cotizacion->pago_forma_nombre ?? '-' }}
+        </p>
 
         <div class="line"></div>
-        <div class="spacer"></div>
 
-        {{-- ENCABEZADO TABLA --}}
-        <div class="bold">
-            <span style="display: inline-block; width: 30%;">Cant</span>
-            <span style="display: inline-block; width: 25%; text-align: right;">P.Unit</span>
-            <span style="display: inline-block; width: 35%; text-align: right;">Importe</span>
-        </div>
+        {{-- CABECERA DETALLE --}}
+        <table class="detail-table">
+            <thead>
+                <tr>
+                    <th class="col-cant">Cant</th>
+                    <th class="col-price">P.Unit</th>
+                    <th class="col-total">Importe</th>
+                </tr>
+            </thead>
+        </table>
+
         <div class="line"></div>
 
         {{-- DETALLE PRODUCTOS --}}
@@ -92,58 +248,74 @@
             @php
                 $unidadCodigo = $detalle->unidad_codigo ?? 'NIU';
                 $empaque = (float) ($detalle->producto_empaque ?? 1);
+                $cantidadBase = (float) ($detalle->cantidad ?? 0);
 
                 if ($unidadCodigo === 'KGM') {
-                    $cantidad = number_format((float) $detalle->cantidad * $empaque, 2);
+                    $cantidad = number_format($cantidadBase * $empaque, 2, '.', ',');
                     $unidadTexto = 'KG';
                 } elseif ($unidadCodigo === 'SCO') {
-                    $cantidad = number_format((float) $detalle->cantidad, 2);
+                    $cantidad = number_format($cantidadBase, 2, '.', ',');
                     $unidadTexto = 'SACO';
                 } elseif ($unidadCodigo === 'ZZ') {
-                    $cantidad = number_format((float) $detalle->cantidad, 2);
+                    $cantidad = number_format($cantidadBase, 2, '.', ',');
                     $unidadTexto = '';
                 } else {
-                    $cantidad = number_format((float) $detalle->cantidad, 2);
+                    $cantidad = number_format($cantidadBase, 2, '.', ',');
                     $unidadTexto = $unidadCodigo;
                 }
 
-                $precio = number_format((float) $detalle->precio_unitario, 2);
-                $importe = number_format((float) $detalle->total, 2);
+                $precio = number_format((float) ($detalle->precio_unitario ?? 0), 2, '.', ',');
+                $importe = number_format((float) ($detalle->total ?? 0), 2, '.', ',');
             @endphp
 
-            <p class="bold">{{ $detalle->producto_nombre }}</p>
-            <p>
-                <span style="display: inline-block; width: 30%;">{{ $cantidad }} {{ $unidadTexto }}</span>
-                <span style="display: inline-block; width: 25%; text-align: right;">S/ {{ $precio }}</span>
-                <span style="display: inline-block; width: 35%; text-align: right;">S/ {{ $importe }}</span>
+            <p class="product-name">
+                {{ $detalle->producto_nombre ?? 'PRODUCTO SIN NOMBRE' }}
             </p>
+
+            <table class="detail-table">
+                <tr>
+                    <td class="col-cant">
+                        {{ $cantidad }} {{ $unidadTexto }}
+                    </td>
+                    <td class="col-price">
+                        S/ {{ $precio }}
+                    </td>
+                    <td class="col-total">
+                        S/ {{ $importe }}
+                    </td>
+                </tr>
+            </table>
         @endforeach
 
         <div class="line"></div>
         <div class="spacer"></div>
 
         {{-- TOTAL --}}
-        <p class="bold" style="text-align: right; font-size: 11px;">
-            TOTAL: S/ {{ number_format($cotizacion->total, 2) }}
+        <p class="total">
+            TOTAL: S/ {{ number_format((float) ($cotizacion->total ?? 0), 2, '.', ',') }}
         </p>
 
-        <p class="center" style="font-size: 8px;">Son: {{ $total_letras }}</p>
+        <p class="center small">
+            Son: {{ $total_letras ?? '' }}
+        </p>
 
         <div class="line"></div>
         <div class="spacer"></div>
 
-        {{-- VENDEDOR --}}
-        <p><strong>USUARIO:</strong> {{ $cotizacion->user_nombre }}</p>
+        {{-- USUARIO --}}
+        <p>
+            <span class="data-label">USUARIO:</span>
+            {{ $cotizacion->user_nombre ?? '-' }}
+        </p>
 
         <div class="line"></div>
 
+        {{-- PIE --}}
         <div class="center">
             <p class="bold">GRACIAS POR SU PREFERENCIA</p>
         </div>
 
-        <div class="spacer"></div>
-
-        <div style="height: 4mm;"></div>
+        <div class="footer-space"></div>
 
     </div>
 </body>

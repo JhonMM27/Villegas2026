@@ -15,7 +15,7 @@ class Cliente extends Model
         'direccion',
         'telefono',
         'email',
-        'saldo_credito'
+        'saldo_credito',
     ];
 
     public function documentoTipo()

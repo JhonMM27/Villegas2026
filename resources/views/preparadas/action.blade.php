@@ -47,9 +47,7 @@
                         <div class="col-lg-6 mt-2">
                           <div class="row border border-primary rounded p-3">
                             <div class="col-lg-3">
-                                <label for="fecha" class="form-label">Fecha Servicio<span class="text-danger">*</span></label>
-                                <input type="datetime-local" id="fecha" name="fecha" class="form-control form-control-sm">
-                                <div class="invalid-feedback"></div>
+                                <x-datetime-picker id="fecha" label="Fecha Servicio" :required="true" />
                             </div>
                             <div class="col-lg-3">
                               <label for="costo_servicio" class="form-label">Servicio<span class="text-danger">*</span></label>

@@ -74,6 +74,11 @@ class PlanillaAdelantoService
         $oldMes = (int) $adelanto->fecha->format('m');
         $oldAnio = (int) $adelanto->fecha->format('Y');
 
+        $data['importe_p'] = $data['principal'] ?? $adelanto->importe_p;
+        $data['importe_d'] = $data['deposito'] ?? $adelanto->importe_d;
+        $data['importe_c'] = $data['consorcio'] ?? $adelanto->importe_c;
+        unset($data['principal'], $data['deposito'], $data['consorcio']);
+
         $result = $adelanto->update($data);
 
         $newEmpleadoId = (int) ($data['empleado_id'] ?? $adelanto->empleado_id);

@@ -1148,8 +1148,7 @@ class CuentaCorrienteClienteController extends Controller
             ->where('ventas.saldo', '>', 0)
             ->whereNotNull('ventas.fecha_vencimiento')
             // equivalente a >= días, pero sin funciones sobre la columna
-            ->whereDate('ventas.fecha_venta', '<=', DB::raw('DATE_SUB(CURDATE(), INTERVAL ? DAY)'))
-            ->addBinding($dias, 'where')
+            ->whereRaw('DATE(ventas.fecha_venta) <= DATE_SUB(CURDATE(), INTERVAL ? DAY)', [$dias])
             ->orderBy('ventas.cliente_nombre')
             ->orderBy('ventas.fecha_venta')
             ->get();
@@ -1208,8 +1207,7 @@ class CuentaCorrienteClienteController extends Controller
             ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0)
             // >= 30 días de antigüedad desde la fecha_venta:
-            ->whereDate('ventas.fecha_venta', '<=', DB::raw('DATE_SUB(CURDATE(), INTERVAL ? DAY)'))
-            ->addBinding($dias, 'where')
+            ->whereRaw('DATE(ventas.fecha_venta) <= DATE_SUB(CURDATE(), INTERVAL ? DAY)', [$dias])
             ->groupBy(
                 'ventas.cliente_id',
                 'ventas.cliente_nombre',

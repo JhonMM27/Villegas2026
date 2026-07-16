@@ -7,8 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class AfectacionTipo extends Model
 {
     protected $table = 'afectacion_tipos';
+
     protected $primaryKey = 'codigo';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [
@@ -17,7 +20,7 @@ class AfectacionTipo extends Model
         'descripcion',
         'letra',
         'porcentaje',
-        'activo'
+        'activo',
     ];
 
     protected $casts = [

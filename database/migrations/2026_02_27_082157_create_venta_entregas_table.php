@@ -21,7 +21,7 @@ return new class extends Migration
             $table->unsignedInteger('venta_id');
 
             // Datos del documento de entrega (opcional)
-             $table->string('numero_recibo', 10)->nullable();
+            $table->string('numero_recibo', 10)->nullable();
             $table->dateTime('fecha_entrega');
 
             // Estado del movimiento

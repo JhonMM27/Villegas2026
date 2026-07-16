@@ -1,5 +1,15 @@
 @extends('plantilla.app')
 @push('estilos')
+<style>
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
+</style>
 @endpush
 @section('contenido')
     <div class="container-fluid">
@@ -693,8 +703,8 @@
                 document.getElementById('comprobante_tipo_codigo').value = 'NP';
                 document.getElementById('pago_forma_codigo').value = '1';
                 document.getElementById('cobranza_tipo_id').value = '1';
-                document.getElementById('fecha_venta').value = this.obtenerFechaHoraActual();
-                document.getElementById('fecha_vencimiento').value = this.obtenerFechaActual();
+                this.setFieldValue('fecha_venta', this.obtenerFechaHoraActual());
+                this.setFieldValue('fecha_vencimiento', this.obtenerFechaActual());
                 const usuarioNombre = @json(auth()->user()->name);
                 document.getElementById('usuario_nombre').textContent = usuarioNombre;
                 this.getSerie('NP');
@@ -805,12 +815,14 @@
                 const consorcioEl = document.getElementById('consorcio');
                 const totalCobranzaEl = document.getElementById('total_cobranza');
 
+                const setVal = (el, val) => { if (el) el.value = val; };
+
                 // 🔴 SI NO ES FORMA 1 → TODO EN CERO
                 if (pagoForma !== '1') {
-                    depositoEl.value = '0.00';
-                    principalEl.value = '0.00';
-                    consorcioEl.value = '0.00';
-                    totalCobranzaEl.value = '0.00';
+                    setVal(depositoEl, '0.00');
+                    setVal(principalEl, '0.00');
+                    setVal(consorcioEl, '0.00');
+                    setVal(totalCobranzaEl, '0.00');
                     return;
                 }
 
@@ -818,22 +830,22 @@
                 tipo = tipo ?? document.getElementById('cobranza_tipo_id')?.value;
                 if (!tipo) return;
 
-                const total = parseFloat(document.getElementById('total').value) || 0;
+                const total = parseFloat(document.getElementById('total')?.value) || 0;
 
                 // reset
-                depositoEl.value = '0.00';
-                principalEl.value = '0.00';
-                consorcioEl.value = '0.00';
+                setVal(depositoEl, '0.00');
+                setVal(principalEl, '0.00');
+                setVal(consorcioEl, '0.00');
 
                 if (tipo === '1') {
-                    principalEl.value = total.toFixed(2);
+                    setVal(principalEl, total.toFixed(2));
                 } else if (tipo === '2') {
-                    depositoEl.value = total.toFixed(2);
+                    setVal(depositoEl, total.toFixed(2));
                 } else if (tipo === '3') {
-                    consorcioEl.value = total.toFixed(2);
+                    setVal(consorcioEl, total.toFixed(2));
                 }
 
-                totalCobranzaEl.value = total.toFixed(2);
+                setVal(totalCobranzaEl, total.toFixed(2));
             }
 
             async showEditModal(id) {
@@ -860,10 +872,8 @@
                     document.getElementById('cliente_id').value = response.cliente_id || '';
                     document.getElementById('cliente_razon_social').value = response.cliente_id + ' - ' + response
                         .cliente_nombre || '';
-                    document.getElementById('fecha_venta').value =
-                        this.formatDateTimeLocal(response.fecha_venta);
-
-                    document.getElementById('fecha_vencimiento').value = response.fecha_vencimiento;
+                    this.setFieldValue('fecha_venta', this.formatDateTimeLocal(response.fecha_venta));
+                    this.setFieldValue('fecha_vencimiento', response.fecha_vencimiento);
                     document.getElementById('usuario_nombre').textContent = response.user_nombre || '';
                     //document.getElementById('acuenta').value = parseFloat(response.acuenta).toFixed(2);
                     //document.getElementById('saldo').value = parseFloat(response.saldo).toFixed(2);
@@ -987,8 +997,8 @@
                     document.getElementById('correlativo').value = response.correlativo || '';
                     document.getElementById('cliente_id').value = response.cliente_id || '';
                     document.getElementById('cliente_razon_social').value = response.cliente_nombre || '';
-                    document.getElementById('fecha_venta').value = this.formatDateTimeLocal(response.fecha_venta);
-                    document.getElementById('fecha_vencimiento').value = response.fecha_vencimiento;
+                    this.setFieldValue('fecha_venta', this.formatDateTimeLocal(response.fecha_venta));
+                    this.setFieldValue('fecha_vencimiento', response.fecha_vencimiento);
                     document.getElementById('usuario_nombre').textContent = response.user_nombre || '';
                     document.getElementById('docpagoi').value = response.docpagoi || '';
 
@@ -1057,8 +1067,8 @@
                     this.getSerie(response.comprobante_tipo_codigo);
                     document.getElementById('cliente_id').value = response.cliente_id || '';
                     document.getElementById('cliente_razon_social').value = response.cliente_nombre || '';
-                    document.getElementById('fecha_venta').value = this.obtenerFechaHoraActual();
-                    document.getElementById('fecha_vencimiento').value = this.obtenerFechaActual();
+                    this.setFieldValue('fecha_venta', this.obtenerFechaHoraActual());
+                    this.setFieldValue('fecha_vencimiento', this.obtenerFechaActual());
                     document.getElementById('usuario_nombre').textContent = response.user_nombre || '';
                     this.aplicarCobranza(response.cobranza_tipo_id, response.acuenta);
 
@@ -1338,16 +1348,6 @@
                         errorDiv.remove();
                     }
                 });
-            }
-
-            formatDateTimeLocal(fecha) {
-                if (!fecha || fecha.startsWith('-000') || fecha === 'null') return '';
-                if (typeof fecha !== 'string') return '';
-
-                // "2025-12-29 09:58:00" → "2025-12-29T09:58"
-                // "2025-12-29T09:58:00" stays the same
-                const normalized = fecha.replace(' ', 'T').substring(0, 16);
-                return normalized;
             }
 
         }

@@ -82,8 +82,9 @@
 @endsection
 @push('scripts')
     <script>
-        class PagoManager {
+        class PagoManager extends CrudManager {
             constructor(baseUrl, prestamoId, prestamoData) {
+                super(baseUrl);
                 this.baseUrl = baseUrl;
                 this.prestamoId = prestamoId;
                 this.prestamo = prestamoData;
@@ -207,7 +208,7 @@
                             </div>
                             <div class="mb-2">
                                 <label for="pago_fecha" class="form-label">Fecha <span class="text-danger">*</span></label>
-                                <input type="date" id="pago_fecha" name="fecha_pago" class="form-control form-control-sm" value="${new Date().toISOString().split('T')[0]}" required>
+                                <input type="text" id="pago_fecha" name="fecha_pago" class="form-control form-control-sm date-picker" value="${new Date().toISOString().split('T')[0]}" required>
                             </div>
                             <div class="mb-2">
                                 <label for="pago_observaciones" class="form-label">Observaciones</label>
@@ -226,6 +227,7 @@
         </div>`;
 
                 document.getElementById('modalPagoContainer').innerHTML = html;
+                if (typeof window.reinitFlatpickr === 'function') window.reinitFlatpickr();
                 this.modal = new bootstrap.Modal(document.getElementById('modalRegistrarPago'));
                 this.modal.show();
 
@@ -285,7 +287,7 @@
                             </div>
                             <div class="mb-2">
                                 <label for="pago_fecha" class="form-label">Fecha <span class="text-danger">*</span></label>
-                                <input type="date" id="pago_fecha" name="fecha_pago" class="form-control form-control-sm" value="${pago.fecha_pago}" required>
+                                <input type="text" id="pago_fecha" name="fecha_pago" class="form-control form-control-sm date-picker" value="${pago.fecha_pago}" required>
                             </div>
                             <div class="mb-2">
                                 <label for="pago_observaciones" class="form-label">Observaciones</label>
@@ -304,6 +306,7 @@
         </div>`;
 
                 document.getElementById('modalPagoContainer').innerHTML = html;
+                if (typeof window.reinitFlatpickr === 'function') window.reinitFlatpickr();
                 this.modal = new bootstrap.Modal(document.getElementById('modalEditarPago'));
                 this.modal.show();
 
@@ -490,6 +493,7 @@
         </div>`;
 
                 document.getElementById('modalPagoContainer').innerHTML = html;
+                if (typeof window.reinitFlatpickr === 'function') window.reinitFlatpickr();
                 this.modal = new bootstrap.Modal(document.getElementById('modalVerPago'));
                 this.modal.show();
             }

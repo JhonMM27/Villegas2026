@@ -3,151 +3,335 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>NP - venta {{ $venta->serie }}-{{ str_pad($venta->correlativo, 8, '0', STR_PAD_LEFT) }}</title>
+
+    <title>
+        NP - venta {{ $venta->serie }}-{{ str_pad($venta->correlativo, 8, '0', STR_PAD_LEFT) }}
+    </title>
+
     <style>
         @page {
-            margin: 2mm 0mm 2mm 0mm;
-            size: 76mm auto;
+            margin: 0;
+            size: 302px auto;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 302px;
+            margin: 0;
+            padding: 0;
+            color: #000;
         }
 
         body {
-            font-family: DejaVu Sans, sans-serif;
-            font-size: 10px;
-            margin: 0;
-            padding: 0;
-            line-height: 1.2;
+            font-family: FontA11, Font11, Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            line-height: 1.22;
+            font-weight: normal;
         }
 
         .ticket {
-            width: 72mm;
-            margin: 0 auto;
+            width: 302px;
+            margin: 0;
+            padding-left: 26px;
+            padding-right: 31px;
             text-align: left;
         }
 
-        .center { text-align: center; }
-        .bold { font-weight: bold; }
-        .right { text-align: right; }
-
-        h3 { margin: 0; padding: 0; font-size: 12px; }
-        p { margin: 0; padding: 0; font-size: 9px; }
-
-        .line {
-            border-top: 1px dashed #000;
-            margin: 2px 0;
+        .center {
+            text-align: center;
         }
 
-        .spacer { height: 3px; }
+        .right {
+            text-align: right;
+        }
+
+        .bold,
+        strong,
+        .data-label {
+            font-weight: bold;
+        }
+
+        h3 {
+            width: 245px;
+            margin: 0;
+            padding: 0;
+            font-size: 15px;
+            line-height: 1.15;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        p {
+            width: 245px;
+            margin: 0;
+            padding: 0;
+            font-size: 13px;
+            line-height: 1.22;
+            font-weight: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        table {
+            width: 245px;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin: 0;
+            padding: 0;
+        }
+
+        td,
+        th {
+            padding: 0;
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.22;
+            font-weight: normal;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        th {
+            font-weight: bold;
+        }
+
+        .line {
+            width: 245px;
+            border-top: 1px dashed #000;
+            height: 0;
+            margin: 4px 0;
+        }
+
+        .line-thin {
+            width: 245px;
+            border-top: 1px dotted #888;
+            height: 0;
+            margin: 4px 0;
+        }
+
+        .spacer {
+            height: 5px;
+        }
+
+        .fecha-col {
+            width: 122px;
+            text-align: left;
+        }
+
+        .hora-col {
+            width: 123px;
+            text-align: right;
+        }
+
+        .detail-table {
+            width: 245px;
+        }
+
+        .col-cant {
+            width: 78px;
+            text-align: left;
+        }
+
+        .col-price {
+            width: 75px;
+            text-align: right;
+        }
+
+        .col-total {
+            width: 92px;
+            text-align: right;
+        }
+
+        .product-name {
+            width: 245px;
+            font-size: 14px;
+            line-height: 1.20;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding-top: 5px;
+        }
+
+        .total {
+            width: 245px;
+            text-align: right;
+            font-size: 19px;
+            line-height: 1.20;
+            font-weight: bold;
+        }
+
+        .small {
+            width: 245px;
+            font-size: 12px;
+            line-height: 1.20;
+        }
+
+        .cobranza p {
+            text-align: center;
+            font-size: 13px;
+            line-height: 1.25;
+        }
+
+        .saldo {
+            width: 245px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .footer-space {
+            height: 25px;
+        }
     </style>
 </head>
 
 <body>
     <div class="ticket">
 
+        @php
+            $numeroVenta = $venta->serie . '-' . str_pad($venta->correlativo, 8, '0', STR_PAD_LEFT);
+            $fechaVenta = \Carbon\Carbon::parse($venta->fecha_venta);
+        @endphp
+
         {{-- ENCABEZADO EMPRESA --}}
         <div class="center">
             <h3>CONSORCIOS VILLEGAS E.I.R.L.</h3>
-        </div>
-
-        <div class="center">
             <p>CEL: 967984895 / 978431737</p>
-            <p>NOTA PEDIDO NP: {{ $venta->serie }}-{{ str_pad($venta->correlativo, 8, '0', STR_PAD_LEFT) }}</p>
+            <p>NOTA PEDIDO NP: {{ $numeroVenta }}</p>
         </div>
 
         <div class="line"></div>
 
         {{-- FECHA Y HORA --}}
-        <table style="width: 100%;">
+        <table>
             <tr>
-                <td></td>
-                <td class="right">FECHA: {{ \Carbon\Carbon::parse($venta->fecha_venta)->format('d/m/Y') }}</td>
-                <td class="right">HORA: {{ \Carbon\Carbon::parse($venta->fecha_venta)->format('H:i:s') }}</td>
+                <td class="fecha-col">
+                    FECHA: {{ $fechaVenta->format('d/m/Y') }}
+                </td>
+                <td class="hora-col">
+                    HORA: {{ $fechaVenta->format('H:i:s') }}
+                </td>
             </tr>
         </table>
 
         <div class="spacer"></div>
 
         {{-- DATOS CLIENTE --}}
-        <p><strong>RUC/DNI:</strong> {{ $venta->cliente->documento_numero ?? '-' }}</p>
-        <p><strong>CLIENTE:</strong> {{ $venta->cliente_nombre }}</p>
-        <p><strong>DIRECCION:</strong> {{ $venta->cliente->direccion ?? '-' }}</p>
-        <p><strong>TELEFONO:</strong> {{ $venta->cliente->telefono ?? '-' }}</p>
+        <p>
+            <span class="data-label">RUC/DNI:</span>
+            {{ $venta->cliente->documento_numero ?? '-' }}
+        </p>
+
+        <p>
+            <span class="data-label">CLIENTE:</span>
+            {{ $venta->cliente_nombre ?? '-' }}
+        </p>
+
+        <p>
+            <span class="data-label">DIRECCION:</span>
+            {{ $venta->cliente->direccion ?? '-' }}
+        </p>
+
+        <p>
+            <span class="data-label">TELEFONO:</span>
+            {{ $venta->cliente->telefono ?? '-' }}
+        </p>
 
         <div class="spacer"></div>
 
-        <p><strong>FORMA DE PAGO:</strong> {{ $venta->pago_forma_nombre ?? '-' }}</p>
+        <p>
+            <span class="data-label">FORMA DE PAGO:</span>
+            {{ $venta->pago_forma_nombre ?? '-' }}
+        </p>
 
         <div class="line"></div>
-        <div class="spacer"></div>
 
-        {{-- ENCABEZADO TABLA --}}
-        <div class="bold">
-            <span style="display: inline-block; width: 30%;">Cant</span>
-            <span style="display: inline-block; width: 25%; text-align: right;">P.Unit</span>
-            <span style="display: inline-block; width: 35%; text-align: right;">Importe</span>
-        </div>
+        {{-- CABECERA DETALLE --}}
+        <table class="detail-table">
+            <thead>
+                <tr>
+                    <th class="col-cant">Cant</th>
+                    <th class="col-price">P.Unit</th>
+                    <th class="col-total">Importe</th>
+                </tr>
+            </thead>
+        </table>
+
         <div class="line"></div>
 
         {{-- DETALLE PRODUCTOS --}}
         @foreach ($venta->detalles as $detalle)
             @php
-                // Determinar unidad y cantidad según unidad_codigo
                 $unidadCodigo = $detalle->unidad_codigo ?? 'NIU';
-                
-                // Para KGM usar salida_kg, para SCO usar salida_saco
-                // ZZ (servicios) no muestra unidad
+
                 if ($unidadCodigo === 'KGM') {
-                    $cantidad = number_format((float) $detalle->salida_kg, 2);
+                    $cantidad = number_format((float) ($detalle->salida_kg ?? 0), 2, '.', ',');
                     $unidadTexto = 'KG';
                 } elseif ($unidadCodigo === 'SCO') {
-                    $cantidad = number_format((float) $detalle->salida_saco, 2);
+                    $cantidad = number_format((float) ($detalle->salida_saco ?? 0), 2, '.', ',');
                     $unidadTexto = 'SACO';
                 } elseif ($unidadCodigo === 'ZZ') {
-                    // Servicio - usar salida_saco sin unidad
-                    $cantidad = number_format((float) $detalle->salida_saco, 2);
+                    $cantidad = number_format((float) ($detalle->salida_saco ?? 0), 2, '.', ',');
                     $unidadTexto = '';
                 } else {
-                    $cantidad = number_format((float) $detalle->salida_saco, 2);
+                    $cantidad = number_format((float) ($detalle->salida_saco ?? 0), 2, '.', ',');
                     $unidadTexto = $unidadCodigo;
                 }
 
-                $precio = number_format((float) $detalle->precio_unitario, 2);
-                $importe = number_format((float) $detalle->total, 2);
+                $precio = number_format((float) ($detalle->precio_unitario ?? 0), 2, '.', ',');
+                $importe = number_format((float) ($detalle->total ?? 0), 2, '.', ',');
             @endphp
 
-            <p class="bold">{{ $detalle->producto_nombre }}</p>
-            <p>
-                <span style="display: inline-block; width: 30%;">{{ $cantidad }} {{ $unidadTexto }}</span>
-                <span style="display: inline-block; width: 25%; text-align: right;">S/ {{ $precio }}</span>
-                <span style="display: inline-block; width: 35%; text-align: right;">S/ {{ $importe }}</span>
+            <p class="product-name">
+                {{ $detalle->producto_nombre ?? 'PRODUCTO SIN NOMBRE' }}
             </p>
+
+            <table class="detail-table">
+                <tr>
+                    <td class="col-cant">
+                        {{ $cantidad }} {{ $unidadTexto }}
+                    </td>
+                    <td class="col-price">
+                        S/ {{ $precio }}
+                    </td>
+                    <td class="col-total">
+                        S/ {{ $importe }}
+                    </td>
+                </tr>
+            </table>
+            @if (!$loop->last)
+                <div class="line-thin"></div>
+            @endif
         @endforeach
 
         <div class="line"></div>
         <div class="spacer"></div>
 
         {{-- TOTAL --}}
-        <p class="bold" style="text-align: right; font-size: 11px;">
-            TOTAL: S/ {{ number_format($venta->total, 2) }}
+        <p class="total">
+            TOTAL: S/ {{ number_format((float) ($venta->total ?? 0), 2, '.', ',') }}
         </p>
 
-        <p class="center" style="font-size: 8px;">Son: {{ $total_letras }}</p>
+        <p class="center small">
+            Son: {{ $total_letras ?? '' }}
+        </p>
 
         <div class="line"></div>
         <div class="spacer"></div>
 
-        {{-- SALDO ANTERIOR --}}
-        @if($saldoAnterior > 0)
-            <p class="bold" style="text-align: right; font-size: 10px;">
-                SALDO ANTERIOR: S/ {{ number_format($saldoAnterior, 2) }}
-            </p>
-            <div class="spacer"></div>
-        @endif
-
-        {{-- VENDEDOR --}}
-        <p><strong>USUARIO:</strong> {{ $venta->user_nombre }}</p>
+        {{-- USUARIO --}}
+        <p>
+            <span class="data-label">USUARIO:</span>
+            {{ $venta->user_nombre ?? '-' }}
+        </p>
 
         <div class="line"></div>
 
+        {{-- PIE --}}
         <div class="center">
             <p class="bold">GRACIAS POR SU PREFERENCIA</p>
         </div>
@@ -155,14 +339,36 @@
         <div class="spacer"></div>
 
         {{-- COBRANZA --}}
-        <div class="center">
-            <p class="bold">COBRANZA</p>
-            <p>PRINCIPAL</p>
-            <p>DEPOSITO</p>
-            <p>CONSORCIO</p>
+        <div class="cobranza">
+            <p class="bold center">COBRANZA</p>
+            <table>
+                <tr>
+                    <td class="bold">PRINCIPAL:</td>
+                    <td class="right">S/ {{ number_format((float)($venta->importe_p ?? 0), 2, '.', ',') }}</td>
+                </tr>
+                <tr>
+                    <td class="bold">DEPOSITO:</td>
+                    <td class="right">S/ {{ number_format((float)($venta->importe_d ?? 0), 2, '.', ',') }}</td>
+                </tr>
+                <tr>
+                    <td class="bold">CONSORCIO:</td>
+                    <td class="right">S/ {{ number_format((float)($venta->importe_c ?? 0), 2, '.', ',') }}</td>
+                </tr>
+            </table>
         </div>
 
-        <div style="height: 4mm;"></div>
+        <div class="spacer"></div>
+
+        {{-- SALDO ANTERIOR --}}
+        @if (($saldoAnterior ?? 0) > 0)
+            <div class="center">
+                <p class="saldo">
+                    SALDO ANTERIOR: S/ {{ number_format((float) $saldoAnterior, 2, '.', ',') }}
+                </p>
+            </div>
+        @endif
+
+        <div class="footer-space"></div>
 
     </div>
 </body>

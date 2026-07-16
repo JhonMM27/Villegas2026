@@ -11,8 +11,7 @@
                     <div class="p-3 border-bottom bg-light">
                         <div class="row g-3 mb-3">
                             <div class="col-lg-3 col-md-4">
-                                <label for="fecha" class="form-label form-label-sm small fw-bold">Fecha <span class="text-danger">*</span></label>
-                                <input type="date" id="fecha" name="fecha" class="form-control form-control-sm" required>
+                                <x-date-picker id="fecha" label="Fecha" :required="true" />
                             </div>
                             <div class="col-lg-5 col-md-4">
                                 <label for="notas" class="form-label form-label-sm small fw-bold">Notas</label>

@@ -16,9 +16,7 @@
                             <div class="border border-primary rounded-3 p-3">
                                 <div class="row g-3">
                                     <div class="col-6">
-                                        <label for="fecha_gasto" class="form-label text-muted small">Fecha Gasto</label>
-                                        <input type="datetime-local" id="fecha_gasto" name="fecha_gasto" class="form-control form-control-sm">
-                                        <div class="invalid-feedback"></div>
+                                        <x-datetime-picker id="fecha_gasto" label="Fecha Gasto" />
                                     </div>
                                     <div class="col-6">
                                         <label for="numero_interno" class="form-label text-muted small">Número interno</label>

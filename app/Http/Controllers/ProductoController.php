@@ -3,21 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Models\Producto;
-use Illuminate\Http\Request;
-use Yajra\DataTables\DataTables;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Str;
 use App\Models\ProductoFraccion;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Yajra\DataTables\DataTables;
 
 class ProductoController extends Controller
 {
-    public function __construct(){
-        $this->middleware('can:productos_list')->only(['index','view']);
+    public function __construct()
+    {
+        $this->middleware('can:productos_list')->only(['index', 'view']);
         $this->middleware('can:productos_create')->only(['store']);
         $this->middleware('can:productos_edit')->only(['show', 'update']);
         $this->middleware('can:productos_delete')->only(['destroy']);
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -25,44 +27,46 @@ class ProductoController extends Controller
     {
         if ($request->ajax()) {
             $data = Producto::with(['afectacionTipo:codigo,descripcion',
-             'unidad:codigo,descripcion', 'linea:id,nombre'])
-             ->select([
-                'id',
-                'unidad_codigo',
-                'afectacion_tipo_codigo',
-                'linea_id', 
-                'nombre',
-                'empaque',
-                'stock_almacen',
-                'stock_minimo',
-                'costo_unitario',
-                'activo'
-            ])->orderBy('id','desc');
+                'unidad:codigo,descripcion', 'linea:id,nombre'])
+                ->select([
+                    'id',
+                    'unidad_codigo',
+                    'afectacion_tipo_codigo',
+                    'linea_id',
+                    'nombre',
+                    'empaque',
+                    'stock_almacen',
+                    'stock_minimo',
+                    'costo_unitario',
+                    'activo',
+                ])->orderBy('id', 'desc');
 
             return DataTables::of($data)
-                ->addColumn('action', function ($row) {                 
-                    $editButton ='';
-                    if(auth()->user()->can('productos_edit')){
+                ->addColumn('action', function ($row) {
+                    $editButton = '';
+                    if (auth()->user()->can('productos_edit')) {
                         $editButton = view('components.button-edit', ['id' => $row->id])->render();
                     }
                     $deleteButton = '';
-                    if(auth()->user()->can('productos_delete')){
+                    if (auth()->user()->can('productos_delete')) {
                         $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $row->nombre])->render();
                     }
-                    $ver='<button class="btn btn-sm btn-info btn-view-producto" data-id="'.$row->id.'" title="Ver producto">
+                    $ver = '<button class="btn btn-sm btn-info btn-view-producto" data-id="'.$row->id.'" title="Ver producto">
                         <i class="bi bi-eye"></i>
                      </button>';
-                    return '<div class="btn-group">' . $editButton . $deleteButton . $ver. '</div>';
+
+                    return '<div class="btn-group">'.$editButton.$deleteButton.$ver.'</div>';
                 })
-                ->addColumn('unidad', fn($row) => $row->unidad?->descripcion ?? '-')
-                ->addColumn('afectacion', fn($row) => $row->afectacionTipo?->descripcion ?? '-')
-                ->addColumn('linea', fn($row) => $row->linea?->nombre ?? '-')
-                ->rawColumns(['action','activo'])
+                ->addColumn('unidad', fn ($row) => $row->unidad?->descripcion ?? '-')
+                ->addColumn('afectacion', fn ($row) => $row->afectacionTipo?->descripcion ?? '-')
+                ->addColumn('linea', fn ($row) => $row->linea?->nombre ?? '-')
+                ->rawColumns(['action', 'activo'])
                 ->editColumn('activo', function ($row) {
                     return $row->activo ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-danger">Inactivo</span>';
                 })
                 ->make(true);
         }
+
         return view('productos.index');
     }
 
@@ -82,14 +86,14 @@ class ProductoController extends Controller
         try {
             DB::beginTransaction();
             $request->merge([
-                'activo' => $request->has('activo') ? 1 : 0
+                'activo' => $request->has('activo') ? 1 : 0,
             ]);
             $data = $this->validateData($request);
 
             if ($request->hasFile('imagen')) {
                 $file = $request->file('imagen');
-                //$filename = time() . '_' . $file->getClientOriginalName();
-                $filename = time() . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
+                // $filename = time() . '_' . $file->getClientOriginalName();
+                $filename = time().'_'.Str::random(10).'.'.$file->getClientOriginalExtension();
                 $file->move(public_path('uploads/productos/'), $filename);
                 $data['imagen'] = $filename;
             }
@@ -101,16 +105,16 @@ class ProductoController extends Controller
             DB::commit(); // ← AGREGAR
 
             return response()->json([
-                'success'=> true,
-                'message'=>'Registro creado satisfactoriamente'
+                'success' => true,
+                'message' => 'Registro creado satisfactoriamente',
             ]);
-            
+
         } catch (\Exception $e) {
             DB::rollBack(); // ← AGREGAR
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error al crear el registro: ' . $e->getMessage()
+                'message' => 'Error al crear el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -122,15 +126,16 @@ class ProductoController extends Controller
     {
         try {
             $registro = Producto::with([
-                'fracciones' => function($query) {
+                'fracciones' => function ($query) {
                     $query->select('id', 'producto_id', 'producto_nombre', 'unidad_codigo', 'empaque', 'codigo_detalle', 'precio_lista', 'activo')
                         ->with('unidad:codigo,descripcion'); // ← Cargar relación unidad dentro de fracciones
                 },
                 'unidad:codigo,descripcion',
                 'afectacionTipo:codigo,nombre',
-                'linea:id,nombre'
+                'linea:id,nombre',
             ])->findOrFail($id);
-            //$registro = Producto::findOrFail($id);
+
+            // $registro = Producto::findOrFail($id);
             return response()->json($registro);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
@@ -152,20 +157,20 @@ class ProductoController extends Controller
     {
         try {
             DB::beginTransaction(); // ← AGREGAR
-            
+
             $request->merge([
-                'activo' => $request->has('activo') ? 1 : 0
+                'activo' => $request->has('activo') ? 1 : 0,
             ]);
             $data = $this->validateData($request, $id);
             $registro = Producto::findOrFail($id);
-            
+
             if ($request->hasFile('imagen')) {
-                $file = $request->file('imagen');            
-                //$filename = time() . '_' . $file->getClientOriginalName();
-                $filename = time() . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
+                $file = $request->file('imagen');
+                // $filename = time() . '_' . $file->getClientOriginalName();
+                $filename = time().'_'.Str::random(10).'.'.$file->getClientOriginalExtension();
                 $file->move(public_path('uploads/productos/'), $filename);
                 $data['imagen'] = $filename;
-                
+
                 $old_image = 'uploads/productos/'.$registro->imagen;
                 if (file_exists($old_image)) {
                     @unlink($old_image);
@@ -178,17 +183,17 @@ class ProductoController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro actualizado correctamente'
+                'message' => 'Registro actualizado correctamente',
             ]);
-            
+
         } catch (\Exception $e) {
             DB::rollBack(); // ← AGREGAR
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error al actualizar el registro: ' . $e->getMessage()
+                'message' => 'Error al actualizar el registro: '.$e->getMessage(),
             ], 500);
-        }        
+        }
     }
 
     /**
@@ -207,16 +212,16 @@ class ProductoController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro.'
+                'message' => 'Error al eliminar el registro.',
             ], 500);
         }
     }
 
-    protected function validateData(Request $request,  $id = null)
+    protected function validateData(Request $request, $id = null)
     {
         return $request->validate([
             'unidad_codigo' => 'required|string|max:3',
@@ -227,7 +232,7 @@ class ProductoController extends Controller
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('productos', 'nombre')->ignore($id, 'id')  // usar Rule para mayor claridad
+                Rule::unique('productos', 'nombre')->ignore($id, 'id'),  // usar Rule para mayor claridad
             ],
             'empaque' => 'required|numeric|min:0',
             'descripcion' => 'nullable|string|max:255',
@@ -240,32 +245,36 @@ class ProductoController extends Controller
             'detalles' => 'required|array|min:1',
             'detalles.*.unidad_codigo_det' => 'required|exists:unidades,codigo',
             'detalles.*.empaque' => 'required|numeric|min:0.01',
-            'detalles.*.precio_lista' => 'required|numeric|min:0'
+            'detalles.*.precio_lista' => 'required|numeric|min:0',
         ]);
     }
 
     public function buscar(Request $request)
     {
         $q = $request->input('q');
-        return Producto::with('afectacionTipo:codigo,porcentaje','unidad:codigo,descripcion', 'fracciones:id,producto_id,unidad_codigo,empaque,precio_lista')
-                    ->where('activo', true)
-                    ->where(function($query) use ($q) {
-                        $query->where('id', '=', $q)
-                            ->orWhere('nombre', 'like', "%{$q}%")
-                            ->orWhere('codigo', 'like', "%{$q}%");
-                    })
-                    ->select('id','codigo', 'nombre', 'costo_unitario','stock_almacen', 'afectacion_tipo_codigo', 'unidad_codigo','empaque')
-                    ->limit(10)
-                    ->get();
+
+        return Producto::with('afectacionTipo:codigo,porcentaje', 'unidad:codigo,descripcion', 'fracciones:id,producto_id,unidad_codigo,empaque,precio_lista')
+            ->where('activo', true)
+            ->where(function ($query) use ($q) {
+                $query->where('id', '=', $q)
+                    ->orWhere('nombre', 'like', "%{$q}%")
+                    ->orWhere('codigo', 'like', "%{$q}%");
+            })
+            ->select('id', 'codigo', 'nombre', 'costo_unitario', 'stock_almacen', 'afectacion_tipo_codigo', 'unidad_codigo', 'empaque')
+            ->limit(10)
+            ->get();
     }
-    public function buscarFormulacion(Request $request) { 
-        $q = $request->input('q'); 
-        return Producto::with('linea:id,nombre') 
-            ->where('id', '=', $q) 
-            ->orWhere('nombre', 'like', "%{$q}%") 
-            ->orWhere('codigo', 'like', "%{$q}%") 
-            ->select('id','codigo', 'nombre', 'costo_unitario', 'empaque', 'linea_id')
-            ->limit(10) ->get();
+
+    public function buscarFormulacion(Request $request)
+    {
+        $q = $request->input('q');
+
+        return Producto::with('linea:id,nombre')
+            ->where('id', '=', $q)
+            ->orWhere('nombre', 'like', "%{$q}%")
+            ->orWhere('codigo', 'like', "%{$q}%")
+            ->select('id', 'codigo', 'nombre', 'costo_unitario', 'empaque', 'linea_id')
+            ->limit(10)->get();
     }
 
     public function buscarFormulacionPreparada(Request $request)
@@ -326,13 +335,13 @@ class ProductoController extends Controller
     {
         try {
             $producto = Producto::with([
-                'fracciones' => function($query) {
+                'fracciones' => function ($query) {
                     $query->select('id', 'producto_id', 'producto_nombre', 'unidad_codigo', 'empaque', 'codigo_detalle', 'precio_lista', 'activo')
                         ->with('unidad:codigo,descripcion'); // ← Cargar relación unidad dentro de fracciones
                 },
                 'unidad:codigo,descripcion',
                 'afectacionTipo:codigo,nombre',
-                'linea:id,nombre'
+                'linea:id,nombre',
             ])->findOrFail($id);
 
             // Devolver vista parcial
@@ -341,6 +350,7 @@ class ProductoController extends Controller
             return response()->json(['error' => 'Registro no encontrado'], 404);
         }
     }
+
     private function storeFracciones(Producto $producto, Request $request, bool $isUpdate = false)
     {
         // Si es actualización, eliminar fracciones anteriores
@@ -351,7 +361,7 @@ class ProductoController extends Controller
         // Insertar nuevas fracciones si existen en el request
         if ($request->has('detalles') && is_array($request->detalles)) {
             $codigoDetalle = 1;
-            
+
             foreach ($request->detalles as $fraccion) {
                 // Validar que tenga los campos mínimos requeridos
                 if (empty($fraccion['unidad_codigo_det']) || empty($fraccion['empaque'])) {
@@ -367,8 +377,8 @@ class ProductoController extends Controller
                     'precio_lista' => $fraccion['precio_lista'] ?? 0,
                     'activo' => true,
                 ]);
-                
-                $codigoDetalle++; 
+
+                $codigoDetalle++;
             }
         }
     }

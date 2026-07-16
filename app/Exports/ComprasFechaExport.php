@@ -2,15 +2,15 @@
 
 namespace App\Exports;
 
-use App\Models\CompraDetalle;
+use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Illuminate\Support\Carbon;
 
 class ComprasFechaExport implements FromCollection, WithHeadings, WithMapping
 {
     protected $fechaInicio;
+
     protected $fechaFin;
 
     public function __construct($fechaInicio = null, $fechaFin = null)
@@ -40,7 +40,7 @@ class ComprasFechaExport implements FromCollection, WithHeadings, WithMapping
         if ($this->fechaInicio && $this->fechaFin) {
             $query->whereBetween('compras.fecha_compra', [
                 Carbon::parse($this->fechaInicio)->startOfDay(),
-                Carbon::parse($this->fechaFin)->endOfDay()
+                Carbon::parse($this->fechaFin)->endOfDay(),
             ]);
         }
 
@@ -73,7 +73,7 @@ class ComprasFechaExport implements FromCollection, WithHeadings, WithMapping
             'Ítems',
             'Total',
             'ID Proveedor',
-            'Razón Social'
+            'Razón Social',
         ];
     }
 
@@ -87,9 +87,9 @@ class ComprasFechaExport implements FromCollection, WithHeadings, WithMapping
             $item->correlativo,
             $item->pago_forma_codigo,
             $item->total_items,
-            number_format((float)$item->total, 2, '.', ''), // Total con 2 decimales
+            number_format((float) $item->total, 2, '.', ''), // Total con 2 decimales
             $item->proveedor_id,
-            $item->razon_social
+            $item->razon_social,
         ];
     }
 }

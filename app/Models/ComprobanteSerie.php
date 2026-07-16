@@ -11,7 +11,7 @@ class ComprobanteSerie extends Model
     protected $fillable = [
         'comprobante_tipo_codigo',
         'serie',
-        'correlativo'
+        'correlativo',
     ];
 
     public function tipo()

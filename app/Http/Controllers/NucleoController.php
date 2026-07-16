@@ -3,23 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Models\Nucleo;
-use App\Models\NucleoDetalle;
-use Illuminate\Http\Request;
-use Yajra\DataTables\DataTables;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\DB;
 use App\Models\Producto;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Yajra\DataTables\DataTables;
 
 class NucleoController extends Controller
 {
-
-    public function __construct(){
-        $this->middleware('can:nucleos_list')->only(['index', 'view','printTicket']);
+    public function __construct()
+    {
+        $this->middleware('can:nucleos_list')->only(['index', 'view', 'printTicket']);
         $this->middleware('can:nucleos_create')->only(['store']);
         $this->middleware('can:nucleos_edit')->only(['show', 'update']);
         $this->middleware('can:nucleos_delete')->only(['destroy']);
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -34,20 +34,20 @@ class NucleoController extends Controller
                 'empaque',
                 'cantidad_porcentaje',
                 'items',
-                'activo'
+                'activo',
             ]);
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
                     $editButton = '';
-                    if(auth()->user()->can('nucleos_edit')){
+                    if (auth()->user()->can('nucleos_edit')) {
                         $editButton = view('components.button-edit', ['id' => $row->id])->render();
                     }
                     $deleteButton = '';
-                    if(auth()->user()->can('nucleos_delete')){
+                    if (auth()->user()->can('nucleos_delete')) {
                         $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $row->nombre])->render();
                     }
-                    $ticketButton = '<a href="' . route('nucleos.imprimir', $row->id) . '" 
+                    $ticketButton = '<a href="'.route('nucleos.imprimir', $row->id).'" 
                         target="_blank" 
                         class="btn btn-sm btn-secondary" 
                         title="Núcleo (Ticket)">
@@ -57,11 +57,11 @@ class NucleoController extends Controller
                         <i class="bi bi-eye"></i>
                     </button>';
 
-                    return '<div class="btn-group">' . $editButton . $deleteButton. $ver.$ticketButton . '</div>';
+                    return '<div class="btn-group">'.$editButton.$deleteButton.$ver.$ticketButton.'</div>';
                 })
                 ->editColumn('activo', function ($row) {
-                    return $row->activo 
-                        ? '<span class="badge bg-success">Activo</span>' 
+                    return $row->activo
+                        ? '<span class="badge bg-success">Activo</span>'
                         : '<span class="badge bg-danger">Inactivo</span>';
                 })
                 ->rawColumns(['action', 'activo'])
@@ -70,7 +70,6 @@ class NucleoController extends Controller
 
         return view('nucleos.index');
     }
-
 
     /**
      * Show the form for creating a new resource.
@@ -86,32 +85,33 @@ class NucleoController extends Controller
     public function store(Request $request)
     {
         // Convertir fechas antes de validar
-         $request->merge([
-            'activo' => $request->has('activo') ? 1 : 0
+        $request->merge([
+            'activo' => $request->has('activo') ? 1 : 0,
         ]);
 
-        $data = $this->validateData($request);        
+        $data = $this->validateData($request);
 
         DB::beginTransaction();
         try {
             $nucleoData = $this->proccessNucleoData($data, true);
-            
+
             $nucleo = Nucleo::create($nucleoData['nucleo']);
             $nucleo->detalles()->createMany($nucleoData['detalles']);
-            //Producto::updateStock(true,$nucleoData['detalles']);
+            // Producto::updateStock(true,$nucleoData['detalles']);
 
             DB::commit();
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Registro creado satisfactoriamente',
-                'nucleo_id' => $nucleo->id
+                'nucleo_id' => $nucleo->id,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error al crear el registro: ' . $e->getMessage()
+                'message' => 'Error al crear el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -122,7 +122,7 @@ class NucleoController extends Controller
     public function show($id)
     {
         try {
-            //$registro = Venta::with(['detalles.producto.afectacionTipo', 'cliente'])->findOrFail($id);
+            // $registro = Venta::with(['detalles.producto.afectacionTipo', 'cliente'])->findOrFail($id);
             $registro = Nucleo::with('detalles')->findOrFail($id);
 
             return response()->json($registro);
@@ -147,32 +147,33 @@ class NucleoController extends Controller
         $nucleo = Nucleo::findOrFail($id);
 
         $request->merge([
-            'activo' => $request->has('activo') ? 1 : 0
+            'activo' => $request->has('activo') ? 1 : 0,
         ]);
 
         $data = $this->validateData($request, $id);
-        
+
         DB::beginTransaction();
         try {
             $nucleoData = $this->proccessNucleoData($data, false);
-            
+
             $nucleo->update($nucleoData['nucleo']);
-            //Producto::updateStock(false,$nucleo->detalles->toArray()); 
+            // Producto::updateStock(false,$nucleo->detalles->toArray());
             $nucleo->detalles()->delete();
             $nucleo->detalles()->createMany($nucleoData['detalles']);
-            //Producto::updateStock(true,$nucleoData['detalles']);
+            // Producto::updateStock(true,$nucleoData['detalles']);
 
             DB::commit();
-            
+
             return response()->json([
                 'success' => true,
-                'message' => 'Registro actualizado satisfactoriamente'
+                'message' => 'Registro actualizado satisfactoriamente',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error al actualizar el registro: ' . $e->getMessage()
+                'message' => 'Error al actualizar el registro: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -184,19 +185,20 @@ class NucleoController extends Controller
     {
         try {
             $registro = Nucleo::findOrFail($id);
-            //Producto::updateStock(false,$registro->detalles->toArray()); 
+            // Producto::updateStock(false,$registro->detalles->toArray());
             $registro->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registro eliminado correctamente'
+                'message' => 'Registro eliminado correctamente',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar el registro'
+                'message' => 'Error al eliminar el registro',
             ], 500);
         }
-    }   
+    }
+
     private function proccessNucleoData(array $data, bool $isNew = true)
     {
         // Obtener proveedor desde el modelo
@@ -204,7 +206,7 @@ class NucleoController extends Controller
 
         $productos = Producto::whereIn('id', collect($data['detalles'])->pluck('producto_id'))->get()->keyBy('id');
 
-         $detallesCalculados = [];
+        $detallesCalculados = [];
 
         $cantidadTotal = 0;
 
@@ -235,7 +237,7 @@ class NucleoController extends Controller
 
         return [
             'nucleo' => $nucleoData,
-            'detalles' => $detallesCalculados
+            'detalles' => $detallesCalculados,
         ];
     }
 
@@ -246,7 +248,7 @@ class NucleoController extends Controller
             'producto_id' => $producto->id,
             'producto_nombre' => $producto->nombre,
             'unidad_codigo' => $unidad_codigo,
-            'cantidad' => $cantidad
+            'cantidad' => $cantidad,
         ];
     }
 
@@ -267,23 +269,24 @@ class NucleoController extends Controller
         ]);
     }
 
-
-    public function printTicket($id){
+    public function printTicket($id)
+    {
         $nucleo = Nucleo::findOrFail($id);
 
-        $empresa = (object)[
+        $empresa = (object) [
             'razon_social' => 'Consorcios Villegas E.I.R.L.',
             'direccion' => 'Cal. Inca Roca Nro. 1210 - La Victoria - Chiclayo',
-            'ruc' => '20538937321'
+            'ruc' => '20538937321',
         ];
 
-        $pdf = Pdf::loadView('nucleos.ticket', compact('nucleo','empresa'))
+        $pdf = Pdf::loadView('nucleos.ticket', compact('nucleo', 'empresa'))
             ->setPaper([0, 0, 226.77, 600], 'portrait')
             ->setOption('isRemoteEnabled', true)
             ->setOption('defaultFont', 'DejaVu Sans');
 
         return $pdf->stream("nucleo_{$nucleo->id}.pdf");
     }
+
     public function view($id)
     {
         try {
@@ -301,13 +304,13 @@ class NucleoController extends Controller
         $q = $request->input('q');
 
         return Nucleo::with([
-                'producto:id,costo_unitario,empaque',
-                'detalles:nucleo_id,producto_id,producto_nombre,unidad_codigo,cantidad',
-                'detalles.producto:id,costo_unitario,empaque'
-            ])
+            'producto:id,costo_unitario,empaque',
+            'detalles:nucleo_id,producto_id,producto_nombre,unidad_codigo,cantidad',
+            'detalles.producto:id,costo_unitario,empaque',
+        ])
             ->where('id', $q)
             ->orWhere('nombre', 'like', "%{$q}%")
-            ->select('nucleos.id', 'nombre', 'unidad_codigo', 'unidad_nombre', 'empaque', 'cantidad_porcentaje','items', 'activo')
+            ->select('nucleos.id', 'nombre', 'unidad_codigo', 'unidad_nombre', 'empaque', 'cantidad_porcentaje', 'items', 'activo')
             ->limit(10)
             ->get();
     }
