@@ -65,11 +65,45 @@ class MovimientoService
     /** Tipo: Salida por ajuste de inventario (conteo físico < stock sistema) */
     const TIPO_AJUSTE_SALIDA = 'AJUSTE_SALIDA';
 
+    /** Punto de control absoluto importado del sistema anterior. */
+    const TIPO_APERTURA_LEGADO = 'APERTURA_LEGADO';
+
     // ─── Constantes de tipos de transacción ────────────────
 
     const TRANSACCION_AJUSTES = 'ajustes';
 
+    const TRANSACCION_APERTURA_LEGADO = 'apertura_legacy';
+
+    const TRANSACCION_ID_APERTURA_LEGADO = 20260531;
+
     // ─── Métodos públicos ───────────────────────────────────
+
+    /**
+     * Bloquea productos en un orden estable para evitar actualizaciones
+     * perdidas y reducir el riesgo de deadlocks entre operaciones múltiples.
+     */
+    public function bloquearProductos(array $productoIds): void
+    {
+        $ids = collect($productoIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->sort()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        $bloqueados = Producto::whereIn('id', $ids)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->pluck('id');
+
+        if ($bloqueados->count() !== $ids->count()) {
+            throw new \Exception('Uno o más productos del movimiento no existen.');
+        }
+    }
 
     /**
      * Registra un movimiento de INGRESO al almacén.
@@ -88,7 +122,19 @@ class MovimientoService
      */
     public function registrarIngreso(array $params): Movimiento
     {
-        $producto = Producto::findOrFail($params['producto_id']);
+        return DB::transaction(
+            fn (): Movimiento => $this->registrarIngresoBloqueado($params),
+            3
+        );
+    }
+
+    private function registrarIngresoBloqueado(array $params): Movimiento
+    {
+        $this->validarParametrosMovimiento($params, true);
+
+        $producto = Producto::whereKey($params['producto_id'])
+            ->lockForUpdate()
+            ->firstOrFail();
 
         // Detectar si el movimiento es retroactivo (fecha anterior al último movimiento del producto)
         $ultimoMovimiento = Movimiento::where('producto_id', $producto->id)
@@ -98,6 +144,13 @@ class MovimientoService
 
         $esRetroactivo = $ultimoMovimiento
             && Carbon::parse($params['fecha'])->lt(Carbon::parse($ultimoMovimiento->fecha));
+
+        $primerMovimientoExistente = $esRetroactivo
+            ? Movimiento::where('producto_id', $producto->id)
+                ->orderBy('fecha', 'asc')
+                ->orderBy('id', 'asc')
+                ->first()
+            : null;
 
         // Saldos ANTES del movimiento (en unidades base del producto)
         $stockAnterior = (float) $producto->stock_almacen;
@@ -176,9 +229,12 @@ class MovimientoService
         // IMPORTANTE: se pasa datetime completo (Y-m-d H:i:s) para que el punto de partida
         // sea el último movimiento ANTES de la hora exacta, no antes del día completo.
         if ($esRetroactivo) {
-            $this->recalcularKardexProductoDesdeFecha(
+            $this->recalcularKardexProductoDesdeFechaBloqueado(
                 $producto->id,
-                Carbon::parse($params['fecha'])->format('Y-m-d H:i:s')
+                Carbon::parse($params['fecha'])->format('Y-m-d H:i:s'),
+                true,
+                $primerMovimientoExistente ? (float) $primerMovimientoExistente->stock_anterior : null,
+                $primerMovimientoExistente ? (float) $primerMovimientoExistente->costo_actual : null
             );
         } else {
             // Actualizar producto con saldos nuevos
@@ -206,7 +262,19 @@ class MovimientoService
      */
     public function registrarSalida(array $params): Movimiento
     {
-        $producto = Producto::findOrFail($params['producto_id']);
+        return DB::transaction(
+            fn (): Movimiento => $this->registrarSalidaBloqueada($params),
+            3
+        );
+    }
+
+    private function registrarSalidaBloqueada(array $params): Movimiento
+    {
+        $this->validarParametrosMovimiento($params, false);
+
+        $producto = Producto::whereKey($params['producto_id'])
+            ->lockForUpdate()
+            ->firstOrFail();
 
         // Detectar si el movimiento es retroactivo (fecha anterior al último movimiento del producto)
         $ultimoMovimiento = Movimiento::where('producto_id', $producto->id)
@@ -216,6 +284,13 @@ class MovimientoService
 
         $esRetroactivo = $ultimoMovimiento
             && Carbon::parse($params['fecha'])->lt(Carbon::parse($ultimoMovimiento->fecha));
+
+        $primerMovimientoExistente = $esRetroactivo
+            ? Movimiento::where('producto_id', $producto->id)
+                ->orderBy('fecha', 'asc')
+                ->orderBy('id', 'asc')
+                ->first()
+            : null;
 
         // Saldos ANTES del movimiento (en unidades base del producto)
         $stockAnterior = (float) $producto->stock_almacen;
@@ -281,9 +356,12 @@ class MovimientoService
         // IMPORTANTE: se pasa datetime completo (Y-m-d H:i:s) para que el punto de partida
         // sea el último movimiento ANTES de la hora exacta, no antes del día completo.
         if ($esRetroactivo) {
-            $this->recalcularKardexProductoDesdeFecha(
+            $this->recalcularKardexProductoDesdeFechaBloqueado(
                 $producto->id,
-                Carbon::parse($params['fecha'])->format('Y-m-d H:i:s')
+                Carbon::parse($params['fecha'])->format('Y-m-d H:i:s'),
+                true,
+                $primerMovimientoExistente ? (float) $primerMovimientoExistente->stock_anterior : null,
+                $primerMovimientoExistente ? (float) $primerMovimientoExistente->costo_actual : null
             );
         } else {
             // Actualizar producto: solo stock cambia, CPP se mantiene
@@ -297,139 +375,41 @@ class MovimientoService
     }
 
     /**
-     * Recalcula el kardex completo de un producto desde un movimiento específico.
+     * Recalcula el kardex de un producto desde la fecha de un movimiento específico.
      *
      * Se usa cuando se corrige un dato histórico (ej: precio de compra).
      * Recalcula TODOS los movimientos posteriores aplicando CPP en orden.
      *
      * Algoritmo:
      * 1. Obtiene saldos del movimiento ANTERIOR al punto de corrección
-     * 2. Recorre todos los movimientos posteriores en orden ASC
+     * 2. Recorre todos los movimientos posteriores por fecha ASC, id ASC
      * 3. Recalcula cada uno con las fórmulas CPP correctas
      * 4. Si es VENTA, actualiza rentabilidad en venta_detalles
      * 5. Al final, actualiza el producto con los saldos del último movimiento
      *
-     * @param  int   $productoId          ID del producto a recalcular
-     * @param  int   $desdeMovimientoId   ID del movimiento desde donde recalcular
-     * @param  bool  $actualizarStock     Si true (default), actualiza productos.stock_almacen al final.
-     *                                   Pasar FALSE cuando el recálculo solo propaga COSTOS (ej: desde
-     *                                   actualizarCostoPreparada) para evitar modificar el stock de
-     *                                   productos no relacionados con la operación original.
+     * @param  int  $productoId  ID del producto a recalcular
+     * @param  int  $desdeMovimientoId  ID del movimiento desde donde recalcular
+     * @param  bool  $actualizarStock  Si true (default), actualiza productos.stock_almacen al final.
+     *                                 Pasar FALSE cuando el recálculo solo propaga COSTOS (ej: desde
+     *                                 actualizarCostoPreparada) para evitar modificar el stock de
+     *                                 productos no relacionados con la operación original.
      */
     public function recalcularKardexProducto(int $productoId, int $desdeMovimientoId, bool $actualizarStock = true): void
     {
-        // Obtener saldos del movimiento anterior al punto de corrección
-        $movimientoAnterior = Movimiento::where('producto_id', $productoId)
-            ->where('id', '<', $desdeMovimientoId)
-            ->orderBy('id', 'desc')
-            ->first();
+        $movimiento = Movimiento::where('producto_id', $productoId)
+            ->findOrFail($desdeMovimientoId);
 
-        // Si no hay movimiento anterior, partimos de cero
-        $stockActual = $movimientoAnterior ? (float) $movimientoAnterior->stock_nuevo : 0;
-        $costoActual = $movimientoAnterior ? (float) $movimientoAnterior->costo_nuevo : 0;
-
-        // Traer TODOS los movimientos desde el punto de corrección hacia adelante
-        $movimientos = Movimiento::where('producto_id', $productoId)
-            ->where('id', '>=', $desdeMovimientoId)
-            ->orderBy('id', 'asc')
-            ->get();
-
-        foreach ($movimientos as $mov) {
-            $valorAnterior = $stockActual * $costoActual;
-
-            if ($mov->entrada > 0) {
-                // === ENTRADA (Compra / Preparada Ingreso) ===
-                $cantidadKg = (float) $mov->entrada;
-                $costoMov = (float) $mov->costo_unitario;
-                $costoTotal = $cantidadKg * $costoMov;
-
-                $stockNuevo = $stockActual + $cantidadKg;
-                $valorNuevo = $valorAnterior + $costoTotal;
-
-                if ($stockActual <= 0) {
-                    $costoNuevo = $costoMov;
-                    $valorNuevo = $stockNuevo * $costoMov;
-                } else {
-                    $costoNuevo = round($valorNuevo / $stockNuevo, 4);
-                }
-            } else {
-                // === SALIDA (Venta / Preparada Salida / Préstamo) ===
-                $cantidadKg = (float) $mov->salida;
-
-                // Verificar si es una salida con costo exacto forzado (ej. Devolución de préstamo)
-                $esSalidaForzada = false;
-                if ($mov->tipo === self::TIPO_PRESTAMO_SALIDA) {
-                    $prestamo = \App\Models\Prestamo::find($mov->transaccion_id);
-                    if ($prestamo && $prestamo->prestamo_referencia_id) {
-                        $esSalidaForzada = true;
-                    }
-                }
-
-                $costoMov = $esSalidaForzada ? (float) $mov->costo_unitario : $costoActual;
-                $costoTotal = $cantidadKg * $costoMov;
-
-                $stockNuevo = $stockActual - $cantidadKg;
-                $valorNuevo = $valorAnterior - $costoTotal;
-                $costoNuevo = ($esSalidaForzada && $stockNuevo > 0) ? ($valorNuevo / $stockNuevo) : $costoActual;
-            }
-
-            // Actualizar el movimiento con saldos recalculados
-            $mov->update([
-                'stock_anterior' => round($stockActual, 4),
-                'costo_actual' => round($costoActual, 4),
-                'valor_anterior' => round($valorAnterior, 4),
-                'costo_unitario' => round($costoMov, 4),
-                'costo_total' => round($costoTotal, 4),
-                'stock_nuevo' => round($stockNuevo, 4),
-                'costo_nuevo' => round($costoNuevo, 4),
-                'valor_nuevo' => round($valorNuevo, 4),
-            ]);
-
-            // Si es VENTA, actualizar rentabilidad en venta_detalles
-            if ($mov->tipo === self::TIPO_VENTA && $mov->detalle_id) {
-                $this->actualizarRentabilidadVenta($mov);
-            }
-
-            // Si es insumo de PREPARADA, actualizar costos del insumo y del producto final (en cascada)
-            if ($mov->tipo === self::TIPO_PREPARADA_SALIDA && $mov->detalle_id) {
-                $this->actualizarCostoPreparada($mov);
-            }
-
-            // Avanzar saldos para el siguiente movimiento
-            $stockActual = $stockNuevo;
-            $costoActual = $costoNuevo;
-        }
-
-        // ─────────────────────────────────────────────────────────────────
-        // BLOQUE FINAL: Actualizar saldos en la tabla productos
-        //
-        // $actualizarStock = true  → operación directa (venta, compra...)
-        //   → actualiza stock_almacen + costo_unitario.
-        //
-        // $actualizarStock = false → propagación de costos desde preparada
-        //   → solo actualiza costo_unitario; NO toca stock_almacen.
-        //   Razón: solo cambiaron costos (no cantidades), por lo que el
-        //   stock_almacen que ya tiene el producto es el correcto. Evita
-        //   que al rectificar una venta se modifique el stock de productos
-        //   que elaboraron sus insumos (producto final de preparadas).
-        // ─────────────────────────────────────────────────────────────────
-        if ($actualizarStock) {
-            Producto::where('id', $productoId)->update([
-                'stock_almacen' => round($stockActual, 4),
-                'costo_unitario' => round($costoActual, 4),
-            ]);
-        } else {
-            Producto::where('id', $productoId)->update([
-                'costo_unitario' => round($costoActual, 4),
-            ]);
-        }
+        $this->recalcularKardexProductoDesdeFecha(
+            $productoId,
+            Carbon::parse($movimiento->fecha)->format('Y-m-d H:i:s'),
+            $actualizarStock
+        );
     }
 
     /**
      * Recalcula el kardex completo de un producto desde una fecha específica.
      *
-     * A diferencia de recalcularKardexProducto() que ordena por id, este método
-     * ordena por fecha para manejar correctamente compras con fecha pasada.
+     * Este es el motor canónico del kardex y siempre ordena por fecha, id.
      *
      * Algoritmo:
      * 1. Obtiene saldos del movimiento ANTERIOR a la fecha dada
@@ -445,6 +425,19 @@ class MovimientoService
      */
     public function recalcularKardexProductoDesdeFecha(int $productoId, string $fechaDesde, bool $actualizarStock = true): void
     {
+        DB::transaction(function () use ($productoId, $fechaDesde, $actualizarStock): void {
+            Producto::whereKey($productoId)->lockForUpdate()->firstOrFail();
+            $this->recalcularKardexProductoDesdeFechaBloqueado($productoId, $fechaDesde, $actualizarStock);
+        }, 3);
+    }
+
+    private function recalcularKardexProductoDesdeFechaBloqueado(
+        int $productoId,
+        string $fechaDesde,
+        bool $actualizarStock = true,
+        ?float $stockInicialSinAnterior = null,
+        ?float $costoInicialSinAnterior = null
+    ): void {
         // ────────────────────────────────────────────────────────────
         // BLOQUE: Búsqueda del movimiento anterior (punto de partida)
         // ────────────────────────────────────────────────────────────
@@ -466,10 +459,6 @@ class MovimientoService
             ->orderBy('id', 'desc')
             ->first();
 
-        // Si no hay movimiento anterior, partimos de cero
-        $stockActual = $movimientoAnterior ? (float) $movimientoAnterior->stock_nuevo : 0;
-        $costoActual = $movimientoAnterior ? (float) $movimientoAnterior->costo_nuevo : 0;
-
         // Traer TODOS los movimientos desde la fecha dada en orden cronológico
         $movimientos = Movimiento::where('producto_id', $productoId)
             ->where('fecha', '>=', $fechaDesde)
@@ -477,8 +466,31 @@ class MovimientoService
             ->orderBy('id', 'asc')
             ->get();
 
+        if ($movimientos->isEmpty()) {
+            return;
+        }
+
+        // El stock inicial fue migrado sin un movimiento de apertura.
+        // Al recalcular desde el primer movimiento se conserva su saldo previo.
+        $stockActual = $movimientoAnterior
+            ? (float) $movimientoAnterior->stock_nuevo
+            : ($stockInicialSinAnterior ?? (float) $movimientos->first()->stock_anterior);
+        $costoActual = $movimientoAnterior
+            ? (float) $movimientoAnterior->costo_nuevo
+            : ($costoInicialSinAnterior ?? (float) $movimientos->first()->costo_actual);
+
         foreach ($movimientos as $mov) {
             /** @var Movimiento $mov */
+            if ($this->esAperturaLegado($mov)) {
+                [$stockActual, $costoActual] = $this->aplicarAperturaLegado(
+                    $mov,
+                    $stockActual,
+                    $costoActual
+                );
+
+                continue;
+            }
+
             $valorAnterior = $stockActual * $costoActual;
 
             if ($mov->entrada > 0) {
@@ -493,8 +505,11 @@ class MovimientoService
                 if ($stockActual <= 0) {
                     $costoNuevo = $costoMov;
                     $valorNuevo = $stockNuevo * $costoMov;
-                } else {
+                } elseif ($stockNuevo != 0.0) {
                     $costoNuevo = round($valorNuevo / $stockNuevo, 4);
+                } else {
+                    $costoNuevo = $costoMov;
+                    $valorNuevo = 0.0;
                 }
             } else {
                 // === SALIDA (Venta / Preparada Salida / Préstamo) ===
@@ -536,7 +551,11 @@ class MovimientoService
 
             // Si es insumo de PREPARADA, actualizar costos del insumo y del producto final (en cascada)
             if ($mov->tipo === self::TIPO_PREPARADA_SALIDA && $mov->detalle_id) {
-                $this->actualizarCostoPreparada($mov);
+                if ($mov->transaccion_tipo === 'preparadas') {
+                    $this->actualizarCostoPreparada($mov);
+                } elseif ($mov->transaccion_tipo === 'nucleo_preparadas') {
+                    $this->actualizarCostoNucleoPreparada($mov);
+                }
             }
 
             // Avanzar saldos para el siguiente movimiento
@@ -563,7 +582,7 @@ class MovimientoService
      * A diferencia de recalcularKardexProducto(), este método:
      * 1. Toma stock_anterior y costo_actual del PRIMER movimiento excluido como punto de partida
      *    (estos campos guardan el estado del inventario ANTES de la transacción original)
-     * 2. Recorre TODOS los movimientos desde ese punto en orden de ID ASC
+     * 2. Recorre TODOS los movimientos desde ese punto en orden cronológico
      * 3. Los movimientos excluidos se NEUTRALIZAN (entrada/salida → 0) para que no impacten el cálculo
      * 4. Los demás movimientos se recalculan normalmente con el CPP correcto
      * 5. Si es VENTA, actualiza rentabilidad en venta_detalles
@@ -582,117 +601,44 @@ class MovimientoService
             return;
         }
 
-        // Obtener el primer movimiento excluido para tomar el estado PRE-transacción
-        $primerExcluido = Movimiento::where('producto_id', $productoId)
-            ->whereIn('id', $excluirMovIds)
-            ->orderBy('id', 'asc')
-            ->first();
+        DB::transaction(function () use ($productoId, $excluirMovIds, $actualizarStock): void {
+            Producto::whereKey($productoId)->lockForUpdate()->firstOrFail();
 
-        if (! $primerExcluido) {
-            return;
-        }
+            $movimientosExcluidos = Movimiento::where('producto_id', $productoId)
+                ->whereIn('id', $excluirMovIds)
+                ->orderBy('fecha', 'asc')
+                ->orderBy('id', 'asc')
+                ->get();
 
-        // Punto de partida: estado del inventario ANTES de la transacción anulada
-        $stockActual = (float) $primerExcluido->stock_anterior;
-        $costoActual = (float) $primerExcluido->costo_actual;
+            if ($movimientosExcluidos->isEmpty()) {
+                return;
+            }
 
-        // Traer TODOS los movimientos desde el primer excluido hacia adelante
-        $movimientos = Movimiento::where('producto_id', $productoId)
-            ->where('id', '>=', $primerExcluido->id)
-            ->orderBy('id', 'asc')
-            ->get();
+            $fechaDesde = Carbon::parse($movimientosExcluidos->first()->fecha)
+                ->format('Y-m-d H:i:s');
 
-        foreach ($movimientos as $mov) {
-            // Si el movimiento está en la lista de exclusión, NEUTRALIZARLO
-            if (in_array($mov->id, $excluirMovIds)) {
-                $valorActual = $stockActual * $costoActual;
-                $mov->update([
+            // Neutralizar sin borrar registros. Después se reconstruye toda la
+            // cadena cronológica desde la fecha del primer movimiento afectado.
+            foreach ($movimientosExcluidos as $movimiento) {
+                $movimiento->update([
                     'entrada' => 0,
                     'salida' => 0,
                     'cantidad' => 0,
                     'cantidad_kg' => 0,
                     'costo_total' => 0,
-                    'stock_anterior' => round($stockActual, 4),
-                    'costo_actual' => round($costoActual, 4),
-                    'valor_anterior' => round($valorActual, 4),
-                    'stock_nuevo' => round($stockActual, 4),
-                    'costo_nuevo' => round($costoActual, 4),
-                    'valor_nuevo' => round($valorActual, 4),
                     'costo_unitario' => 0,
-                    'comentario' => '[ANULADO] '.($mov->comentario ?? $mov->tipo),
+                    'comentario' => str_starts_with((string) $movimiento->comentario, '[ANULADO]')
+                        ? $movimiento->comentario
+                        : '[ANULADO] '.($movimiento->comentario ?? $movimiento->tipo),
                 ]);
-
-                // No avanzar saldos: el movimiento no tiene impacto
-                continue;
             }
 
-            // Recálculo normal para movimientos NO excluidos
-            $valorAnterior = $stockActual * $costoActual;
-
-            if ($mov->entrada > 0) {
-                // === ENTRADA (Compra / Preparada Ingreso / Anulación Venta) ===
-                $cantidadKg = (float) $mov->entrada;
-                $costoMov = (float) $mov->costo_unitario;
-                $costoTotal = $cantidadKg * $costoMov;
-
-                $stockNuevo = $stockActual + $cantidadKg;
-                $valorNuevo = $valorAnterior + $costoTotal;
-
-                if ($stockActual <= 0) {
-                    $costoNuevo = $costoMov;
-                    $valorNuevo = $stockNuevo * $costoMov;
-                } else {
-                    $costoNuevo = round($valorNuevo / $stockNuevo, 4);
-                }
-            } else {
-                // === SALIDA (Venta / Preparada Salida / Préstamo) ===
-                $cantidadKg = (float) $mov->salida;
-                $costoMov = $costoActual; // CPP vigente
-                $costoTotal = $cantidadKg * $costoMov;
-
-                $stockNuevo = $stockActual - $cantidadKg;
-                $valorNuevo = $valorAnterior - $costoTotal;
-                $costoNuevo = $costoActual; // No cambia en salidas
-            }
-
-            // Actualizar el movimiento con saldos recalculados
-            $mov->update([
-                'stock_anterior' => round($stockActual, 4),
-                'costo_actual' => round($costoActual, 4),
-                'valor_anterior' => round($valorAnterior, 4),
-                'costo_unitario' => round($costoMov, 4),
-                'costo_total' => round($costoTotal, 4),
-                'stock_nuevo' => round($stockNuevo, 4),
-                'costo_nuevo' => round($costoNuevo, 4),
-                'valor_nuevo' => round($valorNuevo, 4),
-            ]);
-
-            // Si es VENTA, actualizar rentabilidad en venta_detalles
-            if ($mov->tipo === self::TIPO_VENTA && $mov->detalle_id) {
-                $this->actualizarRentabilidadVenta($mov);
-            }
-
-            // Si es insumo de PREPARADA, actualizar costos del insumo y del producto final (en cascada)
-            if ($mov->tipo === self::TIPO_PREPARADA_SALIDA && $mov->detalle_id) {
-                $this->actualizarCostoPreparada($mov);
-            }
-
-            // Avanzar saldos para el siguiente movimiento
-            $stockActual = $stockNuevo;
-            $costoActual = $costoNuevo;
-        }
-
-        // Actualizar producto con saldos del último movimiento procesado
-        if ($actualizarStock) {
-            Producto::where('id', $productoId)->update([
-                'stock_almacen' => round($stockActual, 4),
-                'costo_unitario' => round($costoActual, 4),
-            ]);
-        } else {
-            Producto::where('id', $productoId)->update([
-                'costo_unitario' => round($costoActual, 4),
-            ]);
-        }
+            $this->recalcularKardexProductoDesdeFechaBloqueado(
+                $productoId,
+                $fechaDesde,
+                $actualizarStock
+            );
+        }, 3);
     }
 
     /**
@@ -716,7 +662,7 @@ class MovimientoService
      *
      * Algoritmo:
      * 1. Toma el costo_nuevo del movimiento anterior como semilla.
-     * 2. Recorre los movimientos desde $desdeMovimientoId en orden de ID ASC.
+     * 2. Recorre los movimientos desde $desdeMovimientoId en orden cronológico.
      * 3. Para cada movimiento, LEE stock_anterior/stock_nuevo existentes.
      * 4. Calcula el nuevo CPP usando esos stocks + el nuevo costo propagado.
      * 5. Actualiza SOLO los campos de costo en cada movimiento.
@@ -724,25 +670,46 @@ class MovimientoService
      * 7. Si encuentra PREPARADA_SALIDA, cascadea a actualizarCostoPreparada.
      * 8. Al final, actualiza solo productos.costo_unitario.
      *
-     * @param  int  $productoId          ID del producto a propagar costos
-     * @param  int  $desdeMovimientoId   ID del movimiento desde donde propagar
+     * @param  int  $productoId  ID del producto a propagar costos
+     * @param  int  $desdeMovimientoId  ID del movimiento desde donde propagar
      */
     private function propagarSoloCostosProducto(int $productoId, int $desdeMovimientoId): void
     {
+        Producto::whereKey($productoId)->lockForUpdate()->firstOrFail();
+
         // ────────────────────────────────────────────────────────────
         // Obtener el costo del movimiento anterior como punto de partida.
         // Solo necesitamos el costo (costo_nuevo), no el stock.
         // ────────────────────────────────────────────────────────────
+        $movimientoInicial = Movimiento::where('producto_id', $productoId)
+            ->findOrFail($desdeMovimientoId);
+
         $movimientoAnterior = Movimiento::where('producto_id', $productoId)
-            ->where('id', '<', $desdeMovimientoId)
+            ->where(function ($query) use ($movimientoInicial): void {
+                $query->where('fecha', '<', $movimientoInicial->fecha)
+                    ->orWhere(function ($sameDateQuery) use ($movimientoInicial): void {
+                        $sameDateQuery->where('fecha', $movimientoInicial->fecha)
+                            ->where('id', '<', $movimientoInicial->id);
+                    });
+            })
+            ->orderBy('fecha', 'desc')
             ->orderBy('id', 'desc')
             ->first();
 
-        $costoActual = $movimientoAnterior ? (float) $movimientoAnterior->costo_nuevo : 0;
+        $costoActual = $movimientoAnterior
+            ? (float) $movimientoAnterior->costo_nuevo
+            : (float) $movimientoInicial->costo_actual;
 
-        // Traer TODOS los movimientos desde el punto de corrección hacia adelante
+        // Propagar desde la clave cronológica exacta (fecha, id).
         $movimientos = Movimiento::where('producto_id', $productoId)
-            ->where('id', '>=', $desdeMovimientoId)
+            ->where(function ($query) use ($movimientoInicial): void {
+                $query->where('fecha', '>', $movimientoInicial->fecha)
+                    ->orWhere(function ($sameDateQuery) use ($movimientoInicial): void {
+                        $sameDateQuery->where('fecha', $movimientoInicial->fecha)
+                            ->where('id', '>=', $movimientoInicial->id);
+                    });
+            })
+            ->orderBy('fecha', 'asc')
             ->orderBy('id', 'asc')
             ->get();
 
@@ -750,8 +717,18 @@ class MovimientoService
             // ────────────────────────────────────────────────────────
             // LEER stocks existentes del movimiento (NO se modifican)
             // ────────────────────────────────────────────────────────
+            if ($this->esAperturaLegado($mov)) {
+                [, $costoActual] = $this->aplicarAperturaLegado(
+                    $mov,
+                    (float) $mov->stock_anterior,
+                    $costoActual
+                );
+
+                continue;
+            }
+
             $stockAnterior = (float) $mov->stock_anterior;
-            $stockNuevo    = (float) $mov->stock_nuevo;
+            $stockNuevo = (float) $mov->stock_nuevo;
 
             $valorAnterior = $stockAnterior * $costoActual;
 
@@ -759,7 +736,7 @@ class MovimientoService
                 // === ENTRADA (Compra / Preparada Ingreso) ===
                 // El costo_unitario del ingreso ya fue actualizado por actualizarCostoPreparada
                 // para el movimiento semilla; para otros ingresos, se mantiene el existente.
-                $costoMov   = (float) $mov->costo_unitario;
+                $costoMov = (float) $mov->costo_unitario;
                 $costoTotal = (float) $mov->entrada * $costoMov;
                 $valorNuevo = $valorAnterior + $costoTotal;
 
@@ -774,7 +751,7 @@ class MovimientoService
             } else {
                 // === SALIDA (Venta / Preparada Salida / Préstamo) ===
                 // En salidas, el costo unitario es el CPP vigente (costoActual)
-                $costoMov   = $costoActual;
+                $costoMov = $costoActual;
                 $costoTotal = (float) $mov->salida * $costoMov;
                 $valorNuevo = $valorAnterior - $costoTotal;
                 $costoNuevo = $costoActual; // CPP no cambia en salidas normales
@@ -784,12 +761,12 @@ class MovimientoService
             // Actualizar SOLO campos de costo (stock NO se toca)
             // ────────────────────────────────────────────────────────
             $mov->update([
-                'costo_actual'    => round($costoActual, 4),
-                'valor_anterior'  => round($valorAnterior, 4),
-                'costo_unitario'  => round($costoMov, 4),
-                'costo_total'     => round($costoTotal, 4),
-                'costo_nuevo'     => round($costoNuevo, 4),
-                'valor_nuevo'     => round($valorNuevo, 4),
+                'costo_actual' => round($costoActual, 4),
+                'valor_anterior' => round($valorAnterior, 4),
+                'costo_unitario' => round($costoMov, 4),
+                'costo_total' => round($costoTotal, 4),
+                'costo_nuevo' => round($costoNuevo, 4),
+                'valor_nuevo' => round($valorNuevo, 4),
                 // NO se actualizan: stock_anterior, stock_nuevo, entrada, salida
             ]);
 
@@ -800,7 +777,11 @@ class MovimientoService
 
             // Si es insumo de PREPARADA, propagar costo en cascada al producto final
             if ($mov->tipo === self::TIPO_PREPARADA_SALIDA && $mov->detalle_id) {
-                $this->actualizarCostoPreparada($mov);
+                if ($mov->transaccion_tipo === 'preparadas') {
+                    $this->actualizarCostoPreparada($mov);
+                } elseif ($mov->transaccion_tipo === 'nucleo_preparadas') {
+                    $this->actualizarCostoNucleoPreparada($mov);
+                }
             }
 
             // Avanzar costo para el siguiente movimiento
@@ -818,6 +799,322 @@ class MovimientoService
     // ─── Métodos privados ───────────────────────────────────
 
     /**
+     * Registra aperturas absolutas y reconstruye el kardex posterior en una
+     * sola secuencia global fecha/id.
+     *
+     * @param  array<int, array{producto_id:int, stock_apertura:float, costo_apertura:float, fuente_costo?:string}>  $aperturas
+     * @return array{aperturas:int, movimientos:int, productos:int}
+     */
+    public function reconciliarAperturasLegacy(array $aperturas, string $fechaApertura): array
+    {
+        $fecha = Carbon::parse($fechaApertura)->format('Y-m-d H:i:s');
+        $transaccionId = (int) Carbon::parse($fecha)->format('Ymd');
+
+        return DB::transaction(function () use ($aperturas, $fecha, $transaccionId): array {
+            $idsApertura = collect($aperturas)
+                ->pluck('producto_id')
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values();
+
+            $idsConMovimientos = Movimiento::where('fecha', '>=', $fecha)
+                ->where('producto_id', '!=', 77)
+                ->distinct()
+                ->pluck('producto_id');
+
+            $productoIds = $idsApertura
+                ->merge($idsConMovimientos)
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->sort()
+                ->values();
+
+            $this->bloquearProductos($productoIds->all());
+            $productos = Producto::whereIn('id', $productoIds)->get()->keyBy('id');
+
+            foreach ($aperturas as $apertura) {
+                $productoId = (int) $apertura['producto_id'];
+                $producto = $productos->get($productoId);
+
+                if (! $producto) {
+                    throw new \RuntimeException("Producto {$productoId} no existe durante la reconciliacion.");
+                }
+
+                $existentes = Movimiento::where('producto_id', $productoId)
+                    ->where('tipo', self::TIPO_APERTURA_LEGADO)
+                    ->where('transaccion_tipo', self::TRANSACCION_APERTURA_LEGADO)
+                    ->where('transaccion_id', $transaccionId)
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($existentes->count() > 1) {
+                    throw new \RuntimeException("Existen aperturas legacy duplicadas para el producto {$productoId}.");
+                }
+
+                $stockObjetivo = round((float) $apertura['stock_apertura'], 4);
+                $costoObjetivo = round((float) $apertura['costo_apertura'], 4);
+                $comentario = '[APERTURA LEGADO] Saldo autoritativo al cierre del sistema anterior. Fuente CPP: '
+                    .($apertura['fuente_costo'] ?? 'CSV');
+
+                $datosObjetivo = [
+                    'fecha' => $fecha,
+                    'tipo' => self::TIPO_APERTURA_LEGADO,
+                    'transaccion_tipo' => self::TRANSACCION_APERTURA_LEGADO,
+                    'transaccion_id' => $transaccionId,
+                    'detalle_id' => null,
+                    'producto_id' => $productoId,
+                    'producto_nombre' => $producto->nombre,
+                    'empaque' => $producto->empaque,
+                    'unidad_codigo' => $producto->unidad_codigo,
+                    // En este tipo especial cantidad guarda el stock absoluto objetivo.
+                    'cantidad' => $stockObjetivo,
+                    'cantidad_kg' => 0,
+                    'costo_unitario' => $costoObjetivo,
+                    'user_id' => auth()->id(),
+                    'comentario' => $comentario,
+                ];
+
+                if ($existentes->isNotEmpty()) {
+                    $existentes->first()->update($datosObjetivo);
+                } else {
+                    Movimiento::create($datosObjetivo + [
+                        'entrada' => 0,
+                        'salida' => 0,
+                        'costo_total' => 0,
+                        'stock_anterior' => 0,
+                        'costo_actual' => 0,
+                        'valor_anterior' => 0,
+                        'stock_nuevo' => $stockObjetivo,
+                        'costo_nuevo' => $costoObjetivo,
+                        'valor_nuevo' => round($stockObjetivo * $costoObjetivo, 4),
+                    ]);
+                }
+            }
+
+            $movimientos = $this->recalcularKardexGlobalDesdeFechaBloqueado(
+                $productoIds->all(),
+                $fecha
+            );
+
+            // Una rectificacion puede reutilizar IDs y dejar el ingreso de una
+            // preparada antes que alguno de sus insumos en la misma fecha. La
+            // segunda pasada parte de los costos de detalle ya estabilizados y
+            // garantiza el CPP correcto del producto final y sus consumidores.
+            $this->recalcularKardexGlobalDesdeFechaBloqueado(
+                $productoIds->all(),
+                $fecha
+            );
+
+            return [
+                'aperturas' => count($aperturas),
+                'movimientos' => $movimientos,
+                'productos' => $productoIds->count(),
+            ];
+        }, 3);
+    }
+
+    /**
+     * Reconstruye productos interdependientes en el mismo orden contable.
+     * Debe ejecutarse dentro de una transaccion con productos bloqueados.
+     */
+    private function recalcularKardexGlobalDesdeFechaBloqueado(array $productoIds, string $fechaDesde): int
+    {
+        $estados = [];
+
+        foreach ($productoIds as $productoId) {
+            $anterior = Movimiento::where('producto_id', $productoId)
+                ->where('fecha', '<', $fechaDesde)
+                ->orderBy('fecha', 'desc')
+                ->orderBy('id', 'desc')
+                ->first();
+            $primero = Movimiento::where('producto_id', $productoId)
+                ->where('fecha', '>=', $fechaDesde)
+                ->orderBy('fecha')
+                ->orderBy('id')
+                ->first();
+
+            if ($anterior) {
+                $estados[$productoId] = [(float) $anterior->stock_nuevo, (float) $anterior->costo_nuevo];
+            } elseif ($primero) {
+                $estados[$productoId] = [(float) $primero->stock_anterior, (float) $primero->costo_actual];
+            }
+        }
+
+        $movimientos = Movimiento::whereIn('producto_id', $productoIds)
+            ->where('fecha', '>=', $fechaDesde)
+            ->orderBy('fecha')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($movimientos as $movimiento) {
+            $productoId = (int) $movimiento->producto_id;
+            [$stockActual, $costoActual] = $estados[$productoId] ?? [0.0, 0.0];
+
+            if ($this->esAperturaLegado($movimiento)) {
+                $estados[$productoId] = $this->aplicarAperturaLegado(
+                    $movimiento,
+                    $stockActual,
+                    $costoActual
+                );
+
+                continue;
+            }
+
+            // El costo de ingreso pudo cambiar al procesar los insumos de la
+            // misma produccion unos IDs antes.
+            if ($movimiento->tipo === self::TIPO_PREPARADA_INGRESO) {
+                $movimiento->refresh();
+            }
+
+            $valorAnterior = $stockActual * $costoActual;
+
+            if ((float) $movimiento->entrada > 0) {
+                $cantidad = (float) $movimiento->entrada;
+                $costoMovimiento = (float) $movimiento->costo_unitario;
+                $costoTotal = $cantidad * $costoMovimiento;
+                $stockNuevo = $stockActual + $cantidad;
+                $valorNuevo = $valorAnterior + $costoTotal;
+
+                if ($stockActual <= 0) {
+                    $costoNuevo = $costoMovimiento;
+                    $valorNuevo = $stockNuevo * $costoMovimiento;
+                } elseif ($stockNuevo != 0.0) {
+                    $costoNuevo = round($valorNuevo / $stockNuevo, 4);
+                } else {
+                    $costoNuevo = $costoMovimiento;
+                    $valorNuevo = 0.0;
+                }
+            } else {
+                $cantidad = (float) $movimiento->salida;
+                $esSalidaForzada = false;
+
+                if ($movimiento->tipo === self::TIPO_PRESTAMO_SALIDA) {
+                    $prestamo = \App\Models\Prestamo::find($movimiento->transaccion_id);
+                    $esSalidaForzada = $prestamo && $prestamo->prestamo_referencia_id;
+                }
+
+                $costoMovimiento = $esSalidaForzada
+                    ? (float) $movimiento->costo_unitario
+                    : $costoActual;
+                $costoTotal = $cantidad * $costoMovimiento;
+                $stockNuevo = $stockActual - $cantidad;
+                $valorNuevo = $valorAnterior - $costoTotal;
+                $costoNuevo = ($esSalidaForzada && $stockNuevo > 0)
+                    ? round($valorNuevo / $stockNuevo, 4)
+                    : $costoActual;
+            }
+
+            $movimiento->update([
+                'stock_anterior' => round($stockActual, 4),
+                'costo_actual' => round($costoActual, 4),
+                'valor_anterior' => round($valorAnterior, 4),
+                'costo_unitario' => round($costoMovimiento, 4),
+                'costo_total' => round($costoTotal, 4),
+                'stock_nuevo' => round($stockNuevo, 4),
+                'costo_nuevo' => round($costoNuevo, 4),
+                'valor_nuevo' => round($valorNuevo, 4),
+            ]);
+
+            if ($movimiento->tipo === self::TIPO_VENTA && $movimiento->detalle_id) {
+                $this->actualizarRentabilidadVenta($movimiento);
+            }
+
+            if ($movimiento->tipo === self::TIPO_PREPARADA_SALIDA && $movimiento->detalle_id) {
+                if ($movimiento->transaccion_tipo === 'preparadas') {
+                    $this->actualizarCostoPreparada($movimiento, false);
+                } elseif ($movimiento->transaccion_tipo === 'nucleo_preparadas') {
+                    $this->actualizarCostoNucleoPreparada($movimiento, false);
+                }
+            }
+
+            $estados[$productoId] = [$stockNuevo, $costoNuevo];
+        }
+
+        foreach ($estados as $productoId => [$stock, $costo]) {
+            Producto::whereKey($productoId)->update([
+                'stock_almacen' => round($stock, 4),
+                'costo_unitario' => round($costo, 4),
+            ]);
+        }
+
+        return $movimientos->count();
+    }
+
+    private function esAperturaLegado(Movimiento $movimiento): bool
+    {
+        return $movimiento->tipo === self::TIPO_APERTURA_LEGADO
+            && $movimiento->transaccion_tipo === self::TRANSACCION_APERTURA_LEGADO;
+    }
+
+    /**
+     * Aplica un punto de apertura absoluto sin borrar el historial anterior.
+     * `cantidad` conserva el stock objetivo y `costo_unitario` el CPP objetivo.
+     * Entrada/salida se recalculan para mantener la formula contable del kardex.
+     *
+     * @return array{0: float, 1: float}
+     */
+    private function aplicarAperturaLegado(
+        Movimiento $movimiento,
+        float $stockAnterior,
+        float $costoAnterior
+    ): array {
+        $stockObjetivo = round((float) $movimiento->cantidad, 4);
+        $costoObjetivo = round((float) $movimiento->costo_unitario, 4);
+        $diferencia = round($stockObjetivo - $stockAnterior, 4);
+        $entrada = max($diferencia, 0);
+        $salida = max(-$diferencia, 0);
+        $valorAnterior = round($stockAnterior * $costoAnterior, 4);
+        $valorNuevo = round($stockObjetivo * $costoObjetivo, 4);
+
+        $movimiento->update([
+            'cantidad_kg' => 0,
+            'entrada' => $entrada,
+            'salida' => $salida,
+            'costo_total' => round($valorNuevo - $valorAnterior, 4),
+            'stock_anterior' => round($stockAnterior, 4),
+            'costo_actual' => round($costoAnterior, 4),
+            'valor_anterior' => $valorAnterior,
+            'stock_nuevo' => $stockObjetivo,
+            'costo_nuevo' => $costoObjetivo,
+            'valor_nuevo' => $valorNuevo,
+        ]);
+
+        return [$stockObjetivo, $costoObjetivo];
+    }
+
+    private function validarParametrosMovimiento(array $params, bool $esIngreso): void
+    {
+        foreach (['fecha', 'tipo', 'transaccion_tipo', 'transaccion_id', 'producto_id'] as $campo) {
+            if (! array_key_exists($campo, $params) || $params[$campo] === '' || $params[$campo] === null) {
+                throw new \InvalidArgumentException("El campo {$campo} es obligatorio para registrar un movimiento.");
+            }
+        }
+
+        try {
+            Carbon::parse($params['fecha']);
+        } catch (\Throwable) {
+            throw new \InvalidArgumentException('La fecha del movimiento no es válida.');
+        }
+
+        $cantidad = (float) ($params['cantidad'] ?? 0);
+        $cantidadKg = (float) ($params['cantidad_kg'] ?? 0);
+
+        if ($cantidad < 0 || $cantidadKg < 0) {
+            throw new \InvalidArgumentException('Las cantidades del movimiento no pueden ser negativas.');
+        }
+
+        if ($esIngreso) {
+            if (! array_key_exists('costo_unitario', $params)) {
+                throw new \InvalidArgumentException('El costo unitario es obligatorio para un ingreso.');
+            }
+
+            if ((float) $params['costo_unitario'] < 0) {
+                throw new \InvalidArgumentException('El costo unitario no puede ser negativo.');
+            }
+        }
+    }
+
+    /**
      * Actualiza el costo y rentabilidad de un detalle de venta
      * cuando se recalcula el kardex.
      *
@@ -825,6 +1122,10 @@ class MovimientoService
      */
     private function actualizarRentabilidadVenta(Movimiento $mov): void
     {
+        if ($mov->transaccion_tipo !== 'ventas') {
+            return;
+        }
+
         $detalle = DB::table('venta_detalles')->where('id', $mov->detalle_id)->first();
 
         if (! $detalle) {
@@ -875,8 +1176,12 @@ class MovimientoService
      *
      * @param  Movimiento  $mov  Movimiento de tipo PREPARADA_SALIDA con detalle_id
      */
-    private function actualizarCostoPreparada(Movimiento $mov): void
+    private function actualizarCostoPreparada(Movimiento $mov, bool $propagar = true): void
     {
+        if ($mov->transaccion_tipo !== 'preparadas') {
+            return;
+        }
+
         // Fix 1: Filtrar por preparada_id para evitar que un detalle_id apunte a un detalle
         // de OTRA preparada por coincidencia de auto-increment. Esto detiene la cascada
         // cruzada que afecta a productos no relacionados al recalcular el kardex.
@@ -960,7 +1265,83 @@ class MovimientoService
                 //   b) Que la cadena de stocks se corrompa cuando hay movimientos retroactivos
                 //      (ID alto pero fecha anterior), ya que recalcularKardexProducto ordena
                 //      por ID pero la cadena original pudo construirse en orden cronológico.
-                $this->propagarSoloCostosProducto($movIngresoFinal->producto_id, $movIngresoFinal->id);
+                if ($propagar) {
+                    $this->propagarSoloCostosProducto($movIngresoFinal->producto_id, $movIngresoFinal->id);
+                }
+            }
+        }
+    }
+
+    /**
+     * Actualiza costos de una preparacion de nucleo durante el replay global.
+     * No propaga por separado: el ingreso y sus movimientos posteriores seran
+     * procesados despues en la misma secuencia fecha/id.
+     */
+    private function actualizarCostoNucleoPreparada(Movimiento $movimiento, bool $propagar = true): void
+    {
+        $detalle = DB::table('nucleo_preparada_detalles')
+            ->where('id', $movimiento->detalle_id)
+            ->where('nucleo_preparada_id', $movimiento->transaccion_id)
+            ->first();
+
+        if (! $detalle) {
+            return;
+        }
+
+        $empaque = (float) ($detalle->producto_empaque ?: 1);
+        $costoKg = $empaque > 0
+            ? (float) $movimiento->costo_unitario / $empaque
+            : 0;
+
+        DB::table('nucleo_preparada_detalles')
+            ->where('id', $movimiento->detalle_id)
+            ->where('nucleo_preparada_id', $movimiento->transaccion_id)
+            ->update([
+                'costo_unitario' => round($costoKg, 4),
+                'salida_soles' => round((float) $movimiento->costo_total, 4),
+            ]);
+
+        $totalSoles = (float) DB::table('nucleo_preparada_detalles')
+            ->where('nucleo_preparada_id', $movimiento->transaccion_id)
+            ->sum('salida_soles');
+        $preparada = DB::table('nucleo_preparadas')
+            ->where('id', $movimiento->transaccion_id)
+            ->first();
+
+        if (! $preparada) {
+            return;
+        }
+
+        $ingresoSaco = (float) $preparada->ingreso_saco;
+        $costoFinal = $ingresoSaco > 0 ? $totalSoles / $ingresoSaco : 0;
+
+        DB::table('nucleo_preparadas')
+            ->where('id', $movimiento->transaccion_id)
+            ->update([
+                'ingreso_soles' => round($totalSoles, 4),
+                'costo_unitario' => round($costoFinal, 4),
+            ]);
+
+        $ingreso = Movimiento::where('transaccion_tipo', 'nucleo_preparadas')
+            ->where('transaccion_id', $movimiento->transaccion_id)
+            ->where('tipo', self::TIPO_PREPARADA_INGRESO)
+            ->first();
+
+        if (! $ingreso) {
+            return;
+        }
+
+        $cantidadStock = (float) $ingreso->entrada;
+        $costoBase = $cantidadStock > 0 ? $totalSoles / $cantidadStock : $costoFinal;
+        if (abs((float) $ingreso->costo_unitario - $costoBase) > 0.0001
+            || abs((float) $ingreso->costo_total - $totalSoles) > 0.001) {
+            $ingreso->update([
+                'costo_unitario' => round($costoBase, 4),
+                'costo_total' => round($totalSoles, 4),
+            ]);
+
+            if ($propagar) {
+                $this->propagarSoloCostosProducto($ingreso->producto_id, $ingreso->id);
             }
         }
     }

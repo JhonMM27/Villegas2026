@@ -63,6 +63,8 @@ class CompraService
             $compra = Compra::create($compraData['compra']);
             $detallesCreados = $compra->detalles()->createMany($compraData['detalles']);
 
+            $this->movimientoService->bloquearProductos($detallesCreados->pluck('producto_id')->all());
+
             // 3) Registrar movimientos de INGRESO en el kardex por cada detalle
             foreach ($detallesCreados as $detalle) {
                 // CPP usa costo total por unidad = costo producto + costo servicio
@@ -103,21 +105,6 @@ class CompraService
             //   3. No depender de la fecha actual: la detección ya
             //      usa el último movimiento del producto.
             // ────────────────────────────────────────────────────────────
-            // 3.1) Recalcular en cascada si la fecha de compra es anterior a hoy
-            // IMPORTANTE: se pasa datetime completo (Y-m-d H:i:s) para que el punto de partida
-            // sea el último movimiento ANTES de la hora exacta, no antes del día completo.
-            $fechaCompra = $compra->fecha_compra instanceof \Carbon\Carbon
-                ? $compra->fecha_compra
-                : \Carbon\Carbon::parse($compra->fecha_compra);
-
-            if ($fechaCompra->lt(today())) {
-                foreach ($detallesCreados as $detalle) {
-                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                        $detalle->producto_id,
-                        $fechaCompra->format('Y-m-d H:i:s')
-                    );
-                }
-            }
             // 4) Incrementar correlativo solo para Notas de Compra (NC)
             if ($comprobanteTipoCodigo === 'NC') {
                 ComprobanteSerie::where('comprobante_tipo_codigo', $comprobanteTipoCodigo)
@@ -150,6 +137,7 @@ class CompraService
             $compraAnuladaId, $data
         ) {
             $compraAnulada = Compra::with('detalles')->findOrFail($compraAnuladaId);
+            $productoIdsAnteriores = $compraAnulada->detalles->pluck('producto_id')->all();
 
             // Validar que esté anulada
             if ($compraAnulada->estado !== 'anulada') {
@@ -181,6 +169,11 @@ class CompraService
             // 2) Reemplazar detalles: eliminamos los anteriores y creamos los nuevos
             $compraAnulada->detalles()->delete();
             $detallesCreados = $compraAnulada->detalles()->createMany($compraData['detalles']);
+
+            $this->movimientoService->bloquearProductos(array_merge(
+                $productoIdsAnteriores,
+                $detallesCreados->pluck('producto_id')->all()
+            ));
 
             // ────────────────────────────────────────────────────────────
             // BLOQUE: Reconstrucción de movimientos del kardex
@@ -264,28 +257,10 @@ class CompraService
                 : \Carbon\Carbon::parse($compraAnulada->fecha_compra);
 
             foreach (array_unique($productosAfectados) as $productoId) {
-                if ($fechaCompra->lt(today())) {
-                    // Fecha pasada: recalcular en cascada desde la fecha+hora de la compra
-                    // IMPORTANTE: se pasa datetime completo (Y-m-d H:i:s) para que el punto de
-                    // partida sea el último movimiento ANTES de la hora exacta de la compra.
-                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                        $productoId,
-                        $fechaCompra->format('Y-m-d H:i:s')
-                    );
-                } else {
-                    // Fecha actual o futura: recalcular desde el primer movimiento
-                    $primerMov = Movimiento::where('transaccion_id', $compraAnulada->id)
-                        ->where('producto_id', $productoId)
-                        ->orderBy('id', 'asc')
-                        ->first();
-
-                    if ($primerMov) {
-                        $this->movimientoService->recalcularKardexProducto(
-                            $productoId,
-                            $primerMov->id
-                        );
-                    }
-                }
+                $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                    $productoId,
+                    $fechaCompra->format('Y-m-d H:i:s')
+                );
             }
 
             return $compraAnulada;
@@ -332,6 +307,8 @@ class CompraService
                     $productosAfectados[] = $detalle->producto_id;
                 }
             }
+
+            $this->movimientoService->bloquearProductos($productosAfectados);
 
             // 3) Para cada producto, obtener los IDs de movimientos originales
             //    de esta compra y recalcular excluyéndolos.

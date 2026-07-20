@@ -56,6 +56,11 @@ class NucleoPreparadaService
             $detallesCreados = $preparada->detalles()->createMany($preparadaData['detalles']);
             $preparada->load('detalles');
 
+            $this->movimientoService->bloquearProductos(array_merge(
+                $detallesCreados->pluck('producto_id')->all(),
+                [$preparada->nucleo_id]
+            ));
+
             // 3) Registrar SALIDA de insumos en el kardex (excluir producto ID 77)
             foreach ($detallesCreados as $detalle) {
                 // Excluir producto ID 77 (servicio mezclado)
@@ -149,6 +154,8 @@ class NucleoPreparadaService
                 $productosAfectados[] = $preparada->nucleo_id;
             }
 
+            $this->movimientoService->bloquearProductos($productosAfectados);
+
             // 3) Recalcular kardex para productos afectados
             foreach ($productosAfectados as $productoId) {
                 $movIds = Movimiento::where('transaccion_tipo', 'nucleo_preparadas')
@@ -179,6 +186,8 @@ class NucleoPreparadaService
     {
         return DB::transaction(function () use ($preparadaId, $data) {
             $preparada = NucleoPreparada::findOrFail($preparadaId);
+            $productoIdsAnteriores = $preparada->detalles()->pluck('producto_id')->all();
+            $productoIdsAnteriores[] = $preparada->nucleo_id;
 
             if ($preparada->estado !== 'anulada') {
                 throw new \Exception('Solo se pueden rectificar Preparaciones de Núcleo en estado anulada.');
@@ -207,11 +216,15 @@ class NucleoPreparadaService
             $detallesNuevos = $preparada->detalles()->createMany($preparadaDataRaw['detalles']);
             $preparada->load('detalles');
 
-            // 4) ELIMINAR movimientos existentes de esta nucleo_preparada
-            // (se reemplazarán por movimientos nuevos con datos correctos)
-            Movimiento::where('transaccion_tipo', 'nucleo_preparadas')
-                ->where('transaccion_id', $preparada->id)
-                ->delete();
+            $this->movimientoService->bloquearProductos(array_merge(
+                $productoIdsAnteriores,
+                $detallesNuevos->pluck('producto_id')->all(),
+                [$preparada->nucleo_id]
+            ));
+
+            // Los movimientos neutralizados se conservan como trazabilidad.
+            // La rectificación agrega movimientos activos nuevos y nunca borra
+            // registros históricos del kardex.
 
             // 5) Registrar SALIDA de insumos en el kardex (siempre movimientos nuevos)
             $productosAfectados = [];
@@ -267,20 +280,10 @@ class NucleoPreparadaService
                 : \Carbon\Carbon::parse($preparada->fecha);
 
             foreach (array_unique($productosAfectados) as $pId) {
-                if ($fechaPreparada->lt(today())) {
-                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                        $pId,
-                        $fechaPreparada->format('Y-m-d H:i:s')
-                    );
-                } else {
-                    $primerMov = Movimiento::where('transaccion_id', $preparada->id)
-                        ->where('producto_id', $pId)
-                        ->orderBy('id', 'asc')
-                        ->first();
-                    if ($primerMov) {
-                        $this->movimientoService->recalcularKardexProducto($pId, $primerMov->id);
-                    }
-                }
+                $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                    $pId,
+                    $fechaPreparada->format('Y-m-d H:i:s')
+                );
             }
 
             return [

@@ -90,6 +90,10 @@ class CuadreStockService
                 'user_id' => $data['user_id'] ?? auth()->id(),
             ]);
 
+            $this->movimientoService->bloquearProductos(
+                collect($data['detalles'])->pluck('producto_id')->all()
+            );
+
             $detallesAjustados = [];
 
             foreach ($data['detalles'] as $detalle) {
@@ -168,6 +172,8 @@ class CuadreStockService
                 }
             }
 
+            $this->movimientoService->bloquearProductos($productosAfectados);
+
             $cuadre->update(['estado' => 'anulado']);
 
             foreach ($productosAfectados as $productoId) {
@@ -205,6 +211,12 @@ class CuadreStockService
                     $productosAfectados[] = $detalle->producto_id;
                 }
             }
+
+            $productosAfectados = array_values(array_unique(array_merge(
+                $productosAfectados,
+                collect($data['detalles'])->pluck('producto_id')->map(fn ($id): int => (int) $id)->all()
+            )));
+            $this->movimientoService->bloquearProductos($productosAfectados);
 
             $cuadre->update([
                 'estado' => 'completado',
@@ -292,8 +304,10 @@ class CuadreStockService
             }
 
             foreach ($productosAfectados as $productoId) {
-                $primerMov = Movimiento::where('transaccion_id', $cuadre->id)
+                $primerMov = Movimiento::where('transaccion_tipo', MovimientoService::TRANSACCION_AJUSTES)
+                    ->where('transaccion_id', $cuadre->id)
                     ->where('producto_id', $productoId)
+                    ->orderBy('fecha', 'asc')
                     ->orderBy('id', 'asc')
                     ->first();
 

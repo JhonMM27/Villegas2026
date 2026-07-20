@@ -48,7 +48,9 @@ class KardexValidarCommand extends Command
             }
 
             $problemas = [];
-            $stockEsperado = 0.0;
+            // Las aperturas históricas se migraron en stock_anterior del
+            // primer movimiento, no como un movimiento de tipo APERTURA.
+            $stockEsperado = (float) $movimientos->first()->stock_anterior;
 
             foreach ($movimientos as $index => $mov) {
                 $stockEsperadoRedondeado = round($stockEsperado, 4);
@@ -56,6 +58,7 @@ class KardexValidarCommand extends Command
 
                 if (abs($stockAnterior - $stockEsperadoRedondeado) > 0.0001) {
                     $problemas[] = [
+                        'problema' => 'CADENA',
                         'id' => $mov->id,
                         'fecha' => $mov->fecha,
                         'tipo' => $mov->tipo,
@@ -65,7 +68,51 @@ class KardexValidarCommand extends Command
                     ];
                 }
 
+                $stockNuevoCalculado = round(
+                    $stockAnterior + (float) $mov->entrada - (float) $mov->salida,
+                    4
+                );
+
+                if (abs((float) $mov->stock_nuevo - $stockNuevoCalculado) > 0.0001) {
+                    $problemas[] = [
+                        'problema' => 'FÓRMULA',
+                        'id' => $mov->id,
+                        'fecha' => $mov->fecha,
+                        'tipo' => $mov->tipo,
+                        'stock_esperado' => $stockNuevoCalculado,
+                        'stock_anterior_actual' => (float) $mov->stock_nuevo,
+                        'diferencia' => round((float) $mov->stock_nuevo - $stockNuevoCalculado, 4),
+                    ];
+                }
+
+                $valorEsperado = round((float) $mov->stock_nuevo * (float) $mov->costo_nuevo, 4);
+                $toleranciaValor = max(0.1, abs($valorEsperado) * 0.00001);
+                if (abs((float) $mov->valor_nuevo - $valorEsperado) > $toleranciaValor) {
+                    $problemas[] = [
+                        'problema' => 'VALORIZACIÓN',
+                        'id' => $mov->id,
+                        'fecha' => $mov->fecha,
+                        'tipo' => $mov->tipo,
+                        'stock_esperado' => $valorEsperado,
+                        'stock_anterior_actual' => (float) $mov->valor_nuevo,
+                        'diferencia' => round((float) $mov->valor_nuevo - $valorEsperado, 4),
+                    ];
+                }
+
                 $stockEsperado = (float) $mov->stock_nuevo;
+            }
+
+            $ultimoMovimiento = $movimientos->last();
+            if (abs((float) $producto->stock_almacen - (float) $ultimoMovimiento->stock_nuevo) > 0.0001) {
+                $problemas[] = [
+                    'problema' => 'SALDO PRODUCTO',
+                    'id' => $ultimoMovimiento->id,
+                    'fecha' => $ultimoMovimiento->fecha,
+                    'tipo' => $ultimoMovimiento->tipo,
+                    'stock_esperado' => (float) $ultimoMovimiento->stock_nuevo,
+                    'stock_anterior_actual' => (float) $producto->stock_almacen,
+                    'diferencia' => round((float) $producto->stock_almacen - (float) $ultimoMovimiento->stock_nuevo, 4),
+                ];
             }
 
             $productoOk = empty($problemas);
@@ -79,8 +126,9 @@ class KardexValidarCommand extends Command
                 $totalProblemas += count($problemas);
 
                 $this->table(
-                    ['ID', 'Fecha', 'Tipo', 'Stock Esperado', 'Stock Anterior', 'Diferencia'],
+                    ['Problema', 'ID', 'Fecha', 'Tipo', 'Esperado', 'Actual', 'Diferencia'],
                     array_map(fn ($p) => [
+                        $p['problema'],
                         $p['id'],
                         $p['fecha'],
                         $p['tipo'],
@@ -106,7 +154,7 @@ class KardexValidarCommand extends Command
         if (! empty($productosConProblemas)) {
             $this->line('  IDs afectados: '.implode(', ', $productosConProblemas));
             $this->newLine();
-            $this->warn('Para corregir, ejecute: php artisan kardex:recalcular {producto_id} {fecha_inicio}');
+            $this->warn('Auditoría de solo lectura: no se modificó ningún dato.');
         }
 
         return self::SUCCESS;

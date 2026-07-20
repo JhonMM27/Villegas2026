@@ -72,6 +72,8 @@ class VentaService
             $venta = Venta::create($ventaData['venta']);
             $detallesCreados = $venta->detalles()->createMany($ventaData['detalles']);
 
+            $this->movimientoService->bloquearProductos($detallesCreados->pluck('producto_id')->all());
+
             // 5) Registrar movimientos de SALIDA en el kardex SOLO por la cantidad entregada
             //    Si entregado < cantidad, queda saldo pendiente que se gestiona en VentaEntrega
             foreach ($detallesCreados as $detalle) {
@@ -177,6 +179,8 @@ class VentaService
                 }
             }
 
+            $this->movimientoService->bloquearProductos($productosAfectados);
+
             // 3) Proceso de recálculo (neutralización lógica)
             foreach ($productosAfectados as $productoId) {
                 $movIds = Movimiento::where('transaccion_tipo', 'ventas')
@@ -205,6 +209,7 @@ class VentaService
     {
         return DB::transaction(function () use ($ventaId, $data) {
             $venta = Venta::findOrFail($ventaId);
+            $productoIdsAnteriores = $venta->detalles()->pluck('producto_id')->all();
 
             if ($venta->estado !== 'anulada') {
                 throw new \Exception('Solo se pueden rectificar ventas en estado anulada.');
@@ -234,6 +239,11 @@ class VentaService
             // Eliminamos detalles antiguos para reemplazarlos (más limpio que update individual)
             $venta->detalles()->delete();
             $detallesNuevos = $venta->detalles()->createMany($ventaDataRaw['detalles']);
+
+            $this->movimientoService->bloquearProductos(array_merge(
+                $productoIdsAnteriores,
+                $detallesNuevos->pluck('producto_id')->all()
+            ));
 
             // ────────────────────────────────────────────────────────────
             // BLOQUE: Reconstrucción de movimientos del kardex
@@ -323,21 +333,10 @@ class VentaService
                 : \Carbon\Carbon::parse($venta->fecha_venta);
 
             foreach (array_unique($productosAfectados) as $productoId) {
-                if ($fechaVenta->lt(today())) {
-                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                        $productoId,
-                        $fechaVenta->format('Y-m-d H:i:s')
-                    );
-                } else {
-                    $primerMov = Movimiento::where('transaccion_id', $venta->id)
-                        ->where('producto_id', $productoId)
-                        ->orderBy('id', 'asc')
-                        ->first();
-
-                    if ($primerMov) {
-                        $this->movimientoService->recalcularKardexProducto($productoId, $primerMov->id);
-                    }
-                }
+                $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                    $productoId,
+                    $fechaVenta->format('Y-m-d H:i:s')
+                );
             }
 
             return $venta;

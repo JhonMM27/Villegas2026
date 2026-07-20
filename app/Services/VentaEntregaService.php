@@ -71,6 +71,7 @@ class VentaEntregaService
                 //   movimientos huérfanos o con detalle_id incorrecto.
                 // ────────────────────────────────────────────────────────
                 $detallesCreados = $entrega->detalles()->createMany($entregaData['detalles']);
+                $this->movimientoService->bloquearProductos($detallesCreados->pluck('producto_id')->all());
                 $this->aplicarDetalleEnVentas($entrega->id);
 
                 // 4) Registrar movimientos de SALIDA en el kardex por cada detalle entregado
@@ -126,6 +127,7 @@ class VentaEntregaService
             $entrega->detalles()->delete();
             if (! empty($entregaData['detalles'])) {
                 $detallesCreados = $entrega->detalles()->createMany($entregaData['detalles']);
+                $this->movimientoService->bloquearProductos($detallesCreados->pluck('producto_id')->all());
                 $this->aplicarDetalleEnVentas($entrega->id);
 
                 // 5) Registrar nuevos movimientos de SALIDA
@@ -346,6 +348,7 @@ class VentaEntregaService
             ->get();
 
         $productosAfectados = $movimientos->pluck('producto_id')->unique()->toArray();
+        $this->movimientoService->bloquearProductos($productosAfectados);
 
         foreach ($productosAfectados as $productoId) {
             $movIds = $movimientos
@@ -431,6 +434,7 @@ class VentaEntregaService
             $entrega->detalles()->delete();
             if (! empty($entregaData['detalles'])) {
                 $detallesCreados = $entrega->detalles()->createMany($entregaData['detalles']);
+                $this->movimientoService->bloquearProductos($detallesCreados->pluck('producto_id')->all());
                 $this->aplicarDetalleEnVentas($entrega->id);
 
                 // 5) Registrar nuevos movimientos de SALIDA

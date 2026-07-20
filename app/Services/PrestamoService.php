@@ -90,6 +90,7 @@ class PrestamoService
             // 4) Persistir préstamo y sus detalles
             $prestamo = Prestamo::create($prestamoData['prestamo']);
             $detallesCreados = $prestamo->detalles()->createMany($prestamoData['detalles']);
+            $this->movimientoService->bloquearProductos($detallesCreados->pluck('producto_id')->all());
 
             // 5) Registrar movimientos en el kardex por cada detalle
             $movimientoTipo = $prestamoData['prestamo']['movimiento_tipo'];
@@ -153,6 +154,11 @@ class PrestamoService
             $prestamo->update($prestamoData['prestamo']);
             $prestamo->detalles()->delete();
             $detallesCreados = $prestamo->detalles()->createMany($prestamoData['detalles']);
+            $productosAfectados = array_values(array_unique(array_merge(
+                $productosAfectados,
+                $detallesCreados->pluck('producto_id')->all()
+            )));
+            $this->movimientoService->bloquearProductos($productosAfectados);
 
             // 4) Excluir (neutralizar) movimientos anteriores y recalcular kardex
             foreach ($productosAfectados as $productoId) {
@@ -183,22 +189,10 @@ class PrestamoService
                 : \Carbon\Carbon::parse($prestamo->fecha_prestamo);
 
             foreach ($productosAfectados as $prodId) {
-                if ($fechaPrestamo->lt(today())) {
-                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                        $prodId,
-                        $fechaPrestamo->format('Y-m-d H:i:s')
-                    );
-                } else {
-                    $primerMov = Movimiento::where('transaccion_tipo', 'prestamos')
-                        ->where('transaccion_id', $prestamo->id)
-                        ->where('producto_id', $prodId)
-                        ->orderBy('id', 'asc')
-                        ->first();
-
-                    if ($primerMov) {
-                        $this->movimientoService->recalcularKardexProducto($prodId, $primerMov->id);
-                    }
-                }
+                $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                    $prodId,
+                    $fechaPrestamo->format('Y-m-d H:i:s')
+                );
             }
 
             // Actualizar estado del préstamo original si este registro es una devolución
@@ -292,6 +286,8 @@ class PrestamoService
                 }
             }
 
+            $this->movimientoService->bloquearProductos($productosAfectados);
+
             foreach ($productosAfectados as $productoId) {
                 $movIds = Movimiento::where('transaccion_tipo', 'prestamos')
                     ->where('transaccion_id', $prestamo->id)
@@ -342,6 +338,7 @@ class PrestamoService
             $prestamoId, $data, $comprobanteTipoCodigo
         ) {
             $prestamo = Prestamo::findOrFail($prestamoId);
+            $productoIdsAnteriores = $prestamo->detalles()->pluck('producto_id')->all();
 
             if ($prestamo->estado !== 'anulada') {
                 throw new \Exception('Solo se pueden rectificar préstamos en estado anulada.');
@@ -376,6 +373,10 @@ class PrestamoService
             // 2) Reemplazar detalles
             $prestamo->detalles()->delete();
             $detallesNuevos = $prestamo->detalles()->createMany($prestamoDataRaw['detalles']);
+            $this->movimientoService->bloquearProductos(array_merge(
+                $productoIdsAnteriores,
+                $detallesNuevos->pluck('producto_id')->all()
+            ));
 
             $productosAfectados = [];
             // ────────────────────────────────────────────────────────────
@@ -452,22 +453,10 @@ class PrestamoService
                 : \Carbon\Carbon::parse($prestamo->fecha_prestamo);
 
             foreach (array_unique($productosAfectados) as $productoId) {
-                if ($fechaPrestamo->lt(today())) {
-                    // IMPORTANTE: datetime completo para punto de partida exacto (por hora, no solo fecha)
-                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                        $productoId,
-                        $fechaPrestamo->format('Y-m-d H:i:s')
-                    );
-                } else {
-                    $primerMov = Movimiento::where('transaccion_id', $prestamo->id)
-                        ->where('producto_id', $productoId)
-                        ->orderBy('id', 'asc')
-                        ->first();
-
-                    if ($primerMov) {
-                        $this->movimientoService->recalcularKardexProducto($productoId, $primerMov->id);
-                    }
-                }
+                $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                    $productoId,
+                    $fechaPrestamo->format('Y-m-d H:i:s')
+                );
             }
 
             if ($prestamo->prestamo_referencia_id) {

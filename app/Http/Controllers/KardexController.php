@@ -634,55 +634,40 @@ class KardexController extends Controller
     /**
      * Stock al corte.
      *
-     * LÓGICA:
-     * - El stock se calcula deshaciendo movimientos futuros: stock_almacen - delta_post
-     * - El CPP (costo_unitario) se obtiene de la tabla movimientos a la fecha del corte
+     * El stock y el CPP provienen del último movimiento cronológico a la fecha.
      */
     private function getStockAlCorteReportes(Carbon $fechaCorte, bool $soloActivos = true, bool $soloConStock = true)
     {
         $fechaCorte = $fechaCorte->copy()->endOfDay();
 
-        // Movimientos que ocurrieron DESPUÉS del corte (los que debemos deshacer)
-        $movPostCorte = DB::query()
-            ->fromSub($this->movimientosStockUnion(), 'm')
-            ->where('m.fecha', '>', $fechaCorte)
-            ->groupBy('m.producto_id')
+        $movimientosOrdenados = DB::table('movimientos')
+            ->where('fecha', '<=', $fechaCorte)
             ->selectRaw('
-                m.producto_id,
-                SUM(COALESCE(m.delta, 0)) as delta_post
+                producto_id,
+                stock_nuevo,
+                costo_nuevo,
+                ROW_NUMBER() OVER (
+                    PARTITION BY producto_id
+                    ORDER BY fecha DESC, id DESC
+                ) as rn
             ');
 
-        // Subconsulta para CPP: último costo_nuevo por producto a la fecha del corte
-        $cppSubquery = DB::query()
-            ->fromRaw("(
-                SELECT producto_id, costo_nuevo,
-                    ROW_NUMBER() OVER (PARTITION BY producto_id ORDER BY fecha DESC, id DESC) as rn
-                FROM movimientos
-                WHERE fecha <= '{$fechaCorte->toDateTimeString()}'
-                    AND costo_nuevo IS NOT NULL
-            ) as ranked")
+        $saldoAlCorte = DB::query()
+            ->fromSub($movimientosOrdenados, 'movimientos_ordenados')
             ->where('rn', 1)
-            ->selectRaw('producto_id, costo_nuevo');
-
-        // Calcular el stock al corte como subconsulta para poder filtrar en WHERE
-        $stockCalculado = DB::query()
-            ->from('productos as p2')
-            ->leftJoinSub($movPostCorte, 's2', fn ($j) => $j->on('s2.producto_id', '=', 'p2.id'))
-            ->selectRaw('p2.id, (COALESCE(p2.stock_almacen, 0) - COALESCE(s2.delta_post, 0)) as stock_calculado');
+            ->select(['producto_id', 'stock_nuevo', 'costo_nuevo']);
 
         $q = DB::table('productos as p')
             ->leftJoin('lineas as l', 'l.id', '=', 'p.linea_id')
-            ->leftJoinSub($movPostCorte, 's', fn ($j) => $j->on('s.producto_id', '=', 'p.id'))
-            ->leftJoinSub($cppSubquery, 'cpp', fn ($j) => $j->on('cpp.producto_id', '=', 'p.id'))
-            ->leftJoinSub($stockCalculado, 'sc', fn ($j) => $j->on('sc.id', '=', 'p.id'))
+            ->leftJoinSub($saldoAlCorte, 'saldo', fn ($j) => $j->on('saldo.producto_id', '=', 'p.id'))
             ->selectRaw('
                 p.id as producto_id,
                 p.nombre as producto,
                 p.empaque,
                 l.nombre as linea,
-                COALESCE(sc.stock_calculado, COALESCE(p.stock_almacen, 0) - COALESCE(s.delta_post, 0)) as stock,
-                COALESCE(cpp.costo_nuevo, p.costo_unitario, 0) as costo_unitario,
-                COALESCE(sc.stock_calculado, COALESCE(p.stock_almacen, 0) - COALESCE(s.delta_post, 0)) * COALESCE(cpp.costo_nuevo, p.costo_unitario, 0) as valor_total
+                COALESCE(saldo.stock_nuevo, 0) as stock,
+                COALESCE(saldo.costo_nuevo, p.costo_unitario, 0) as costo_unitario,
+                COALESCE(saldo.stock_nuevo, 0) * COALESCE(saldo.costo_nuevo, p.costo_unitario, 0) as valor_total
             ');
 
         if ($soloActivos) {
@@ -693,9 +678,7 @@ class KardexController extends Controller
         $q->where('p.id', '!=', 77);
 
         if ($soloConStock) {
-            // Filtrar en WHERE usando la subconsulta de stock calculado
-            // (evita el error de HAVING con sql_mode estricto)
-            $q->where('sc.stock_calculado', '!=', 0);
+            $q->whereRaw('COALESCE(saldo.stock_nuevo, 0) != 0');
         }
 
         return $q->orderBy('l.nombre')
