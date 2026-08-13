@@ -4,6 +4,29 @@
         .app-sidebar .sidebar-menu .nav-item.menu-open > .nav-link > p {
             font-weight: 700;
         }
+
+        .sidebar-search-container {
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Ocultar buscador cuando el sidebar está colapsado (modo mini/responsive) */
+        .sidebar-collapse .sidebar-search-container,
+        body.sidebar-collapse .sidebar-search-container {
+            display: none !important;
+        }
+
+        .sidebar-search-group .form-control:focus {
+            box-shadow: none;
+        }
+
+        .sidebar-search-no-results {
+            display: none;
+            padding: 10px 14px;
+            font-size: 0.82rem;
+            text-align: center;
+            border-radius: 6px;
+            margin: 8px 12px 4px 12px;
+        }
     </style>
 
     {{-- Sidebar Brand --}}
@@ -14,8 +37,32 @@
         </a>
     </div>
 
+    {{-- Sidebar Search Input --}}
+    <div class="sidebar-search-container px-3 pt-2 pb-1">
+        <div class="input-group input-group-sm sidebar-search-group">
+            <span class="input-group-text bg-body-secondary border-end-0 text-secondary">
+                <i class="bi bi-search"></i>
+            </span>
+            <input type="text" 
+                   id="sidebarMenuSearch" 
+                   class="form-control form-control-sm bg-body-secondary border-start-0 border-end-0 shadow-none ps-0" 
+                   placeholder="Buscar en menú..." 
+                   aria-label="Buscar en menú"
+                   autocomplete="off">
+            <button class="btn btn-sm bg-body-secondary border-start-0 text-secondary d-none" 
+                    type="button" 
+                    id="btnClearSidebarSearch"
+                    title="Limpiar búsqueda">
+                <i class="bi bi-x-circle-fill"></i>
+            </button>
+        </div>
+    </div>
+
     {{-- Sidebar Wrapper --}}
     <div class="sidebar-wrapper">
+        <div id="sidebarSearchNoResults" class="sidebar-search-no-results bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+            <i class="bi bi-exclamation-triangle me-1"></i> No se encontraron apartados
+        </div>
         <nav class="mt-2">
             <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu" data-accordion="false">
 
@@ -840,3 +887,171 @@
         </nav>
     </div>
 </aside>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const searchInput = document.getElementById('sidebarMenuSearch');
+    const clearBtn = document.getElementById('btnClearSidebarSearch');
+    const noResultsMsg = document.getElementById('sidebarSearchNoResults');
+    const sidebarMenu = document.querySelector('.sidebar-menu');
+
+    if (!searchInput || !sidebarMenu) return;
+
+    let isSearching = false;
+    let initialOpenItems = new Set();
+
+    function normalizeText(str) {
+        return (str || '')
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .trim();
+    }
+
+    function saveInitialState() {
+        initialOpenItems.clear();
+        sidebarMenu.querySelectorAll('li.nav-item.menu-open').forEach(li => {
+            initialOpenItems.add(li);
+        });
+    }
+
+    function filterMenu() {
+        const query = normalizeText(searchInput.value);
+
+        if (query.length > 0) {
+            if (!isSearching) {
+                saveInitialState();
+                isSearching = true;
+            }
+            clearBtn.classList.remove('d-none');
+        } else {
+            clearBtn.classList.add('d-none');
+            if (isSearching) {
+                restoreInitialState();
+            }
+            return;
+        }
+
+        // 1. Resetear visibilidad de todos los nav-item, nav-treeview y remover menu-open
+        const allItems = sidebarMenu.querySelectorAll('li.nav-item');
+        allItems.forEach(item => {
+            item.style.display = 'none';
+            item.classList.remove('menu-open');
+        });
+
+        const allTreeviews = sidebarMenu.querySelectorAll('ul.nav-treeview');
+        allTreeviews.forEach(tv => {
+            tv.style.display = 'none';
+        });
+
+        let totalMatches = 0;
+
+        // 2. Buscar coincidencias en los textos de los nav-link <p>
+        const allLinks = sidebarMenu.querySelectorAll('a.nav-link');
+        allLinks.forEach(link => {
+            const pEl = link.querySelector('p');
+            if (!pEl) return;
+
+            // Extraer solo los nodos de texto principales (omitiendo flechas e iconos de badge)
+            const textContent = Array.from(pEl.childNodes)
+                .filter(node => node.nodeType === Node.TEXT_NODE)
+                .map(node => node.textContent)
+                .join(' ') || pEl.innerText;
+
+            const normalizedText = normalizeText(textContent);
+
+            if (normalizedText.includes(query)) {
+                totalMatches++;
+                const item = link.closest('li.nav-item');
+                if (!item) return;
+
+                // Mostrar el ítem encontrado
+                item.style.display = 'block';
+
+                // Si el ítem encontrado es un menú padre que contiene submenús (ul.nav-treeview),
+                // mostrar TODOS sus sub-ítems hijos para que se vean desplegados en la lista
+                if (item.querySelector('ul.nav-treeview')) {
+                    item.classList.add('menu-open');
+                    item.querySelectorAll('ul.nav-treeview').forEach(tv => tv.style.display = 'block');
+                    item.querySelectorAll('li.nav-item').forEach(childLi => childLi.style.display = 'block');
+                }
+
+                // Subir por el árbol de ancestros para abrir e integrar los menús contenedores padres
+                let parentLi = item.parentElement ? item.parentElement.closest('li.nav-item') : null;
+                while (parentLi && sidebarMenu.contains(parentLi)) {
+                    parentLi.style.display = 'block';
+                    parentLi.classList.add('menu-open');
+                    const parentTv = parentLi.querySelector('ul.nav-treeview');
+                    if (parentTv) {
+                        parentTv.style.display = 'block';
+                    }
+                    parentLi = parentLi.parentElement ? parentLi.parentElement.closest('li.nav-item') : null;
+                }
+            }
+        });
+
+        // 3. Visibilidad de los encabezados de sección (nav-header)
+        const headers = sidebarMenu.querySelectorAll('li.nav-header');
+        headers.forEach(header => {
+            let hasVisibleChild = false;
+            let sibling = header.nextElementSibling;
+
+            while (sibling && !sibling.classList.contains('nav-header')) {
+                if (sibling.classList.contains('nav-item') && sibling.style.display === 'block') {
+                    hasVisibleChild = true;
+                    break;
+                }
+                sibling = sibling.nextElementSibling;
+            }
+
+            header.style.display = hasVisibleChild ? 'block' : 'none';
+        });
+
+        // 4. Mostrar u ocultar mensaje "Sin resultados"
+        if (noResultsMsg) {
+            noResultsMsg.style.display = (totalMatches === 0) ? 'block' : 'none';
+        }
+    }
+
+    function restoreInitialState() {
+        isSearching = false;
+
+        // Restaurar visibilidad de todos los elementos
+        sidebarMenu.querySelectorAll('li.nav-item, li.nav-header').forEach(el => {
+            el.style.display = '';
+        });
+
+        // Restaurar estado previo de los menús colapsables
+        sidebarMenu.querySelectorAll('li.nav-item').forEach(li => {
+            const treeview = li.querySelector('ul.nav-treeview');
+            if (initialOpenItems.has(li)) {
+                li.classList.add('menu-open');
+                if (treeview) treeview.style.display = 'block';
+            } else {
+                li.classList.remove('menu-open');
+                if (treeview) treeview.style.display = '';
+            }
+        });
+
+        if (noResultsMsg) {
+            noResultsMsg.style.display = 'none';
+        }
+    }
+
+    // Event Listeners
+    searchInput.addEventListener('input', filterMenu);
+
+    clearBtn.addEventListener('click', function () {
+        searchInput.value = '';
+        filterMenu();
+        searchInput.focus();
+    });
+
+    searchInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            searchInput.value = '';
+            filterMenu();
+        }
+    });
+});
+</script>

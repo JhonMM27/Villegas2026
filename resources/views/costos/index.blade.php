@@ -8,7 +8,7 @@
                 <div class="card mb-4">
                     <div class="card-header d-flex align-items-center">
                         <h3 class="card-title flex-grow-1">Costos</h3>
-                        @can('gastos_create')
+                        @can('costos_create')
                             <button type="button" class="btn btn-primary" id="btnCreate">
                                 <i class="bi bi-plus-circle"></i> Nuevo
                             </button>
@@ -91,11 +91,11 @@
                         },
                         {
                             data: 'costo_tipo.nombre',
-                            name: 'costo_tipo.nombre'
+                            name: 'costoTipo.nombre'
                         },
                         {
                             data: 'categoria_costo.nombre',
-                            name: 'categoria_costo.nombre'
+                            name: 'categoriaCosto.nombre'
                         },
                         {
                             data: 'user_nombre',

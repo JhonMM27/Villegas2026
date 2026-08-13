@@ -85,8 +85,8 @@ class GastoManager extends CrudManager {
                         return `${day}/${month}/${year} ${hours}:${minutes}`;
                     }
                 },
-                 { data: 'gasto_tipo.nombre', name: 'gasto_tipo.nombre' },
-                 { data: 'categoria_gasto.nombre', name: 'categoria_gasto.nombre' },
+                 { data: 'gasto_tipo.nombre', name: 'gastoTipo.nombre' },
+                 { data: 'categoria_gasto.nombre', name: 'categoriaGasto.nombre' },
                  { data: 'user_nombre', name: 'user_nombre'},
                 { data: 'descripcion', name: 'descripcion' },
                 { data: 'responsable', name: 'responsable' },

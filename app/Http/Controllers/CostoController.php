@@ -7,6 +7,7 @@ use App\Models\Costo;
 use App\Support\NumericStringOrder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 use Yajra\DataTables\DataTables;
 
 class CostoController extends Controller
@@ -33,6 +34,40 @@ class CostoController extends Controller
             $data = Costo::with(['costoTipo', 'categoriaCosto'])->select(['id', 'fecha_costo', 'user_nombre', 'descripcion', 'responsable', 'responsable_dni', 'categoria_costo_id', 'numero_recibo', 'monto', 'costo_tipo_id']);
 
             return DataTables::of($data)
+                // Personalización de filtrado para las relaciones de tipo y categoría de costo
+                ->filterColumn('costo_tipo.nombre', function ($query, $keyword) {
+                    $query->whereHas('costoTipo', function ($q) use ($keyword) {
+                        $q->where('nombre', 'like', "%{$keyword}%");
+                    });
+                })
+                ->filterColumn('costoTipo.nombre', function ($query, $keyword) {
+                    $query->whereHas('costoTipo', function ($q) use ($keyword) {
+                        $q->where('nombre', 'like', "%{$keyword}%");
+                    });
+                })
+                ->filterColumn('categoria_costo.nombre', function ($query, $keyword) {
+                    $query->whereHas('categoriaCosto', function ($q) use ($keyword) {
+                        $q->where('nombre', 'like', "%{$keyword}%");
+                    });
+                })
+                ->filterColumn('categoriaCosto.nombre', function ($query, $keyword) {
+                    $query->whereHas('categoriaCosto', function ($q) use ($keyword) {
+                        $q->where('nombre', 'like', "%{$keyword}%");
+                    });
+                })
+                // Ordenamiento personalizado por nombre de tipo y categoría de costo
+                ->orderColumn('costo_tipo.nombre', function ($query, $direction) {
+                    $query->orderBy(
+                        \App\Models\CostoTipo::select('nombre')->whereColumn('costo_tipos.id', 'costos.costo_tipo_id'),
+                        $direction
+                    );
+                })
+                ->orderColumn('categoria_costo.nombre', function ($query, $direction) {
+                    $query->orderBy(
+                        \App\Models\CostoCategoria::select('nombre')->whereColumn('categoria_costos.id', 'costos.categoria_costo_id'),
+                        $direction
+                    );
+                })
                 ->orderColumn('numero_recibo', function ($query, $direction) {
                     NumericStringOrder::apply($query, 'costos.numero_recibo', 'costos.id', $direction);
                 })
@@ -335,7 +370,7 @@ class CostoController extends Controller
 
         $fileName = 'costos_general_'.now()->format('Ymd_His').'.xlsx';
 
-        return \Excel::download(new \App\Exports\CostosGeneralExport($reportes), $fileName);
+        return Excel::download(new \App\Exports\CostosGeneralExport($reportes), $fileName);
     }
 
     public function exportarDetallado(Request $request)
@@ -362,7 +397,7 @@ class CostoController extends Controller
 
         $fileName = 'costos_detallado_'.now()->format('Ymd_His').'.xlsx';
 
-        return \Excel::download(new \App\Exports\CostosDetalladoExport($reportes), $fileName);
+        return Excel::download(new \App\Exports\CostosDetalladoExport($reportes), $fileName);
     }
 
     public function imprimirGeneral(Request $request)

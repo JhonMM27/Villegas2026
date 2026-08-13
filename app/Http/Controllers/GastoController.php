@@ -7,6 +7,7 @@ use App\Models\Gasto;
 use App\Support\NumericStringOrder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 use Yajra\DataTables\DataTables;
 
 class GastoController extends Controller
@@ -33,6 +34,40 @@ class GastoController extends Controller
             $data = Gasto::with(['gastoTipo', 'categoriaGasto'])->select(['id', 'fecha_gasto', 'user_nombre', 'descripcion', 'responsable', 'responsable_dni', 'categoria_gasto_id', 'numero_recibo', 'monto', 'gasto_tipo_id']);
 
             return DataTables::of($data)
+                // Personalización de filtrado para las relaciones de tipo y categoría de gasto
+                ->filterColumn('gasto_tipo.nombre', function ($query, $keyword) {
+                    $query->whereHas('gastoTipo', function ($q) use ($keyword) {
+                        $q->where('nombre', 'like', "%{$keyword}%");
+                    });
+                })
+                ->filterColumn('gastoTipo.nombre', function ($query, $keyword) {
+                    $query->whereHas('gastoTipo', function ($q) use ($keyword) {
+                        $q->where('nombre', 'like', "%{$keyword}%");
+                    });
+                })
+                ->filterColumn('categoria_gasto.nombre', function ($query, $keyword) {
+                    $query->whereHas('categoriaGasto', function ($q) use ($keyword) {
+                        $q->where('nombre', 'like', "%{$keyword}%");
+                    });
+                })
+                ->filterColumn('categoriaGasto.nombre', function ($query, $keyword) {
+                    $query->whereHas('categoriaGasto', function ($q) use ($keyword) {
+                        $q->where('nombre', 'like', "%{$keyword}%");
+                    });
+                })
+                // Ordenamiento personalizado por nombre de tipo y categoría
+                ->orderColumn('gasto_tipo.nombre', function ($query, $direction) {
+                    $query->orderBy(
+                        \App\Models\GastoTipo::select('nombre')->whereColumn('gasto_tipos.id', 'gastos.gasto_tipo_id'),
+                        $direction
+                    );
+                })
+                ->orderColumn('categoria_gasto.nombre', function ($query, $direction) {
+                    $query->orderBy(
+                        \App\Models\GastoCategoria::select('nombre')->whereColumn('categoria_gastos.id', 'gastos.categoria_gasto_id'),
+                        $direction
+                    );
+                })
                 ->orderColumn('numero_recibo', function ($query, $direction) {
                     NumericStringOrder::apply($query, 'gastos.numero_recibo', 'gastos.id', $direction);
                 })
@@ -336,7 +371,7 @@ class GastoController extends Controller
 
         $fileName = 'gastos_general_'.now()->format('Ymd_His').'.xlsx';
 
-        return \Excel::download(new \App\Exports\GastosGeneralExport($reportes), $fileName);
+        return Excel::download(new \App\Exports\GastosGeneralExport($reportes), $fileName);
     }
 
     public function exportarDetallado(Request $request)
@@ -363,7 +398,7 @@ class GastoController extends Controller
 
         $fileName = 'gastos_detallado_'.now()->format('Ymd_His').'.xlsx';
 
-        return \Excel::download(new \App\Exports\GastosDetalladoExport($reportes), $fileName);
+        return Excel::download(new \App\Exports\GastosDetalladoExport($reportes), $fileName);
     }
 
     public function imprimirGeneral(Request $request)
