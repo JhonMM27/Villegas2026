@@ -221,6 +221,7 @@ class FormulacionManager extends CrudManager {
 
         tr.querySelector('.btnEliminarFila').addEventListener('click', () => {
             tr.remove();
+            this.reindexDetalles();
             this.calculateTotals();
         });
 
@@ -253,6 +254,27 @@ class FormulacionManager extends CrudManager {
 
         document.getElementById('total_salida_saco').value = total_salida_saco.toFixed(2);
         document.getElementById('total_salida_kg').value = total_salida_kg.toFixed(2);
+    }
+
+    /**
+     * Reindexa las filas de la tabla de detalles tras eliminar un producto,
+     * actualizando tanto el número de fila (#) como los atributos name de los campos detalles[x].
+     */
+    reindexDetalles() {
+        const tbody = document.querySelector('#tablaDetalles tbody');
+        if (!tbody) return;
+
+        [...tbody.querySelectorAll('tr')].forEach((tr, index) => {
+            const newIndex = index + 1;
+
+            // 🔢 Actualizar columna #
+            tr.children[1].textContent = newIndex;
+
+            // 🔁 Actualizar todos los name="detalles[x][campo]"
+            tr.querySelectorAll('input[name^="detalles["]').forEach(input => {
+                input.name = input.name.replace(/detalles\[\d+\]/, `detalles[${newIndex}]`);
+            });
+        });
     }
 
 

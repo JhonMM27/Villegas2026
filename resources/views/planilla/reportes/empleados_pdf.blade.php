@@ -205,10 +205,12 @@
                         <strong>Total Adelantos:</strong><br>
                         S/ {{ number_format($resumen['total_adelantos'] ?? 0, 2) }}
                     </div>
-                    <div class="resumen-cell">
-                        <strong>Total Pendiente:</strong><br>
-                        S/ {{ number_format($resumen['total_pendiente'] ?? 0, 2) }}
-                    </div>
+                    @if (($resumen['total_pendiente'] ?? 0) > 0)
+                        <div class="resumen-cell">
+                            <strong>Total Pendiente:</strong><br>
+                            S/ {{ number_format($resumen['total_pendiente'], 2) }}
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -299,11 +301,13 @@
                                     <td class="text-right fw-bold" style="color: green;">S/
                                         {{ number_format($resumen['total_pagado'] ?? 0, 2) }}</td>
                                 </tr>
-                                <tr>
-                                    <td>Total Pendiente:</td>
-                                    <td class="text-right fw-bold" style="color: orange;">S/
-                                        {{ number_format($resumen['total_proporcional'] ?? 0, 2) }}</td>
-                                </tr>
+                                @if (($resumen['total_pendiente'] ?? 0) > 0)
+                                    <tr>
+                                        <td>Total Pendiente:</td>
+                                        <td class="text-right fw-bold" style="color: orange;">S/
+                                            {{ number_format($resumen['total_pendiente'], 2) }}</td>
+                                    </tr>
+                                @endif
                             </tbody>
                         </table>
                     </td>

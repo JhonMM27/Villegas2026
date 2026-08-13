@@ -251,16 +251,25 @@ class CompraService
                 $productosAfectados[] = $detalle->producto_id;
             }
 
-            // Recalcular Kardex para productos afectados
-            $fechaCompra = $compraAnulada->fecha_compra instanceof \Carbon\Carbon
-                ? $compraAnulada->fecha_compra
-                : \Carbon\Carbon::parse($compraAnulada->fecha_compra);
-
+            // Recalcular Kardex para productos afectados por ID de movimiento
             foreach (array_unique($productosAfectados) as $productoId) {
-                $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                    $productoId,
-                    $fechaCompra->format('Y-m-d H:i:s')
-                );
+                $minMovId = Movimiento::where('producto_id', $productoId)
+                    ->where('transaccion_tipo', 'compras')
+                    ->where('transaccion_id', $compraAnulada->id)
+                    ->min('id');
+
+                if ($minMovId) {
+                    $this->movimientoService->recalcularKardexProducto($productoId, (int) $minMovId);
+                } else {
+                    $fechaCompra = $compraAnulada->fecha_compra instanceof \Carbon\Carbon
+                        ? $compraAnulada->fecha_compra
+                        : \Carbon\Carbon::parse($compraAnulada->fecha_compra);
+
+                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                        $productoId,
+                        $fechaCompra->format('Y-m-d H:i:s')
+                    );
+                }
             }
 
             return $compraAnulada;

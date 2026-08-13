@@ -181,18 +181,25 @@ class PrestamoService
                 $this->registrarMovimientoDetalle($prestamo, $detalle, $newIncrease);
             }
 
-            // Recalcular kardex para cada producto afectado
-            // Si la fecha del préstamo es pasada, usar recálculo por fecha (cronológico)
-            // Si es de hoy, usar recálculo por ID del primer movimiento nuevo
-            $fechaPrestamo = $prestamo->fecha_prestamo instanceof \Carbon\Carbon
-                ? $prestamo->fecha_prestamo
-                : \Carbon\Carbon::parse($prestamo->fecha_prestamo);
+            // Recalcular kardex por ID de movimiento para cada producto afectado
+            foreach (array_unique($productosAfectados) as $prodId) {
+                $minMovId = Movimiento::where('producto_id', $prodId)
+                    ->where('transaccion_tipo', 'prestamos')
+                    ->where('transaccion_id', $prestamo->id)
+                    ->min('id');
 
-            foreach ($productosAfectados as $prodId) {
-                $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                    $prodId,
-                    $fechaPrestamo->format('Y-m-d H:i:s')
-                );
+                if ($minMovId) {
+                    $this->movimientoService->recalcularKardexProducto($prodId, (int) $minMovId);
+                } else {
+                    $fechaPrestamo = $prestamo->fecha_prestamo instanceof \Carbon\Carbon
+                        ? $prestamo->fecha_prestamo
+                        : \Carbon\Carbon::parse($prestamo->fecha_prestamo);
+
+                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                        $prodId,
+                        $fechaPrestamo->format('Y-m-d H:i:s')
+                    );
+                }
             }
 
             // Actualizar estado del préstamo original si este registro es una devolución
@@ -447,16 +454,25 @@ class PrestamoService
                 }
             }
 
-            // 4) Recalcular Kardex
-            $fechaPrestamo = $prestamo->fecha_prestamo instanceof \Carbon\Carbon
-                ? $prestamo->fecha_prestamo
-                : \Carbon\Carbon::parse($prestamo->fecha_prestamo);
-
+            // 4) Recalcular Kardex por ID de movimiento
             foreach (array_unique($productosAfectados) as $productoId) {
-                $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                    $productoId,
-                    $fechaPrestamo->format('Y-m-d H:i:s')
-                );
+                $minMovId = Movimiento::where('producto_id', $productoId)
+                    ->where('transaccion_tipo', 'prestamos')
+                    ->where('transaccion_id', $prestamo->id)
+                    ->min('id');
+
+                if ($minMovId) {
+                    $this->movimientoService->recalcularKardexProducto($productoId, (int) $minMovId);
+                } else {
+                    $fechaPrestamo = $prestamo->fecha_prestamo instanceof \Carbon\Carbon
+                        ? $prestamo->fecha_prestamo
+                        : \Carbon\Carbon::parse($prestamo->fecha_prestamo);
+
+                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                        $productoId,
+                        $fechaPrestamo->format('Y-m-d H:i:s')
+                    );
+                }
             }
 
             if ($prestamo->prestamo_referencia_id) {

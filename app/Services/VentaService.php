@@ -208,7 +208,17 @@ class VentaService
     public function rectificarVenta(int $ventaId, array $data): Venta
     {
         return DB::transaction(function () use ($ventaId, $data) {
-            $venta = Venta::findOrFail($ventaId);
+            $venta = Venta::query()
+                ->lockForUpdate()
+                ->findOrFail($ventaId);
+
+            $clienteIdOriginal = (int) $venta->cliente_id;
+            $abonosExistentes = round((float) $venta->abonos, 2);
+            $tieneCobranzasAplicadas = $abonosExistentes > 0
+                || $venta->pagosProvisionales()
+                    ->where('monto', '>', 0)
+                    ->exists();
+
             $productoIdsAnteriores = $venta->detalles()->pluck('producto_id')->all();
 
             if ($venta->estado !== 'anulada') {
@@ -219,9 +229,36 @@ class VentaService
                 throw new \Exception('Esta venta ya no puede ser rectificada. Máximo 3 rectificaciones permitidas.');
             }
 
+            $clienteIdNuevo = (int) $data['cliente_id'];
+            if ($tieneCobranzasAplicadas && $clienteIdNuevo !== $clienteIdOriginal) {
+                throw new \Exception(
+                    'No se puede cambiar el cliente porque la venta tiene cobranzas aplicadas. '
+                    .'Retire o reasigne primero las cobranzas vinculadas.'
+                );
+            }
+
             // 1) Procesar los datos de la venta
             $ventaDataRaw = $this->processVentaData($data, false);
             $ventaData = $ventaDataRaw['venta'];
+
+            $nuevoTotal = round((float) $ventaData['total'], 2);
+            $nuevaAcuenta = round((float) $ventaData['acuenta'], 2);
+            $totalPagado = round($nuevaAcuenta + $abonosExistentes, 2);
+
+            if ($nuevoTotal < $totalPagado) {
+                throw new \Exception(
+                    'No se puede rectificar la venta por S/ '
+                    .number_format($nuevoTotal, 2, '.', ',')
+                    .' porque ya tiene pagado S/ '
+                    .number_format($totalPagado, 2, '.', ',')
+                    .'. Ajuste primero la cobranza.'
+                );
+            }
+
+            // Los abonos pertenecen a cobranzas ya registradas y no forman
+            // parte de los datos editables de la rectificación.
+            $ventaData['abonos'] = $abonosExistentes;
+            $ventaData['saldo'] = round($nuevoTotal - $totalPagado, 2);
 
             // Forzar serie y correlativo originales de la venta (se preservan en rectificación)
             $ventaData['serie'] = $venta->serie;
@@ -322,21 +359,25 @@ class VentaService
                 $productosAfectados[] = $detalle->producto_id;
             }
 
-            // 4) Recalcular Kardex para productos afectados
-            //
-            // IMPORTANTE: se pasa el datetime completo (Y-m-d H:i:s) a recalcularKardexProductoDesdeFecha
-            // para que el punto de partida del recálculo sea el último movimiento ANTES de la hora
-            // exacta de la venta, no simplemente antes del día. Sin esto, todos los movimientos del
-            // mismo día (pero anteriores en hora) también se recalculan con saldo inicial incorrecto.
-            $fechaVenta = $venta->fecha_venta instanceof \Carbon\Carbon
-                ? $venta->fecha_venta
-                : \Carbon\Carbon::parse($venta->fecha_venta);
-
+            // 4) Recalcular Kardex para productos afectados por ID de movimiento
             foreach (array_unique($productosAfectados) as $productoId) {
-                $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                    $productoId,
-                    $fechaVenta->format('Y-m-d H:i:s')
-                );
+                $minMovId = Movimiento::where('producto_id', $productoId)
+                    ->where('transaccion_tipo', 'ventas')
+                    ->where('transaccion_id', $venta->id)
+                    ->min('id');
+
+                if ($minMovId) {
+                    $this->movimientoService->recalcularKardexProducto($productoId, (int) $minMovId);
+                } else {
+                    $fechaVenta = $venta->fecha_venta instanceof \Carbon\Carbon
+                        ? $venta->fecha_venta
+                        : \Carbon\Carbon::parse($venta->fecha_venta);
+
+                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                        $productoId,
+                        $fechaVenta->format('Y-m-d H:i:s')
+                    );
+                }
             }
 
             return $venta;
@@ -455,6 +496,8 @@ class VentaService
         }
         $totalItems = count($data['detalles']);
 
+        $acuenta = round((float) ($data['total_cobranza'] ?? 0), 2);
+
         // Construir array de la cabecera
         $ventaData = [
             'cliente_id' => $data['cliente_id'],
@@ -478,8 +521,8 @@ class VentaService
             'importe_p' => $data['principal'] ?? 0,
             'importe_d' => $data['deposito'] ?? 0,
             'importe_c' => $data['consorcio'] ?? 0,
-            'acuenta' => $data['total_cobranza'] ?? '',
-            'saldo' => round($totales['total'], 2) - ($data['total_cobranza'] ?? 0),
+            'acuenta' => $acuenta,
+            'saldo' => round(round($totales['total'], 2) - $acuenta, 2),
             'abonos' => 0.00,
             'rentabilidad' => round($totales['rentabilidad'], 4),
         ];

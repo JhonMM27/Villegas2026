@@ -8,15 +8,18 @@ use App\Models\Venta;
 use App\Models\VentaDetalle;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\DataTables;
 
 class CuentaCorrienteClienteController extends Controller
 {
+    #region Configuración y navegación
+
     public function __construct()
     {
-        $this->middleware('can:cuenta_corriente_report')->only(['index', 'resumenCliente', 'ventasAgrupadaProductoClientePdf', 'ventasDetallePdf', 'detalleCreditosPorCobrarPdf', 'creditosPorCobrarClienteTodosPdf', 'creditosPorCobrarClienteFechasPdf', 'ventasGeneralFechasPdf', 'saldosTodosPdf', 'creditosPorCobrarIndex', 'creditosPorCobrarData']);
+        $this->middleware('can:cuenta_corriente_report')->only(['index', 'resumenCliente', 'ventasAgrupadaProductoClientePdf', 'ventasDetallePdf', 'detalleCreditosPorCobrarPdf', 'creditosPorCobrarClienteTodosPdf', 'creditosPorCobrarClienteFechasPdf', 'ventasGeneralFechasPdf', 'saldosTodosPdf', 'creditosPorCobrarIndex', 'creditosPorCobrarData', 'estadoCuentaClientePdf', 'estadoCuentaSimplificadoClientePdf']);
     }
 
     public function index(Request $request)
@@ -41,6 +44,10 @@ class CuentaCorrienteClienteController extends Controller
 
         return view('kardex.reportes.stock_general', compact('reportes', 'fecha'));
     }
+
+    #endregion
+
+    #region Reportes de ventas por cliente
 
     public function ventasAgrupadaProductoClientePdf(Request $request)
     {
@@ -111,6 +118,7 @@ class CuentaCorrienteClienteController extends Controller
             ])
             ->whereBetween('v.fecha_venta', [$ini, $fin])
             ->when(! empty($clienteIds), fn ($q) => $q->whereIn('v.cliente_id', $clienteIds))
+            ->where('v.estado', '!=', 'anulada') // ✅ excluir anuladas
             ->orderBy('venta_detalles.producto_nombre')   // primero por producto
             ->orderBy('v.fecha_venta')                   // luego por fecha
             ->orderBy('venta_detalles.id')
@@ -198,6 +206,7 @@ class CuentaCorrienteClienteController extends Controller
             ])
             ->whereBetween('v.fecha_venta', [$ini, $fin])
             ->when(! empty($clienteIds), fn ($q) => $q->whereIn('v.cliente_id', $clienteIds))
+            ->where('v.estado', '!=', 'anulada') // ✅ excluir anuladas
             ->orderBy('v.fecha_venta')
             ->orderBy('venta_detalles.venta_id')
             ->orderBy('venta_detalles.id')
@@ -212,6 +221,10 @@ class CuentaCorrienteClienteController extends Controller
 
         return $pdf->stream('reporte_cliente_ventas_detalle.pdf');
     }
+
+    #endregion
+
+    #region Reportes de rentabilidad
 
     public function rentabilidadClienteFechas(Request $request)
     {
@@ -415,6 +428,10 @@ class CuentaCorrienteClienteController extends Controller
         return $pdf->stream('reporte_rentabilidad_todos_clientes.pdf');
     }
 
+    #endregion
+
+    #region Créditos por cobrar del cliente
+
     public function detalleCreditosPorCobrarPdf(Request $request)
     {
         $data = $request->validate([
@@ -461,6 +478,7 @@ class CuentaCorrienteClienteController extends Controller
             ')
             ->whereBetween('v.fecha_venta', [$ini, $fin])
             ->when(! empty($clienteIds), fn ($q) => $q->whereIn('v.cliente_id', $clienteIds))
+            ->where('v.estado', '!=', 'anulada') // ✅ excluir anuladas
 
             // ✅ créditos por cobrar
             ->where('v.saldo', '>', 0)
@@ -490,92 +508,168 @@ class CuentaCorrienteClienteController extends Controller
         return $pdf->stream('detalle_creditos_por_cobrar.pdf');
     }
 
-    public function creditosPorCobrarClienteTodosPdf(Request $request)
-    {
-        $data = $request->validate([
-            'cliente_ids' => ['required', 'array', 'min:1'],
-            'cliente_ids.*' => ['integer'],
-        ]);
+   #region Créditos por Cobrar del Cliente
 
-        $clienteIds = $data['cliente_ids'];
+public function creditosPorCobrarClienteTodosPdf(
+    Request $request
+) {
+    $data = $request->validate([
+        'cliente_ids' => [
+            'required',
+            'array',
+            'size:1',
+        ],
+        'cliente_ids.0' => [
+            'required',
+            'integer',
+        ],
+    ]);
 
-        // Este reporte solo admite 1 cliente
-        if (count($clienteIds) !== 1) {
-            return back()->with('error', 'Debe seleccionar exactamente un cliente.');
-        }
+    $clienteId = (int) $data['cliente_ids'][0];
 
-        $clienteId = (int) $clienteIds[0];
+    $cliente = Cliente::query()
+        ->select('id', 'razon_social')
+        ->findOrFail($clienteId);
 
-        $cliente = Cliente::find($clienteId);
-        $clienteNombre = $cliente ? ($cliente->id.' - '.$cliente->razon_social) : null;
+    $clienteNombre = $cliente->id
+        . ' - '
+        . $cliente->razon_social;
 
-        // Abonos sueltos (adelantos sin venta asociada)
-        $abonosSueltos = DB::table('venta_provisionales as v')
-            ->selectRaw('
-                v.id,
-                v.fecha_provisional,
-                v.numero_recibo,
-                v.monto
-            ')
-            ->where('v.cliente_id', $clienteId)
-            ->where('v.tipo', 'ADELANTO')
-            ->whereNotExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('venta_provisional_detalles as vpd')
-                    ->whereColumn('vpd.venta_provisional_id', 'v.id')
-                    ->whereNotNull('vpd.venta_id');
-            })
-            ->orderBy('v.fecha_provisional')
-            ->get();
+    $fechaCorte = now()->endOfDay();
 
-        $reportes = Venta::query()
-            ->leftJoin('venta_detalles as vd', 'vd.venta_id', '=', 'ventas.id')
-            ->selectRaw('
-                ventas.id,
-                ventas.fecha_venta,
-                ventas.fecha_vencimiento,
-                CONCAT(ventas.comprobante_tipo_codigo," ",ventas.serie,"-",ventas.correlativo) as documento,
-                ventas.pago_forma_nombre as tipo_venta,
+    #region Ventas con saldo pendiente
 
-                ventas.total,
-                ventas.acuenta,
-                ventas.abonos,
-                ventas.saldo,
+    $reportes = $this->consultaVentasPendientesCliente(
+        $clienteId,
+        $fechaCorte
+    )
+        ->selectRaw('
+            ventas.id,
+            ventas.fecha_venta,
+            ventas.fecha_vencimiento,
 
-                COUNT(vd.id) as items,
+            CONCAT(
+                ventas.comprobante_tipo_codigo,
+                " ",
+                ventas.serie,
+                "-",
+                ventas.correlativo
+            ) AS documento,
 
-                ventas.cliente_nombre,
-                ventas.user_nombre
-            ')
-            ->where('ventas.cliente_id', $clienteId)
-            ->where('ventas.estado', '!=', 'anulada')
-            ->where('ventas.saldo', '>', 0)
-            ->groupBy(
-                'ventas.id',
-                'ventas.fecha_venta',
-                'ventas.fecha_vencimiento',
-                'ventas.comprobante_tipo_codigo',
-                'ventas.serie',
-                'ventas.correlativo',
-                'ventas.pago_forma_nombre',
-                'ventas.total',
-                'ventas.acuenta',
-                'ventas.abonos',
-                'ventas.saldo',
-                'ventas.cliente_nombre',
-                'ventas.user_nombre'
-            )
-            ->orderBy('ventas.fecha_venta')
-            ->get();
+            ventas.pago_forma_nombre AS tipo_venta,
 
-        // Totales generales
-        $totTotal = (float) $reportes->sum('total');
-        $totAcuenta = (float) $reportes->sum('acuenta');
-        $totAbonos = (float) $reportes->sum('abonos');
-        $totSaldo = (float) $reportes->sum('saldo');
-        $totItems = (int) $reportes->sum('items');
+            COALESCE(ventas.total, 0) AS total,
+            COALESCE(ventas.acuenta, 0) AS acuenta,
+            COALESCE(ventas.abonos, 0) AS abonos,
+            COALESCE(ventas.saldo, 0) AS saldo,
 
-        $pdf = Pdf::loadView('cuenta-cliente.reportes.creditos_por_cobrar_cliente_todos', compact(
+            ventas.cliente_nombre,
+            ventas.user_nombre
+        ')
+        ->withCount([
+            'detalles as items',
+        ])
+        ->orderBy('ventas.fecha_venta')
+        ->orderBy('ventas.id')
+        ->get();
+
+    #endregion
+
+    #region Abonos sin venta asociada
+
+    $aplicadoPorProvisional = DB::table(
+        'venta_provisional_detalles as detalle'
+    )
+        ->selectRaw('
+            detalle.venta_provisional_id,
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN detalle.venta_id IS NOT NULL
+                        THEN detalle.monto
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS monto_aplicado
+        ')
+        ->groupBy('detalle.venta_provisional_id');
+
+    $abonosSueltos = DB::table('venta_provisionales as vp')
+        ->leftJoinSub(
+            $aplicadoPorProvisional,
+            'aplicado',
+            function ($join) {
+                $join->on(
+                    'aplicado.venta_provisional_id',
+                    '=',
+                    'vp.id'
+                );
+            }
+        )
+        ->selectRaw('
+            vp.id,
+            vp.fecha_provisional,
+            vp.numero_recibo,
+            CASE
+                WHEN (
+                    COALESCE(vp.monto, 0)
+                    - COALESCE(aplicado.monto_aplicado, 0)
+                ) > 0
+                THEN (
+                    COALESCE(vp.monto, 0)
+                    - COALESCE(aplicado.monto_aplicado, 0)
+                )
+                ELSE 0
+            END AS monto
+        ')
+        ->where('vp.cliente_id', $clienteId)
+        ->where(
+            'vp.fecha_provisional',
+            '<=',
+            $fechaCorte
+        )
+        ->whereRaw('
+            (
+                COALESCE(vp.monto, 0)
+                - COALESCE(aplicado.monto_aplicado, 0)
+            ) > 0
+        ')
+        ->orderBy('vp.fecha_provisional')
+        ->orderBy('vp.id')
+        ->get();
+
+    #endregion
+
+    #region Totales
+
+    $totTotal = round(
+        (float) $reportes->sum('total'),
+        2
+    );
+
+    $totAcuenta = round(
+        (float) $reportes->sum('acuenta'),
+        2
+    );
+
+    $totAbonos = round(
+        (float) $reportes->sum('abonos'),
+        2
+    );
+
+    $totSaldo = round(
+        (float) $reportes->sum('saldo'),
+        2
+    );
+
+    $totItems = (int) $reportes->sum('items');
+
+    #endregion
+
+    $pdf = Pdf::loadView(
+        'cuenta-cliente.reportes.creditos_por_cobrar_cliente_todos',
+        compact(
             'reportes',
             'clienteNombre',
             'totTotal',
@@ -584,17 +678,29 @@ class CuentaCorrienteClienteController extends Controller
             'totSaldo',
             'totItems',
             'abonosSueltos'
-        ))->setPaper('a4', 'portrait');
+        )
+    )->setPaper('a4', 'portrait');
 
-        $nombreSanitizado = preg_replace('/[^a-zA-Z0-9\s\-]/', '', $clienteNombre ?? '');
-        $nombreSanitizado = preg_replace('/\s+/', '_', trim($nombreSanitizado));
-        $partes = explode('_', $nombreSanitizado);
-        $idPart = count($partes) > 0 ? array_shift($partes) : '';
-        $nombreLimpio = implode('_', $partes);
-        $nombreArchivo = $nombreLimpio.'_'.$idPart.'.pdf';
+    $nombreSanitizado = preg_replace(
+        '/[^a-zA-Z0-9\s\-]/',
+        '',
+        $clienteNombre
+    );
 
-        return $pdf->stream('creditos_por_cobrar_'.$nombreArchivo);
-    }
+    $nombreSanitizado = preg_replace(
+        '/\s+/',
+        '_',
+        trim($nombreSanitizado)
+    );
+
+    return $pdf->stream(
+        'creditos_por_cobrar_'
+        . $nombreSanitizado
+        . '.pdf'
+    );
+}
+
+#endregion
 
     public function creditosPorCobrarIndex(Request $request)
     {
@@ -733,6 +839,10 @@ class CuentaCorrienteClienteController extends Controller
 
         return $pdf->stream('creditos_por_cobrar_cliente_fechas.pdf');
     }
+
+    #endregion
+
+    #region Ventas generales y saldos por cliente
 
     public function ventasGeneralFechasPdf(Request $request)
     {
@@ -914,66 +1024,9 @@ class CuentaCorrienteClienteController extends Controller
         return $pdf->stream('saldos_'.$nombreArchivo);
     }
 
-    /* ***GENERAL */
-    public function creditosPorCobrarTodosPdf(Request $request)
-    {
-        $reportes = Venta::query()
-            ->leftJoin('venta_detalles as vd', 'vd.venta_id', '=', 'ventas.id')
-            ->selectRaw('
-                ventas.id,
-                ventas.fecha_venta,
-                ventas.fecha_vencimiento,
-                CONCAT(ventas.comprobante_tipo_codigo," ",ventas.serie,"-",ventas.correlativo) as documento,
-                ventas.pago_forma_nombre as tipo_venta,
+    #endregion
 
-                ventas.total,
-                ventas.acuenta,
-                ventas.abonos,
-                ventas.saldo,
-
-                COUNT(vd.id) as items,
-
-                ventas.cliente_nombre,
-                ventas.user_nombre
-            ')
-            ->where('ventas.estado', '!=', 'anulada')
-            ->where('ventas.saldo', '>', 0)
-            ->groupBy(
-                'ventas.id',
-                'ventas.fecha_venta',
-                'ventas.fecha_vencimiento',
-                'ventas.comprobante_tipo_codigo',
-                'ventas.serie',
-                'ventas.correlativo',
-                'ventas.pago_forma_nombre',
-                'ventas.total',
-                'ventas.acuenta',
-                'ventas.abonos',
-                'ventas.saldo',
-                'ventas.cliente_nombre',
-                'ventas.user_nombre'
-            )
-            ->orderBy('ventas.fecha_venta')
-            ->get();
-
-        // Totales generales
-        $totTotal = (float) $reportes->sum('total');
-        $totAcuenta = (float) $reportes->sum('acuenta');
-        $totAbonos = (float) $reportes->sum('abonos');
-        $totSaldo = (float) $reportes->sum('saldo');
-        $totItems = (int) $reportes->sum('items');
-
-        $pdf = Pdf::loadView('cuenta-cliente.reportes-general.creditos_por_cobrar_todos', compact(
-            'reportes',
-            'totTotal',
-            'totAcuenta',
-            'totAbonos',
-            'totSaldo',
-            'totItems'
-        ))->setPaper('a4', 'landscape');
-
-        return $pdf->stream('creditos_por_cobrar_todos.pdf');
-    }
+    #region Reportes generales de cuentas por cobrar
 
     public function creditosPorCobrarFechasPdf(Request $request)
     {
@@ -1148,7 +1201,7 @@ class CuentaCorrienteClienteController extends Controller
             ->where('ventas.saldo', '>', 0)
             ->whereNotNull('ventas.fecha_vencimiento')
             // equivalente a >= días, pero sin funciones sobre la columna
-            ->whereRaw('DATE(ventas.fecha_venta) <= DATE_SUB(CURDATE(), INTERVAL ? DAY)', [$dias])
+            ->whereDate('ventas.fecha_venta', '<=', Carbon::today()->subDays($dias)->toDateString())
             ->orderBy('ventas.cliente_nombre')
             ->orderBy('ventas.fecha_venta')
             ->get();
@@ -1207,7 +1260,7 @@ class CuentaCorrienteClienteController extends Controller
             ->where('ventas.estado', '!=', 'anulada')
             ->where('ventas.saldo', '>', 0)
             // >= 30 días de antigüedad desde la fecha_venta:
-            ->whereRaw('DATE(ventas.fecha_venta) <= DATE_SUB(CURDATE(), INTERVAL ? DAY)', [$dias])
+            ->whereDate('ventas.fecha_venta', '<=', Carbon::today()->subDays($dias)->toDateString())
             ->groupBy(
                 'ventas.cliente_id',
                 'ventas.cliente_nombre',
@@ -1435,6 +1488,7 @@ class CuentaCorrienteClienteController extends Controller
                 COUNT(CASE WHEN v.saldo > 0 THEN 1 END) as total_docs
             ')
             ->where('v.saldo', '>', 0)
+            ->where('v.estado', '!=', 'anulada') // ✅ excluir anuladas
             ->groupBy('v.user_nombre')
             ->orderBy('v.user_nombre')
             ->get();
@@ -1447,586 +1501,534 @@ class CuentaCorrienteClienteController extends Controller
         return $pdf->stream('resumen_creditos_por_cobrar.pdf');
     }
 
-    public function estadoCuentaClientePdf(Request $request)
-    {
-        $data = $request->validate([
-            'fecha_inicio' => ['required', 'date'],
-            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
-            'cliente_ids' => ['required', 'array', 'size:1'],
-            'cliente_ids.0' => ['required', 'integer'],
-        ]);
-
-        $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
-        $fin = Carbon::parse($data['fecha_fin'])->endOfDay();
-        $clienteId = (int) $data['cliente_ids'][0];
-
-        $clienteData = Cliente::select('id', 'razon_social', 'direccion', 'telefono')
-            ->find($clienteId);
-
-        $clienteNombre = $clienteData
-            ? ($clienteData->id.' - '.$clienteData->razon_social)
-            : (string) $clienteId;
-
-        // =========================
-        // SALDO INICIAL / FINAL (según tu regla: solo ventas.saldo)
-        // =========================
-        $saldoInicial = (float) DB::table('ventas')
-            ->where('cliente_id', $clienteId)
-            ->where('saldo', '>', 0)
-            ->where('fecha_venta', '<', $ini)
-            ->sum('saldo');
-
-        $saldoFinal = (float) DB::table('ventas')
-            ->where('cliente_id', $clienteId)
-            ->where('saldo', '>', 0)
-            ->where('fecha_venta', '<=', $fin)
-            ->sum('saldo');
-
-        // =========================
-        // 1) Provisionales del rango (linked y unlinked)
-        // =========================
-        $provisionales = DB::table('venta_provisional_detalles as vp')
-            ->join('venta_provisionales as v', 'v.id', '=', 'vp.venta_provisional_id')
-            ->selectRaw('
-                vp.id,
-                vp.venta_id,
-                v.fecha_provisional,
-                vp.monto,
-                vp.comentario,
-                v.numero_recibo,
-                vp.comprobante_tipo_codigo,
-                vp.serie,
-                vp.correlativo
-            ')
-            ->where('v.cliente_id', $clienteId)
-            ->whereBetween('v.fecha_provisional', [$ini, $fin])
-            ->orderBy('v.fecha_provisional')
-            ->orderBy('vp.id')
-            ->get();
-
-        $provConVenta = $provisionales->whereNotNull('venta_id');
-        $provSinVenta = $provisionales->whereNull('venta_id')->values();
-
-        $ventaIdsPagadasEnRango = $provConVenta->pluck('venta_id')->unique()->values()->all();
-
-        // =========================
-        // 2) Ventas a mostrar:
-        // A) ventas en rango con saldo>0
-        // B) ventas con pagos en rango (aunque venta esté fuera)
-        // =========================
-        $ventas = DB::table('ventas')
-            ->selectRaw('
-                id,
-                fecha_venta,
-                fecha_vencimiento,
-                comprobante_tipo_codigo,
-                serie,
-                correlativo,
-                total,
-                acuenta,
-                abonos,
-                saldo
-            ')
-            ->where('cliente_id', $clienteId)
-            ->where('estado', '!=', 'anulada')
-            ->where(function ($q) use ($ini, $fin, $ventaIdsPagadasEnRango) {
-                $q->where(function ($q2) use ($ini, $fin) {
-                    $q2->whereBetween('fecha_venta', [$ini, $fin])
-                        ->where('saldo', '>', 0);
-                });
-
-                if (! empty($ventaIdsPagadasEnRango)) {
-                    $q->orWhereIn('id', $ventaIdsPagadasEnRango);
-                }
-            })
-            ->orderBy('fecha_venta')
-            ->orderBy('id')
-            ->get();
-
-        // Agrupar provisionales (del rango) por venta
-        $pagosPorVenta = $provConVenta->groupBy('venta_id')->map->values();
-
-        // =========================
-        // 3) Pagos ANTES del rango por venta (para saldo correcto en cada pago)
-        // =========================
-        $ventaIds = $ventas->pluck('id')->unique()->values()->all();
-
-        $pagosAntesIniPorVenta = collect();
-
-        if (! empty($ventaIds)) {
-            $pagosAntesIniPorVenta = DB::table('venta_provisional_detalles as vp')
-                ->join('venta_provisionales as v', 'v.id', '=', 'vp.venta_provisional_id')
-                ->selectRaw('vp.venta_id, COALESCE(SUM(vp.monto),0) as total')
-                ->where('v.cliente_id', $clienteId)
-                ->whereNotNull('vp.venta_id')
-                ->whereIn('vp.venta_id', $ventaIds)
-                ->where('v.fecha_provisional', '<', $ini)
-                ->groupBy('vp.venta_id')
-                ->pluck('total', 'vp.venta_id');
-        }
-
-        // =========================
-        // 4) Armar jerarquía + calcular:
-        // credito_base = total - acuenta
-        // saldo_inicio_rango = credito_base - pagos_antes_ini
-        // saldo_despues_pago (por cada pago en rango) con acumulado
-        // =========================
-        $ventas = $ventas->map(function ($v) use ($pagosPorVenta, $pagosAntesIniPorVenta) {
-            $v->documento = trim(($v->comprobante_tipo_codigo ? $v->comprobante_tipo_codigo.' ' : '').($v->serie ?? '').'-'.($v->correlativo ?? ''));
-
-            $total = (float) $v->total;
-            $acuenta = (float) $v->acuenta;
-
-            $v->credito_base = $total - $acuenta;
-
-            $pagosAntes = (float) ($pagosAntesIniPorVenta[$v->id] ?? 0);
-            $v->pagos_antes_ini = $pagosAntes;
-
-            $v->saldo_inicio_rango = $v->credito_base - $pagosAntes;
-
-            $pagos = $pagosPorVenta->get($v->id, collect())->values();
-
-            $acum = 0.0;
-            $pagos = $pagos->map(function ($p) use (&$acum, $v) {
-                $acum += (float) $p->monto;
-                $p->saldo_despues = $v->credito_base - ($v->pagos_antes_ini + $acum);
-
-                return $p;
-            });
-
-            $v->pagos = $pagos;
-
-            return $v;
-        });
-
-        // total adelantos
-        // =========================
-        // ADELANTOS / ABONOS SUELTOS (cabecera sin detalles)
-        // =========================
-        $abonosSueltos = DB::table('venta_provisionales as v')
-            ->selectRaw('
-                v.id,
-                v.fecha_provisional,
-                v.numero_recibo,
-                v.monto
-            ')
-            ->where('v.cliente_id', $clienteId)
-            ->whereBetween('v.fecha_provisional', [$ini, $fin])
-            ->where('v.tipo', 'ADELANTO') // ✅ el criterio correcto
-            ->orderBy('v.fecha_provisional')
-            ->orderBy('v.id')
-            ->get();
-
-        $totAdelantos = (float) $abonosSueltos->sum('monto');
-
-        // Totales (para pie)
-        $totPagoRango = (float) $provisionales->sum('monto');
-        $totPagoVentas = (float) $provConVenta->sum('monto');
-        $totAbonoSuelto = $totAdelantos;
-        $totCreditoMostrado = (float) $ventas->sum('credito_base');
-
-        $pdf = PDF::loadView('cuenta-cliente.reportes.estado_cuenta', [
-            'ini' => $ini,
-            'fin' => $fin,
-            'clienteId' => $clienteId,
-            'clienteNombre' => $clienteNombre,
-            'clienteData' => $clienteData,
-            'saldoInicial' => $saldoInicial,
-            'saldoFinal' => $saldoFinal,
-
-            'ventas' => $ventas,
-            'provSinVenta' => $provSinVenta,
-
-            'totCreditoMostrado' => $totCreditoMostrado,
-            'totPagoRango' => $totPagoRango,
-            'totPagoVentas' => $totPagoVentas,
-            'totAbonoSuelto' => $totAbonoSuelto,
-            'abonosSueltos' => $abonosSueltos,
-        ])->setPaper('a4', 'portrait');
-
-        $nombreSanitizado = preg_replace('/[^a-zA-Z0-9\s\-]/', '', $clienteNombre ?? '');
-        $nombreSanitizado = preg_replace('/\s+/', '_', trim($nombreSanitizado));
-        $partes = explode('_', $nombreSanitizado);
-        $idPart = count($partes) > 0 ? array_shift($partes) : '';
-        $nombreLimpio = implode('_', $partes);
-        $nombreArchivo = $nombreLimpio.'_'.$idPart.'.pdf';
-
-        return $pdf->stream('estado_cuenta_'.$nombreArchivo);
-    }
-
-    public function estadoCuentaSimplificadoClientePdf(Request $request)
-    {
-        $data = $request->validate([
-            'fecha_inicio' => ['required', 'date'],
-            'fecha_fin' => ['required', 'date', 'after_or_equal:fecha_inicio'],
-            'cliente_ids' => ['required', 'array', 'size:1'],
-            'cliente_ids.0' => ['required', 'integer'],
-        ]);
-
-        $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
-        $fin = Carbon::parse($data['fecha_fin'])->endOfDay();
-        $clienteId = (int) $data['cliente_ids'][0];
-
-        $clienteData = Cliente::select('id', 'razon_social', 'direccion', 'telefono')
-            ->find($clienteId);
-
-        $clienteNombre = $clienteData
-            ? ($clienteData->id.' - '.$clienteData->razon_social)
-            : (string) $clienteId;
-
-        // =========================
-        // SALDO INICIAL / FINAL (según tu regla: solo ventas.saldo)
-        // =========================
-        $saldoInicial = (float) DB::table('ventas')
-            ->where('cliente_id', $clienteId)
-            ->where('saldo', '>', 0)
-            ->where('fecha_venta', '<', $ini)
-            ->sum('saldo');
-
-        $saldoFinal = (float) DB::table('ventas')
-            ->where('cliente_id', $clienteId)
-            ->where('saldo', '>', 0)
-            ->where('fecha_venta', '<=', $fin)
-            ->sum('saldo');
-
-        // =========================
-        // 1) Provisionales del rango (linked y unlinked)
-        // =========================
-        $provisionales = DB::table('venta_provisional_detalles as vp')
-            ->join('venta_provisionales as v', 'v.id', '=', 'vp.venta_provisional_id')
-            ->selectRaw('
-                vp.id,
-                vp.venta_id,
-                v.fecha_provisional,
-                vp.monto,
-                vp.comentario,
-                v.numero_recibo,
-                vp.comprobante_tipo_codigo,
-                vp.serie,
-                vp.correlativo
-            ')
-            ->where('v.cliente_id', $clienteId)
-            ->whereBetween('v.fecha_provisional', [$ini, $fin])
-            ->orderBy('v.fecha_provisional')
-            ->orderBy('vp.id')
-            ->get();
-
-        $provConVenta = $provisionales->whereNotNull('venta_id');
-        $provSinVenta = $provisionales->whereNull('venta_id')->values();
-
-        $ventaIdsPagadasEnRango = $provConVenta->pluck('venta_id')->unique()->values()->all();
-
-        // =========================
-        // 2) Ventas a mostrar:
-        // A) ventas en rango con saldo>0
-        // B) ventas con pagos en rango (aunque venta esté fuera)
-        // =========================
-        $ventas = DB::table('ventas')
-            ->selectRaw('
-                id,
-                fecha_venta,
-                fecha_vencimiento,
-                comprobante_tipo_codigo,
-                pago_forma_nombre,
-                serie,
-                correlativo,
-                total,
-                acuenta,
-                abonos,
-                saldo
-            ')
-            ->where('cliente_id', $clienteId)
-            ->where(function ($q) use ($ini, $fin, $ventaIdsPagadasEnRango) {
-                $q->where(function ($q2) use ($ini, $fin) {
-                    $q2->whereBetween('fecha_venta', [$ini, $fin])
-                        ->where('saldo', '>', 0);
-                });
-
-                if (! empty($ventaIdsPagadasEnRango)) {
-                    $q->orWhereIn('id', $ventaIdsPagadasEnRango);
-                }
-            })
-            ->orderBy('fecha_venta')
-            ->orderBy('id')
-            ->get();
-
-        // Agrupar provisionales (del rango) por venta
-        $pagosPorVenta = $provConVenta->groupBy('venta_id')->map->values();
-
-        // =========================
-        // 3) Pagos ANTES del rango por venta (para saldo correcto en cada pago)
-        // =========================
-        $ventaIds = $ventas->pluck('id')->unique()->values()->all();
-
-        $pagosAntesIniPorVenta = collect();
-
-        if (! empty($ventaIds)) {
-            $pagosAntesIniPorVenta = DB::table('venta_provisional_detalles as vp')
-                ->join('venta_provisionales as v', 'v.id', '=', 'vp.venta_provisional_id')
-                ->selectRaw('vp.venta_id, COALESCE(SUM(vp.monto),0) as total')
-                ->where('v.cliente_id', $clienteId)
-                ->whereNotNull('vp.venta_id')
-                ->whereIn('vp.venta_id', $ventaIds)
-                ->where('v.fecha_provisional', '<', $ini)
-                ->groupBy('vp.venta_id')
-                ->pluck('total', 'vp.venta_id');
-        }
-
-        // =========================
-        // 4) Armar jerarquía + calcular:
-        // credito_base = total - acuenta
-        // saldo_inicio_rango = credito_base - pagos_antes_ini
-        // saldo_despues_pago (por cada pago en rango) con acumulado
-        // =========================
-        $ventas = $ventas->map(function ($v) use ($pagosPorVenta, $pagosAntesIniPorVenta) {
-            $v->documento = trim(($v->comprobante_tipo_codigo ? $v->comprobante_tipo_codigo.' ' : '').($v->serie ?? '').'-'.($v->correlativo ?? ''));
-
-            $total = (float) $v->total;
-            $acuenta = (float) $v->acuenta;
-
-            $v->credito_base = $total - $acuenta;
-
-            $pagosAntes = (float) ($pagosAntesIniPorVenta[$v->id] ?? 0);
-            $v->pagos_antes_ini = $pagosAntes;
-
-            $v->saldo_inicio_rango = $v->credito_base - $pagosAntes;
-
-            $pagos = $pagosPorVenta->get($v->id, collect())->values();
-
-            $acum = 0.0;
-            $pagos = $pagos->map(function ($p) use (&$acum, $v) {
-                $acum += (float) $p->monto;
-                $p->saldo_despues = $v->credito_base - ($v->pagos_antes_ini + $acum);
-
-                return $p;
-            });
-
-            $v->pagos = $pagos;
-
-            return $v;
-        });
-
-        // total adelantos
-        // =========================
-        // ADELANTOS / ABONOS SUELTOS (cabecera sin detalles)
-        // =========================
-        $abonosSueltos = DB::table('venta_provisionales as v')
-            ->selectRaw('
-                v.id,
-                v.fecha_provisional,
-                v.numero_recibo,
-                v.monto
-            ')
-            ->where('v.cliente_id', $clienteId)
-            ->whereBetween('v.fecha_provisional', [$ini, $fin])
-            ->where('v.tipo', 'ADELANTO') // ✅ el criterio correcto
-            ->orderBy('v.fecha_provisional')
-            ->orderBy('v.id')
-            ->get();
-
-        $totAdelantos = (float) $abonosSueltos->sum('monto');
-
-        // Totales (para pie)
-        $totPagoRango = (float) $provisionales->sum('monto');
-        $totPagoVentas = (float) $provConVenta->sum('monto');
-        $totAbonoSuelto = $totAdelantos;
-        $totCreditoMostrado = (float) $ventas->sum('credito_base');
-
-        $pdf = PDF::loadView('cuenta-cliente.reportes.estado_cuenta_simplificado', [
-            'ini' => $ini,
-            'fin' => $fin,
-            'clienteId' => $clienteId,
-            'clienteNombre' => $clienteNombre,
-            'clienteData' => $clienteData,
-            'saldoInicial' => $saldoInicial,
-            'saldoFinal' => $saldoFinal,
-
-            'ventas' => $ventas,
-            'provSinVenta' => $provSinVenta,
-
-            'totCreditoMostrado' => $totCreditoMostrado,
-            'totPagoRango' => $totPagoRango,
-            'totPagoVentas' => $totPagoVentas,
-            'totAbonoSuelto' => $totAbonoSuelto,
-            'abonosSueltos' => $abonosSueltos,
-        ])->setPaper('a4', 'portrait');
-
-        $nombreSanitizado = preg_replace('/[^a-zA-Z0-9\s\-]/', '', $clienteNombre ?? '');
-        $nombreSanitizado = preg_replace('/\s+/', '_', trim($nombreSanitizado));
-        $partes = explode('_', $nombreSanitizado);
-        $idPart = count($partes) > 0 ? array_shift($partes) : '';
-        $nombreLimpio = implode('_', $partes);
-        $nombreArchivo = $nombreLimpio.'_'.$idPart.'.pdf';
-
-        return $pdf->stream('estado_cuenta_simplificado_'.$nombreArchivo);
-    }
+    #endregion
+
+    #region Estado de cuenta del cliente
+
+    /**
+     * Genera el estado de cuenta detallado.
+     *
+     * El saldo se reconstruye históricamente con las ventas y los cobros
+     * registrados hasta cada fecha de corte. No se utiliza ventas.saldo como
+     * saldo histórico, porque ese campo representa el saldo actual.
+     */
+#region Estado de Cuenta Detallado
+
+public function estadoCuentaClientePdf(Request $request)
+{
+    $data = $request->validate([
+        'fecha_inicio' => ['required', 'date'],
+        'fecha_fin' => [
+            'required',
+            'date',
+            'after_or_equal:fecha_inicio',
+        ],
+        'cliente_ids' => [
+            'required',
+            'array',
+            'size:1',
+        ],
+        'cliente_ids.0' => [
+            'required',
+            'integer',
+        ],
+    ]);
+
+    $ini = Carbon::parse(
+        $data['fecha_inicio']
+    )->startOfDay();
+
+    $fin = Carbon::parse(
+        $data['fecha_fin']
+    )->endOfDay();
+
+    $clienteId = (int) $data['cliente_ids'][0];
+
+    $clienteData = Cliente::query()
+        ->select(
+            'id',
+            'razon_social',
+            'direccion',
+            'telefono'
+        )
+        ->findOrFail($clienteId);
+
+    $clienteNombre = $clienteData->id
+        . ' - '
+        . $clienteData->razon_social;
+
+    $datosReporte = $this->prepararDatosEstadoCuentaCliente(
+        $clienteId,
+        $ini,
+        $fin
+    );
+
+    $pdf = Pdf::loadView(
+        'cuenta-cliente.reportes.estado_cuenta',
+        array_merge(
+            [
+                'ini' => $ini,
+                'fin' => $fin,
+                'clienteId' => $clienteId,
+                'clienteNombre' => $clienteNombre,
+                'clienteData' => $clienteData,
+            ],
+            $datosReporte
+        )
+    )->setPaper('a4', 'portrait');
+
+    $nombreSanitizado = preg_replace(
+        '/[^a-zA-Z0-9\s\-]/',
+        '',
+        $clienteNombre
+    );
+
+    $nombreSanitizado = preg_replace(
+        '/\s+/',
+        '_',
+        trim($nombreSanitizado)
+    );
+
+    return $pdf->stream(
+        'estado_cuenta_'
+        . $nombreSanitizado
+        . '.pdf'
+    );
+}
+
+#endregion
+
+    /**
+     * Genera el estado de cuenta simplificado utilizando exactamente la misma
+     * información y los mismos saldos que el reporte detallado.
+     */
+    #region Estado de Cuenta Simplificado
+
+public function estadoCuentaSimplificadoClientePdf(
+    Request $request
+) {
+    $data = $request->validate([
+        'fecha_inicio' => ['required', 'date'],
+        'fecha_fin' => [
+            'required',
+            'date',
+            'after_or_equal:fecha_inicio',
+        ],
+        'cliente_ids' => [
+            'required',
+            'array',
+            'size:1',
+        ],
+        'cliente_ids.0' => [
+            'required',
+            'integer',
+        ],
+    ]);
+
+    $ini = Carbon::parse(
+        $data['fecha_inicio']
+    )->startOfDay();
+
+    $fin = Carbon::parse(
+        $data['fecha_fin']
+    )->endOfDay();
+
+    $clienteId = (int) $data['cliente_ids'][0];
+
+    $clienteData = Cliente::query()
+        ->select(
+            'id',
+            'razon_social',
+            'direccion',
+            'telefono'
+        )
+        ->findOrFail($clienteId);
+
+    $clienteNombre = $clienteData->id
+        . ' - '
+        . $clienteData->razon_social;
 
     /*
-    public function estadoCuentaSimplificadoClientePdf(Request $request)
-    {
-        $data = $request->validate([
-            'fecha_inicio'  => ['required', 'date'],
-            'fecha_fin'     => ['required', 'date', 'after_or_equal:fecha_inicio'],
-            'cliente_ids'   => ['required', 'array', 'size:1'],
-            'cliente_ids.0' => ['required', 'integer'],
-        ]);
+     * El simplificado usa exactamente la misma información
+     * que el estado de cuenta detallado.
+     */
+    $datosReporte = $this->prepararDatosEstadoCuentaCliente(
+        $clienteId,
+        $ini,
+        $fin
+    );
 
-        $ini = Carbon::parse($data['fecha_inicio'])->startOfDay();
-        $fin = Carbon::parse($data['fecha_fin'])->endOfDay();
-        $clienteId = (int) $data['cliente_ids'][0];
+    $pdf = Pdf::loadView(
+        'cuenta-cliente.reportes.estado_cuenta_simplificado',
+        array_merge(
+            [
+                'ini' => $ini,
+                'fin' => $fin,
+                'clienteId' => $clienteId,
+                'clienteNombre' => $clienteNombre,
+                'clienteData' => $clienteData,
+            ],
+            $datosReporte
+        )
+    )->setPaper('a4', 'portrait');
 
-        $clienteData = Cliente::select('id', 'razon_social', 'direccion', 'telefono')->find($clienteId);
-        $clienteNombre = $clienteData ? ($clienteData->id.' - '.$clienteData->razon_social) : (string)$clienteId;
+    $nombreSanitizado = preg_replace(
+        '/[^a-zA-Z0-9\s\-]/',
+        '',
+        $clienteNombre
+    );
 
-        $saldoInicial = (float) DB::table('ventas')
-            ->where('cliente_id', $clienteId)
-            ->where('saldo', '>', 0)
-            ->where('fecha_venta', '<', $ini)
-            ->sum('saldo');
+    $nombreSanitizado = preg_replace(
+        '/\s+/',
+        '_',
+        trim($nombreSanitizado)
+    );
 
-        // =========================
-        // MISMO BLOQUE QUE EL DETALLADO
-        // =========================
-        $provisionales = DB::table('venta_provisional_detalles as vp')
-            ->join('venta_provisionales as v', 'v.id', '=', 'vp.venta_provisional_id')
-            ->selectRaw("
-                vp.id,
-                vp.venta_id,
-                v.fecha_provisional,
-                vp.monto,
-                vp.comentario,
-                v.numero_recibo,
-                vp.comprobante_tipo_codigo,
-                vp.serie,
-                vp.correlativo
+    return $pdf->stream(
+        'estado_cuenta_simplificado_'
+        . $nombreSanitizado
+        . '.pdf'
+    );
+}
+
+#endregion
+
+    #endregion
+
+    #region Consultas auxiliares del estado de cuenta
+
+    /**
+     * Consulta única de documentos que mantienen deuda actual.
+     */
+    private function consultaVentasPendientesCliente(
+        int $clienteId,
+        ?Carbon $fechaCorte = null
+    ): Builder {
+        return Venta::query()
+            ->where('ventas.cliente_id', $clienteId)
+            ->when(
+                $fechaCorte,
+                fn (Builder $query, Carbon $corte) => $query->where(
+                    'ventas.fecha_venta',
+                    '<=',
+                    $corte
+                )
+            )
+            ->whereRaw("
+                LOWER(TRIM(COALESCE(ventas.estado, '')))
+                <> 'anulada'
             ")
-            ->where('v.cliente_id', $clienteId)
-            ->whereBetween('v.fecha_provisional', [$ini, $fin])
-            ->orderBy('v.fecha_provisional')
+            ->where('ventas.saldo', '>', 0);
+    }
+
+    /**
+     * Retorna el saldo ACTUAL registrado en ventas.saldo.
+     *
+     * No vuelve a sumar el total histórico de todas las ventas. Solo considera
+     * ventas vigentes, no anuladas y cuyo saldo actual sea mayor que cero.
+     */
+    private function calcularSaldoActualCliente(int $clienteId): float
+    {
+        return round(
+            (float) $this->consultaVentasPendientesCliente(
+                $clienteId,
+                now()->endOfDay()
+            )->sum('ventas.saldo'),
+            2
+        );
+    }
+
+    /**
+     * Fuente única para el estado de cuenta detallado y simplificado.
+     *
+     * Reglas:
+     * - Las ventas anuladas no aparecen ni suman.
+     * - El saldo final es el saldo ACTUAL de ventas.saldo.
+     * - Las ventas totalmente pagadas no suman al saldo final.
+     * - Los pagos del rango se muestran y se descuentan movimiento por movimiento.
+     */
+    private function prepararDatosEstadoCuentaCliente(
+        int $clienteId,
+        Carbon $ini,
+        Carbon $fin
+    ): array {
+        #region Pagos aplicados dentro del rango
+
+        $provisionales = DB::table('venta_provisional_detalles as vpd')
+            ->join(
+                'venta_provisionales as vp',
+                'vp.id',
+                '=',
+                'vpd.venta_provisional_id'
+            )
+            ->leftJoin('ventas as venta', 'venta.id', '=', 'vpd.venta_id')
+            ->selectRaw('
+                vpd.id AS detalle_id,
+                vpd.venta_id,
+                vp.id AS provisional_id,
+                vp.fecha_provisional,
+                vpd.monto,
+                vpd.comentario,
+                vp.numero_recibo,
+                vpd.comprobante_tipo_codigo,
+                vpd.serie,
+                vpd.correlativo
+            ')
+            ->where('vp.cliente_id', $clienteId)
+            ->whereBetween('vp.fecha_provisional', [$ini, $fin])
+            ->where(function ($query) {
+                $query->whereNull('vpd.venta_id')
+                    ->orWhereRaw("LOWER(TRIM(COALESCE(venta.estado, ''))) <> 'anulada'");
+            })
+            ->orderBy('vp.fecha_provisional')
+            ->orderBy('vp.id')
+            ->orderBy('vpd.id')
+            ->get();
+
+        $provConVenta = $provisionales
+            ->whereNotNull('venta_id')
+            ->values();
+
+        $provSinVenta = $provisionales
+            ->whereNull('venta_id')
+            ->values();
+
+        $pagosPorVenta = $provConVenta
+            ->groupBy('venta_id')
+            ->map(fn ($pagos) => $pagos->values());
+
+        $ventaIdsPagadasEnRango = $provConVenta
+            ->pluck('venta_id')
+            ->unique()
+            ->values()
+            ->all();
+
+        #endregion
+
+        #region Ventas visibles
+
+        $ventas = DB::table('ventas as venta')
+            ->select([
+                'venta.id',
+                'venta.fecha_venta',
+                'venta.fecha_vencimiento',
+                'venta.comprobante_tipo_codigo',
+                'venta.pago_forma_nombre',
+                'venta.serie',
+                'venta.correlativo',
+                'venta.total',
+                'venta.acuenta',
+                'venta.abonos',
+                'venta.saldo',
+            ])
+            ->where('venta.cliente_id', $clienteId)
+            ->whereRaw("LOWER(TRIM(COALESCE(venta.estado, ''))) <> 'anulada'")
+            ->where('venta.fecha_venta', '<=', $fin)
+            ->where(function ($query) use ($ini, $fin, $ventaIdsPagadasEnRango) {
+                // Ventas del rango que todavía tienen deuda.
+                $query->where(function ($subQuery) use ($ini, $fin) {
+                    $subQuery->whereBetween('venta.fecha_venta', [$ini, $fin])
+                        ->where('venta.saldo', '>', 0);
+                });
+
+                // Ventas anteriores que aún tienen deuda.
+                $query->orWhere(function ($subQuery) use ($ini) {
+                    $subQuery->where('venta.fecha_venta', '<', $ini)
+                        ->where('venta.saldo', '>', 0);
+                });
+
+                // Ventas que recibieron pagos en el rango, aunque ya quedaron pagadas.
+                if (! empty($ventaIdsPagadasEnRango)) {
+                    $query->orWhereIn('venta.id', $ventaIdsPagadasEnRango);
+                }
+            })
+            ->orderBy('venta.fecha_venta')
+            ->orderBy('venta.id')
+            ->get();
+
+        #endregion
+
+        #region Reconstrucción visual de cada movimiento
+
+        $ventas = $ventas->map(function ($venta) use ($pagosPorVenta) {
+            $venta->documento = trim(
+                (! empty($venta->comprobante_tipo_codigo)
+                    ? $venta->comprobante_tipo_codigo.' '
+                    : '')
+                .($venta->serie ?? '')
+                .'-'
+                .($venta->correlativo ?? '')
+            );
+
+            $venta->credito_base = round(
+                max(
+                    (float) ($venta->total ?? 0)
+                    - (float) ($venta->acuenta ?? 0),
+                    0
+                ),
+                2
+            );
+
+            $venta->saldo_actual = round(
+                max((float) ($venta->saldo ?? 0), 0),
+                2
+            );
+
+            $pagos = $pagosPorVenta
+                ->get($venta->id, collect())
+                ->sortBy(fn ($pago) => sprintf(
+                    '%s-%012d',
+                    $pago->fecha_provisional ?? '',
+                    (int) ($pago->detalle_id ?? 0)
+                ))
+                ->values();
+
+            $totalPagadoRango = round((float) $pagos->sum('monto'), 2);
+
+            /*
+             * Partimos del saldo actual más los pagos hechos en el rango.
+             * Al restar cada cobranza se llega exactamente a ventas.saldo.
+             */
+            $saldoMovimiento = round(
+                $venta->saldo_actual + $totalPagadoRango,
+                2
+            );
+
+            $venta->saldo_inicio_rango = $saldoMovimiento;
+            $venta->pagos_antes_ini = 0.0;
+
+            $venta->pagos = $pagos->map(
+                function ($pago) use (&$saldoMovimiento) {
+                    $saldoMovimiento = round(
+                        $saldoMovimiento - (float) ($pago->monto ?? 0),
+                        2
+                    );
+
+                    $pago->saldo_despues = max($saldoMovimiento, 0);
+
+                    return $pago;
+                }
+            );
+
+            // El saldo final de la fila siempre coincide con el saldo actual guardado.
+            $venta->saldo_final_rango = $venta->saldo_actual;
+
+            return $venta;
+        })->values();
+
+        #endregion
+
+        #region Saldos
+
+        /*
+         * Saldo anterior visible: deuda de ventas anteriores al rango antes de
+         * descontar los pagos realizados dentro del rango.
+         */
+        $saldoInicial = round(
+            (float) $ventas
+                ->filter(fn ($venta) => Carbon::parse($venta->fecha_venta)->lt($ini))
+                ->sum('saldo_inicio_rango'),
+            2
+        );
+
+        /*
+         * Saldo final ACTUAL: únicamente ventas vigentes con saldo pendiente.
+         * Este total debe coincidir con Créditos por cobrar.
+         */
+        $saldoFinal = $this->calcularSaldoActualCliente($clienteId);
+
+        #endregion
+
+        #region Adelantos sin venta asociada
+
+        $aplicadoPorProvisional = DB::table('venta_provisional_detalles as detalle')
+            ->selectRaw('
+                detalle.venta_provisional_id,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN detalle.venta_id IS NOT NULL THEN detalle.monto
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS monto_aplicado
+            ')
+            ->groupBy('detalle.venta_provisional_id');
+
+        $abonosSueltos = DB::table('venta_provisionales as vp')
+            ->leftJoinSub(
+                $aplicadoPorProvisional,
+                'aplicado',
+                function ($join) {
+                    $join->on(
+                        'aplicado.venta_provisional_id',
+                        '=',
+                        'vp.id'
+                    );
+                }
+            )
+            ->selectRaw('
+                vp.id,
+                vp.fecha_provisional,
+                vp.numero_recibo,
+                CASE
+                    WHEN (
+                        COALESCE(vp.monto, 0)
+                        - COALESCE(aplicado.monto_aplicado, 0)
+                    ) > 0
+                    THEN (
+                        COALESCE(vp.monto, 0)
+                        - COALESCE(aplicado.monto_aplicado, 0)
+                    )
+                    ELSE 0
+                END AS monto
+            ')
+            ->where('vp.cliente_id', $clienteId)
+            ->whereBetween('vp.fecha_provisional', [$ini, $fin])
+            ->whereRaw('
+                (
+                    COALESCE(vp.monto, 0)
+                    - COALESCE(aplicado.monto_aplicado, 0)
+                ) > 0
+            ')
+            ->orderBy('vp.fecha_provisional')
             ->orderBy('vp.id')
             ->get();
 
-        $provConVenta = $provisionales->whereNotNull('venta_id');
-        $provSinVenta = $provisionales->whereNull('venta_id')->values();
+        #endregion
 
-        $ventaIdsPagadasEnRango = $provConVenta->pluck('venta_id')->unique()->values()->all();
+        #region Totales
 
-        $ventas = DB::table('ventas')
-            ->selectRaw("
-                id,
-                fecha_venta,
-                fecha_vencimiento,
-                comprobante_tipo_codigo,
-                serie,
-                correlativo,
-                pago_forma_nombre,
-                total,
-                acuenta,
-                abonos,
-                saldo
-            ")
-            ->where('cliente_id', $clienteId)
-            ->where(function ($q) use ($ini, $fin, $ventaIdsPagadasEnRango) {
-                $q->where(function ($q2) use ($ini, $fin) {
-                    $q2->whereBetween('fecha_venta', [$ini, $fin])
-                    ->where('saldo', '>', 0);
-                });
+        $totCreditoMostrado = round(
+            (float) $ventas
+                ->filter(function ($venta) use ($ini, $fin) {
+                    $fechaVenta = Carbon::parse($venta->fecha_venta);
 
-                if (!empty($ventaIdsPagadasEnRango)) {
-                    $q->orWhereIn('id', $ventaIdsPagadasEnRango);
-                }
-            })
-            ->orderBy('fecha_venta')
-            ->orderBy('id')
-            ->get();
+                    return $fechaVenta->betweenIncluded($ini, $fin);
+                })
+                ->sum('credito_base'),
+            2
+        );
 
-        $pagosPorVenta = $provConVenta->groupBy('venta_id')->map->values();
-        $ventaIds = $ventas->pluck('id')->unique()->values()->all();
+        $totPagoVentas = round((float) $provConVenta->sum('monto'), 2);
+        $totPagoRango = $totPagoVentas;
+        $totAbonoSuelto = round((float) $abonosSueltos->sum('monto'), 2);
 
-        $pagosAntesIniPorVenta = collect();
-        if (!empty($ventaIds)) {
-            $pagosAntesIniPorVenta = DB::table('venta_provisional_detalles as vp')
-                ->join('venta_provisionales as v', 'v.id', '=', 'vp.venta_provisional_id')
-                ->selectRaw('vp.venta_id, COALESCE(SUM(vp.monto),0) as total')
-                ->where('v.cliente_id', $clienteId)
-                ->whereNotNull('vp.venta_id')
-                ->whereIn('vp.venta_id', $ventaIds)
-                ->where('v.fecha_provisional', '<', $ini)
-                ->groupBy('vp.venta_id')
-                ->pluck('total', 'vp.venta_id');
-        }
+        #endregion
 
-        $ventas = $ventas->map(function ($v) use ($pagosPorVenta, $pagosAntesIniPorVenta) {
-            $v->documento = trim(($v->comprobante_tipo_codigo ? $v->comprobante_tipo_codigo.' ' : '') . ($v->serie ?? '') . '-' . ($v->correlativo ?? ''));
-
-            $total   = (float) $v->total;
-            $acuenta = (float) $v->acuenta;
-
-            $v->credito_base = $total - $acuenta;
-
-            $pagosAntes = (float) ($pagosAntesIniPorVenta[$v->id] ?? 0);
-            $v->pagos_antes_ini = $pagosAntes;
-
-            $v->saldo_inicio_rango = $v->credito_base - $pagosAntes;
-
-            $pagos = $pagosPorVenta->get($v->id, collect())->values();
-
-            $acum = 0.0;
-            $pagos = $pagos->map(function ($p) use (&$acum, $v) {
-                $acum += (float) $p->monto;
-                $p->saldo_despues = $v->credito_base - ($v->pagos_antes_ini + $acum);
-                return $p;
-            });
-
-            $v->pagos = $pagos;
-
-            // ✅ saldo final real de esa venta dentro del rango
-            $v->saldo_final_rango = $pagos->count()
-                ? (float) $pagos->last()->saldo_despues
-                : (float) $v->saldo_inicio_rango;
-
-            return $v;
-        });
-
-        $adelantos = DB::table('venta_provisionales as v')
-            ->selectRaw("v.id, v.fecha_provisional, v.numero_recibo, v.monto")
-            ->where('v.cliente_id', $clienteId)
-            ->whereBetween('v.fecha_provisional', [$ini, $fin])
-            ->where('v.tipo', 'ADELANTO')
-            ->orderBy('v.fecha_provisional')
-            ->orderBy('v.id')
-            ->get();
-
-        $totAdelantos = (float) $adelantos->sum('monto');
-
-        $totCreditoMostrado = (float) $ventas->sum('credito_base');
-        $totPagoRango       = (float) $provisionales->sum('monto');
-        $totPagoVentas      = (float) $provConVenta->sum('monto');
-        $totAbonoSuelto     = $totAdelantos;
-
-        $saldoFinal = (float) $ventas->sum('saldo_final_rango');
-
-        $pdf = PDF::loadView('cuenta-cliente.reportes.estado_cuenta_simplificado', [
-            'ini'                => $ini,
-            'fin'                => $fin,
-            'clienteId'          => $clienteId,
-            'clienteNombre'      => $clienteNombre,
-            'clienteData'        => $clienteData,
-            'saldoInicial'       => $saldoInicial,
-            'saldoFinal'         => $saldoFinal,
-
-            'ventas'             => $ventas,
-            'provSinVenta'       => $provSinVenta,
-            'adelantos'          => $adelantos,
-
+        return [
+            'saldoInicial' => $saldoInicial,
+            'saldoFinal' => $saldoFinal,
+            'ventas' => $ventas,
+            'provSinVenta' => $provSinVenta,
+            'abonosSueltos' => $abonosSueltos,
             'totCreditoMostrado' => $totCreditoMostrado,
-            'totPagoRango'       => $totPagoRango,
-            'totPagoVentas'      => $totPagoVentas,
-            'totAbonoSuelto'     => $totAbonoSuelto,
-        ])->setPaper('a4', 'portrait');
-
-        return $pdf->stream("estado_cuenta_cliente_{$clienteId}.pdf");
+            'totPagoRango' => $totPagoRango,
+            'totPagoVentas' => $totPagoVentas,
+            'totAbonoSuelto' => $totAbonoSuelto,
+        ];
     }
-    */
 
+    #endregion
 }

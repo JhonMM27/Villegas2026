@@ -265,13 +265,16 @@
                         );
 
                     $refVenta = $v->pago_forma_nombre ?? '';
-                    $fechaVentaFmt = \Carbon\Carbon::parse($v->fecha_venta)->format('d/m/Y');
+                    $fechaVentaCarbon = \Carbon\Carbon::parse($v->fecha_venta);
+                    $fechaVentaFmt = $fechaVentaCarbon->format('d/m/Y');
+                    $esVentaEnRango = $fechaVentaCarbon->gte($ini);
 
-                    $impVenta = (float) ($v->credito_base ?? 0);
-
+                    $impVenta = $esVentaEnRango ? (float) ($v->credito_base ?? 0) : 0.0;
                     $saldoVenta = (float) ($v->saldo_inicio_rango ?? 0);
 
-                    $saldoAcum += $saldoVenta;
+                    if ($esVentaEnRango) {
+                        $saldoAcum += $impVenta;
+                    }
                 @endphp
 
                 @if ($nPagos === 0)
@@ -307,10 +310,9 @@
 
                             // Solo actualizar acumulado en el último pago de la venta
                             if ($esUltimo) {
-                                $saldoAcum -= $saldoVenta - $saldoDespues;
-                                // Solo sumar al total el saldo FINAL de esta venta (no los intermedios)
                                 $totalSaldoSuma += $saldoDespues;
                             }
+                            $saldoAcum -= $monto;
 
                             $provKey =
                                 $p->provisional_id ??
@@ -371,7 +373,7 @@
             <tr style="border-top: 2px solid #333;">
                 <td colspan="5" style="text-align:right; font-weight:700; padding:4px;">TOTAL SALDO:</td>
                 <td class="num" style="font-weight:700; padding:4px; border-top:2px solid #333;">
-                    {{ number_format($totalSaldoSuma, 2) }}</td>
+                    {{ number_format($saldoFinal, 2) }}</td>
                 <td colspan="3"></td>
             </tr>
 

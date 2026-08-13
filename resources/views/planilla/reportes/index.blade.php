@@ -69,11 +69,11 @@
                             <div class="row g-2 align-items-end mb-2">
                                 <div class="col-12 col-lg-3">
                                     <label class="form-label mb-0">Fecha Inicio</label>
-                                    <input type="text" id="fecha_inicio" class="form-control form-control-sm date-picker" value="{{ date('Y-01-01') }}">
+                                    <input type="text" id="fecha_inicio" class="form-control form-control-sm date-picker" value="{{ $fechaInicioPredeterminada }}">
                                 </div>
                                 <div class="col-12 col-lg-3">
                                     <label class="form-label mb-0">Fecha Fin</label>
-                                    <input type="text" id="fecha_fin" class="form-control form-control-sm date-picker" value="{{ date('Y-m-d') }}">
+                                    <input type="text" id="fecha_fin" class="form-control form-control-sm date-picker" value="{{ $fechaFinPredeterminada }}">
                                 </div>
                                 <div class="col-12 col-lg-2">
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="btnHoyTab1">
@@ -110,11 +110,11 @@
                             <div class="row g-2 align-items-end mb-2">
                                 <div class="col-12 col-lg-2">
                                     <label class="form-label mb-0">Fecha Inicio</label>
-                                    <input type="text" id="fecha_inicio_general" class="form-control form-control-sm date-picker" value="{{ date('Y-01-01') }}">
+                                    <input type="text" id="fecha_inicio_general" class="form-control form-control-sm date-picker" value="{{ $fechaInicioPredeterminada }}">
                                 </div>
                                 <div class="col-12 col-lg-2">
                                     <label class="form-label mb-0">Fecha Fin</label>
-                                    <input type="text" id="fecha_fin_general" class="form-control form-control-sm date-picker" value="{{ date('Y-m-d') }}">
+                                    <input type="text" id="fecha_fin_general" class="form-control form-control-sm date-picker" value="{{ $fechaFinPredeterminada }}">
                                 </div>
                                 <div class="col-12 col-lg-2">
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="btnHoyTab2">
@@ -214,8 +214,12 @@
             }
             const diff = new Date(fechaFin).getTime() - new Date(fechaInicio).getTime();
             const dias = Math.ceil(diff / (1000 * 3600 * 24)) + 1;
-            if (dias > 30) {
-                showError('El rango de fechas no puede exceder 30 días');
+            if (dias < 1) {
+                showError('La fecha final no puede ser anterior a la fecha inicial');
+                return null;
+            }
+            if (dias > 31) {
+                showError('El rango de fechas no puede exceder 31 días');
                 return null;
             }
             params.append('fecha_inicio', fechaInicio);
@@ -225,6 +229,16 @@
             const fechaFin = document.getElementById('fecha_fin_general').value;
             if (!fechaInicio || !fechaFin) {
                 showError('Seleccione un rango de fechas');
+                return null;
+            }
+            const diff = new Date(fechaFin).getTime() - new Date(fechaInicio).getTime();
+            const dias = Math.ceil(diff / (1000 * 3600 * 24)) + 1;
+            if (dias < 1) {
+                showError('La fecha final no puede ser anterior a la fecha inicial');
+                return null;
+            }
+            if (dias > 31) {
+                showError('El rango de fechas no puede exceder 31 días');
                 return null;
             }
             params.append('fecha_inicio', fechaInicio);

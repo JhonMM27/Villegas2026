@@ -303,12 +303,13 @@ class ProductoController extends Controller
             ->whereHas('linea', function ($query) {
                 $query->where('nombre', 'NUCLEO');
             })
+            ->where('productos.activo', true)
             ->where(function ($query) use ($q) {
                 $query->where('id', $q)
                     ->orWhere('nombre', 'like', "%{$q}%")
                     ->orWhere('codigo', 'like', "%{$q}%");
             })
-            ->select('id', 'codigo', 'nombre', 'costo_unitario', 'unidad_codigo', 'empaque', 'linea_id')
+            ->select('id', 'codigo', 'nombre', 'costo_unitario', 'unidad_codigo', 'empaque', 'linea_id', 'activo')
             ->limit(10)
             ->get();
     }
@@ -319,14 +320,15 @@ class ProductoController extends Controller
 
         return Producto::with('linea:id,nombre')
             ->whereHas('linea', function ($query) {
-                $query->where('nombre', 'ADITIVO');
+                $query->whereIn('nombre', ['ADITIVO', 'INSUMO']);
             })
+            ->where('productos.activo', true)
             ->where(function ($query) use ($q) {
                 $query->where('id', $q)
                     ->orWhere('nombre', 'like', "%{$q}%")
                     ->orWhere('codigo', 'like', "%{$q}%");
             })
-            ->select('id', 'codigo', 'nombre', 'costo_unitario', 'unidad_codigo', 'empaque', 'linea_id')
+            ->select('id', 'codigo', 'nombre', 'costo_unitario', 'unidad_codigo', 'empaque', 'linea_id', 'activo')
             ->limit(10)
             ->get();
     }

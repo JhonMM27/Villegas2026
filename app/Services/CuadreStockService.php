@@ -307,7 +307,6 @@ class CuadreStockService
                 $primerMov = Movimiento::where('transaccion_tipo', MovimientoService::TRANSACCION_AJUSTES)
                     ->where('transaccion_id', $cuadre->id)
                     ->where('producto_id', $productoId)
-                    ->orderBy('fecha', 'asc')
                     ->orderBy('id', 'asc')
                     ->first();
 

@@ -157,6 +157,12 @@ class NucleoManager extends CrudManager {
         tr.dataset.productoId = item.id;
 
         const cantidad = item.cantidad ?? 0;
+        const productoActivo = item.activo === undefined
+            || item.activo === null
+            || Number(item.activo) === 1;
+        const estadoProducto = productoActivo
+            ? ''
+            : ' <span class="badge bg-warning text-dark">Inactivo</span>';
 
         tr.innerHTML = `
             <td class="text-center">
@@ -166,7 +172,7 @@ class NucleoManager extends CrudManager {
             </td>
             <td class="text-center">${rowCount}</td>
             <td>${item.id}</td>
-            <td>${item.nombre}</td>
+            <td>${item.nombre}${estadoProducto}</td>
             <td class="text-end">
                 <select 
                     name="detalles[${rowCount}][unidad_codigo]" 
@@ -221,9 +227,14 @@ class NucleoManager extends CrudManager {
     //Agregamos producto a lo input de preparada
     addNucleo(item) {
         //console.log('Agregando producto:', item);
-        
+
+        const productoActivo = item.activo === undefined
+            || item.activo === null
+            || Number(item.activo) === 1;
+        const estadoProducto = productoActivo ? '' : ' [INACTIVO]';
+
         document.getElementById('producto_id_nucleo').value = item.id;
-        document.getElementById('producto_nombre_nucleo').value = `(${item.id}) ${item.nombre}`;
+        document.getElementById('producto_nombre_nucleo').value = `(${item.id}) ${item.nombre}${estadoProducto}`;
         document.getElementById('producto_empaque').value = item.empaque;
         document.getElementById('producto_empaque_text').textContent = item.empaque;
         document.getElementById('linea').textContent = item.linea.nombre;
@@ -269,7 +280,7 @@ class NucleoManager extends CrudManager {
         this.elements.modalTitle.textContent = 'Nuevo Núcleo';
 
         document.querySelector('#tablaDetalles tbody').innerHTML = '';
-        document.getElementById('documento_tipo_codigo').value = '01';
+        document.getElementById('activo').checked = true;
         document.getElementById('producto_empaque_text').textContent = '';
         document.getElementById('linea').textContent = '';
     }
@@ -291,6 +302,7 @@ class NucleoManager extends CrudManager {
                 id: response.id,
                 nombre: response.nombre,
                 empaque: response.empaque,
+                activo: response.producto?.activo,
                 linea: {
                     nombre: 'NUCLEO'
                 }
@@ -304,6 +316,7 @@ class NucleoManager extends CrudManager {
 
             // Llenar totales
             document.getElementById('cantidad_porcentaje').value = parseFloat(response.cantidad_porcentaje).toFixed(4);
+            document.getElementById('activo').checked = Number(response.activo) === 1;
 
             this.form.action = `${this.baseUrl}/${id}`;
             
@@ -324,7 +337,8 @@ class NucleoManager extends CrudManager {
                 id: detalle.producto_id,
                 nombre: detalle.producto_nombre,
                 empaque: detalle.producto_empaque,
-                cantidad: detalle.cantidad
+                cantidad: detalle.cantidad,
+                activo: detalle.producto?.activo
             };
 
             this.addProductoToTable(item);

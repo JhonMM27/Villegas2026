@@ -52,8 +52,10 @@
     // ==========================================================
     $saldoInicial = (float)($saldoInicial ?? 0);
 
-    // Créditos del rango (ventas) => suma de credito_base
-    $totCreditoMostrado = collect($ventas ?? [])->sum(function($v){
+    // Créditos del rango (ventas) => suma de credito_base de ventas en el rango
+    $totCreditoMostrado = collect($ventas ?? [])->filter(function($v) use ($ini) {
+        return \Carbon\Carbon::parse($v->fecha_venta)->gte($ini);
+    })->sum(function($v){
         return (float)($v->credito_base ?? 0);
     });
 
@@ -70,7 +72,17 @@
     });
 
     // Saldo final del reporte (abonos sueltos NO descuentan aquí)
-    $saldoFinalReporte = $saldoInicial + $totCreditoMostrado - $totPagoRango;
+    $saldoFinalCalculado = round(
+    $saldoInicial
+    + $totCreditoMostrado
+    - $totPagoRango,
+    2
+);
+
+$saldoFinalReporte = round(
+    (float) ($saldoFinal ?? $saldoFinalCalculado),
+    2
+);
 
     // ==========================================================
     // NUEVO: AGRUPAR PAGOS POR DOCUMENTO DE LA VENTA ASOCIADA
@@ -80,14 +92,18 @@
         $docVenta = $v->documento ??
             trim(($v->comprobante_tipo_codigo ? $v->comprobante_tipo_codigo.' ' : '').$v->serie.'-'.$v->correlativo);
 
-        // Agregar la venta
-        $movimientos->push((object)[
-            'tipo'              => 'VENTA',
-            'fecha'             => \Carbon\Carbon::parse($v->fecha_venta),
-            'documento'         => $docVenta,
-            'fecha_vencimiento' => $v->fecha_vencimiento,
-            'credito_base'      => (float)($v->credito_base ?? 0)
-        ]);
+        $fechaVentaCarbon = \Carbon\Carbon::parse($v->fecha_venta);
+
+        // Agregar la venta SOLO si fue emitida en el rango (>= $ini)
+        if ($fechaVentaCarbon->gte($ini)) {
+            $movimientos->push((object)[
+                'tipo'              => 'VENTA',
+                'fecha'             => $fechaVentaCarbon,
+                'documento'         => $docVenta,
+                'fecha_vencimiento' => $v->fecha_vencimiento,
+                'credito_base'      => (float)($v->credito_base ?? 0)
+            ]);
+        }
 
         // Agrupar pagos por numero_recibo dentro de esta venta
         $pagosPorRecibo = collect($v->pagos ?? [])->groupBy(function($p) {

@@ -99,7 +99,7 @@ class NucleoPreparadaService
                 'cantidad' => $preparada->ingreso_saco,
                 'cantidad_kg' => $preparada->ingreso_kg,
                 'costo_unitario' => $preparada->costo_unitario,
-            ], true);
+            ]);
 
             return $preparada;
         });
@@ -267,23 +267,28 @@ class NucleoPreparadaService
                 'cantidad_kg' => $preparada->ingreso_kg,
                 'costo_unitario' => $preparada->costo_unitario,
                 'comentario' => 'Rectificación de nucleo_preparada',
-            ], true);
+            ]);
             $productosAfectados[] = $preparada->nucleo_id;
 
-            // 7) Recalcular Kardex para productos afectados
-            //
-            // IMPORTANTE: se pasa el datetime completo (Y-m-d H:i:s) a recalcularKardexProductoDesdeFecha
-            // para que el punto de partida sea el último movimiento ANTES de la hora exacta de la
-            // preparada, evitando recalcular movimientos del mismo día pero anteriores en hora.
-            $fechaPreparada = $preparada->fecha instanceof \Carbon\Carbon
-                ? $preparada->fecha
-                : \Carbon\Carbon::parse($preparada->fecha);
-
+            // 7) Recalcular Kardex para productos afectados por ID de movimiento
             foreach (array_unique($productosAfectados) as $pId) {
-                $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                    $pId,
-                    $fechaPreparada->format('Y-m-d H:i:s')
-                );
+                $minMovId = Movimiento::where('producto_id', $pId)
+                    ->where('transaccion_tipo', 'nucleo_preparadas')
+                    ->where('transaccion_id', $preparada->id)
+                    ->min('id');
+
+                if ($minMovId) {
+                    $this->movimientoService->recalcularKardexProducto($pId, (int) $minMovId);
+                } else {
+                    $fechaPreparada = $preparada->fecha instanceof \Carbon\Carbon
+                        ? $preparada->fecha
+                        : \Carbon\Carbon::parse($preparada->fecha);
+
+                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                        $pId,
+                        $fechaPreparada->format('Y-m-d H:i:s')
+                    );
+                }
             }
 
             return [

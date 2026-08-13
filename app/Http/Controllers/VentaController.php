@@ -382,7 +382,7 @@ class VentaController extends Controller
         $data = $this->validateData($request);
 
         try {
-            $venta = $this->ventaService->rectificarVenta((int) $id, $request->all());
+            $venta = $this->ventaService->rectificarVenta((int) $id, $data);
 
             return response()->json([
                 'success' => true,

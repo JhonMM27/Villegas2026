@@ -458,6 +458,30 @@ class MovimientoServiceChronologyTest extends TestCase
         $this->assertEqualsWithDelta(5, (float) Producto::findOrFail(2)->costo_unitario, 0.0001);
     }
 
+    public function test_recalculo_procesos_misma_hora_ordena_estrictamente_por_id(): void
+    {
+        // 3 salidas registradas exactamente a la misma hora (08:00:00)
+        $salida1 = $this->salida('2026-07-20 08:00:00', 5, 101);
+        $salida2 = $this->salida('2026-07-20 08:00:00', 10, 102);
+        $salida3 = $this->salida('2026-07-20 08:00:00', 15, 103);
+
+        // Recalcular kardex partiendo de $salida2->id
+        $this->service->recalcularKardexProducto(1, $salida2->id);
+
+        // La salida 1 (creada con ID menor) conserva su posición anterior
+        $movs = Movimiento::orderBy('id')->get();
+        $this->assertEquals(100.0, (float) $movs[0]->stock_anterior);
+        $this->assertEquals(95.0, (float) $movs[0]->stock_nuevo);
+
+        $this->assertEquals(95.0, (float) $movs[1]->stock_anterior);
+        $this->assertEquals(85.0, (float) $movs[1]->stock_nuevo);
+
+        $this->assertEquals(85.0, (float) $movs[2]->stock_anterior);
+        $this->assertEquals(70.0, (float) $movs[2]->stock_nuevo);
+
+        $this->assertEquals(70.0, (float) Producto::findOrFail(1)->stock_almacen);
+    }
+
     private function salida(string $fecha, float $cantidad, int $transaccionId): Movimiento
     {
         return $this->service->registrarSalida([

@@ -373,16 +373,25 @@ class PreparadaService
                 $productosAfectados[] = $preparada->producto_id;
             }
 
-            // 6) Recalcular Kardex para productos afectados
-            $fechaPreparada = $preparada->fecha instanceof \Carbon\Carbon
-                ? $preparada->fecha
-                : \Carbon\Carbon::parse($preparada->fecha);
-
+            // 6) Recalcular Kardex para productos afectados por ID de movimiento
             foreach (array_unique($productosAfectados) as $pId) {
-                $this->movimientoService->recalcularKardexProductoDesdeFecha(
-                    $pId,
-                    $fechaPreparada->format('Y-m-d H:i:s')
-                );
+                $minMovId = Movimiento::where('producto_id', $pId)
+                    ->where('transaccion_tipo', 'preparadas')
+                    ->where('transaccion_id', $preparada->id)
+                    ->min('id');
+
+                if ($minMovId) {
+                    $this->movimientoService->recalcularKardexProducto($pId, (int) $minMovId);
+                } else {
+                    $fechaPreparada = $preparada->fecha instanceof \Carbon\Carbon
+                        ? $preparada->fecha
+                        : \Carbon\Carbon::parse($preparada->fecha);
+
+                    $this->movimientoService->recalcularKardexProductoDesdeFecha(
+                        $pId,
+                        $fechaPreparada->format('Y-m-d H:i:s')
+                    );
+                }
             }
 
             return [

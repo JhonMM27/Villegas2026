@@ -225,9 +225,9 @@ class FormulacionController extends Controller
 
     private function proccessFormulacionData(array $data, bool $isNew = true)
     {
-        // Obtener proveedor desde el modelo
+        // Obtener producto preparado desde el modelo
         $productoFormulacion = Producto::find($data['producto_id_preparada']);
-        $data['producto_empaque'] = $producto->empaque ?? 0;
+        $data['producto_empaque'] = $productoFormulacion->empaque ?? 0;
 
         $cliente = Cliente::find($data['cliente_id']);
 

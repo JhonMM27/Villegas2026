@@ -122,8 +122,10 @@ class NucleoController extends Controller
     public function show($id)
     {
         try {
-            // $registro = Venta::with(['detalles.producto.afectacionTipo', 'cliente'])->findOrFail($id);
-            $registro = Nucleo::with('detalles')->findOrFail($id);
+            $registro = Nucleo::with([
+                'producto:id,activo',
+                'detalles.producto:id,activo',
+            ])->findOrFail($id);
 
             return response()->json($registro);
         } catch (\Exception $e) {
@@ -229,11 +231,8 @@ class NucleoController extends Controller
             'empaque' => $productoNucleo->empaque ?? '',
             'cantidad_porcentaje' => $cantidadTotal,
             'items' => count($detallesCalculados),
+            'activo' => (bool) $data['activo'],
         ];
-
-        if ($isNew) {
-            $nucleoData['activo'] = true;
-        }
 
         return [
             'nucleo' => $nucleoData,
@@ -254,16 +253,45 @@ class NucleoController extends Controller
 
     protected function validateData(Request $request, $id = null)
     {
+        $productosHistoricos = $id
+            ? DB::table('nucleo_detalles')
+                ->where('nucleo_id', $id)
+                ->pluck('producto_id')
+                ->map(fn ($productoId) => (int) $productoId)
+                ->all()
+            : [];
+
+        $productoNucleoActivo = Rule::exists('productos', 'id')
+            ->where(function ($query) use ($id) {
+                $query->where('activo', true);
+
+                if ($id !== null) {
+                    $query->orWhere('id', $id);
+                }
+            });
+
+        $productoDetalleActivo = Rule::exists('productos', 'id')
+            ->where(function ($query) use ($productosHistoricos) {
+                $query->where('activo', true);
+
+                if (! empty($productosHistoricos)) {
+                    $query->orWhereIn('id', $productosHistoricos);
+                }
+            });
+
         return $request->validate([
             'producto_id_nucleo' => [
                 'required',
-                'exists:productos,id',
+                $productoNucleoActivo,
                 Rule::unique('nucleos', 'id')->ignore($id),
             ],
-            'activo' => 'sometimes|boolean',
+            'activo' => 'required|boolean',
 
             'detalles' => 'required|array|min:1', // Al menos un detalle
-            'detalles.*.producto_id' => 'required|exists:productos,id',
+            'detalles.*.producto_id' => [
+                'required',
+                $productoDetalleActivo,
+            ],
             'detalles.*.unidad_codigo' => 'required',
             'detalles.*.cantidad' => 'required|numeric|min:0.01',
         ]);
@@ -308,8 +336,14 @@ class NucleoController extends Controller
             'detalles:nucleo_id,producto_id,producto_nombre,unidad_codigo,cantidad',
             'detalles.producto:id,costo_unitario,empaque',
         ])
-            ->where('id', $q)
-            ->orWhere('nombre', 'like', "%{$q}%")
+            ->where('nucleos.activo', true)
+            ->whereHas('producto', function ($query) {
+                $query->where('productos.activo', true);
+            })
+            ->where(function ($query) use ($q) {
+                $query->where('nucleos.id', $q)
+                    ->orWhere('nucleos.nombre', 'like', "%{$q}%");
+            })
             ->select('nucleos.id', 'nombre', 'unidad_codigo', 'unidad_nombre', 'empaque', 'cantidad_porcentaje', 'items', 'activo')
             ->limit(10)
             ->get();

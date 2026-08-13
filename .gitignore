@@ -24,6 +24,8 @@ npm-debug.log
 Thumbs.db
 yarn-error.log
 *.sql
+!database/sql/corregir_cuentas_clientes_45_53_131.sql
+!database/sql/corregir_proveedor_102_molinorte.sql
 
 
 # === OPENCODE ===

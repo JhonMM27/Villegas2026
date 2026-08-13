@@ -225,13 +225,11 @@ class MovimientoService
             'comentario' => $params['comentario'] ?? null,
         ]);
 
-        // Si es retroactivo, NO actualizar stock_almacen aquí; se recalculará desde la fecha
-        // IMPORTANTE: se pasa datetime completo (Y-m-d H:i:s) para que el punto de partida
-        // sea el último movimiento ANTES de la hora exacta, no antes del día completo.
+        // Si es retroactivo, NO actualizar stock_almacen aquí; se recalculará desde el movimiento retroactivo.
         if ($esRetroactivo) {
-            $this->recalcularKardexProductoDesdeFechaBloqueado(
+            $this->recalcularKardexProductoBloqueado(
                 $producto->id,
-                Carbon::parse($params['fecha'])->format('Y-m-d H:i:s'),
+                (int) $movimiento->id,
                 true,
                 $primerMovimientoExistente ? (float) $primerMovimientoExistente->stock_anterior : null,
                 $primerMovimientoExistente ? (float) $primerMovimientoExistente->costo_actual : null
@@ -352,13 +350,11 @@ class MovimientoService
             'comentario' => $params['comentario'] ?? null,
         ]);
 
-        // Si es retroactivo, NO actualizar stock_almacen aquí; se recalculará desde la fecha
-        // IMPORTANTE: se pasa datetime completo (Y-m-d H:i:s) para que el punto de partida
-        // sea el último movimiento ANTES de la hora exacta, no antes del día completo.
+        // Si es retroactivo, NO actualizar stock_almacen aquí; se recalculará desde el movimiento retroactivo.
         if ($esRetroactivo) {
-            $this->recalcularKardexProductoDesdeFechaBloqueado(
+            $this->recalcularKardexProductoBloqueado(
                 $producto->id,
-                Carbon::parse($params['fecha'])->format('Y-m-d H:i:s'),
+                (int) $movimiento->id,
                 true,
                 $primerMovimientoExistente ? (float) $primerMovimientoExistente->stock_anterior : null,
                 $primerMovimientoExistente ? (float) $primerMovimientoExistente->costo_actual : null
@@ -390,34 +386,27 @@ class MovimientoService
      * @param  int  $productoId  ID del producto a recalcular
      * @param  int  $desdeMovimientoId  ID del movimiento desde donde recalcular
      * @param  bool  $actualizarStock  Si true (default), actualiza productos.stock_almacen al final.
-     *                                 Pasar FALSE cuando el recálculo solo propaga COSTOS (ej: desde
-     *                                 actualizarCostoPreparada) para evitar modificar el stock de
-     *                                 productos no relacionados con la operación original.
+     *                                 Pasar FALSE cuando el recálculo solo propaga COSTOS     /**
+     * Recalcula el kardex completo de un producto desde un movimiento específico (por ID).
+     *
+     * Ordena estrictamente por ID (orden secuencial físico de inserción).
+     *
+     * @param  int  $productoId  ID del producto a recalcular
+     * @param  int  $desdeMovimientoId  ID del movimiento desde donde recalcular
+     * @param  bool  $actualizarStock  Si true (default), actualiza productos.stock_almacen al final.
      */
     public function recalcularKardexProducto(int $productoId, int $desdeMovimientoId, bool $actualizarStock = true): void
     {
-        $movimiento = Movimiento::where('producto_id', $productoId)
-            ->findOrFail($desdeMovimientoId);
-
-        $this->recalcularKardexProductoDesdeFecha(
-            $productoId,
-            Carbon::parse($movimiento->fecha)->format('Y-m-d H:i:s'),
-            $actualizarStock
-        );
+        DB::transaction(function () use ($productoId, $desdeMovimientoId, $actualizarStock): void {
+            Producto::whereKey($productoId)->lockForUpdate()->firstOrFail();
+            $this->recalcularKardexProductoBloqueado($productoId, $desdeMovimientoId, $actualizarStock);
+        }, 3);
     }
 
     /**
      * Recalcula el kardex completo de un producto desde una fecha específica.
      *
-     * Este es el motor canónico del kardex y siempre ordena por fecha, id.
-     *
-     * Algoritmo:
-     * 1. Obtiene saldos del movimiento ANTERIOR a la fecha dada
-     * 2. Recorre todos los movimientos desde esa fecha en orden CRONOLÓGICO (fecha ASC, id ASC)
-     * 3. Recalcula cada uno con las fórmulas CPP correctas
-     * 4. Si es VENTA, actualiza rentabilidad en venta_detalles
-     * 5. Si es insumo de PREPARADA, actualiza costos en cascada
-     * 6. Al final, actualiza el producto con los saldos del último movimiento
+     * Busca el primer movimiento con fecha >= $fechaDesde y delega el recálculo por ID.
      *
      * @param  int  $productoId  ID del producto a recalcular
      * @param  string  $fechaDesde  Fecha desde la cual recalcular (formato Y-m-d)
@@ -427,13 +416,24 @@ class MovimientoService
     {
         DB::transaction(function () use ($productoId, $fechaDesde, $actualizarStock): void {
             Producto::whereKey($productoId)->lockForUpdate()->firstOrFail();
-            $this->recalcularKardexProductoDesdeFechaBloqueado($productoId, $fechaDesde, $actualizarStock);
+
+            $primerMov = Movimiento::where('producto_id', $productoId)
+                ->where('fecha', '>=', $fechaDesde)
+                ->orderBy('fecha', 'asc')
+                ->orderBy('id', 'asc')
+                ->first();
+
+            if (! $primerMov) {
+                return;
+            }
+
+            $this->recalcularKardexProductoBloqueado($productoId, (int) $primerMov->id, $actualizarStock);
         }, 3);
     }
 
-    private function recalcularKardexProductoDesdeFechaBloqueado(
+    private function recalcularKardexProductoBloqueado(
         int $productoId,
-        string $fechaDesde,
+        int $desdeMovimientoId,
         bool $actualizarStock = true,
         ?float $stockInicialSinAnterior = null,
         ?float $costoInicialSinAnterior = null
@@ -441,30 +441,47 @@ class MovimientoService
         // ────────────────────────────────────────────────────────────
         // BLOQUE: Búsqueda del movimiento anterior (punto de partida)
         // ────────────────────────────────────────────────────────────
-        // ¿Qué hace?: Localiza el último movimiento del producto cuya
-        //              fecha sea estrictamente anterior a $fechaDesde.
-        //              Sus campos `stock_nuevo` y `costo_nuevo` son el
-        //              estado del inventario JUSTO ANTES del rango a
-        //              recalcular y sirven como semilla del bucle CPP.
-        //
-        // ¿Por qué fecha desc, id desc?  Porque el kardex soporta
-        //   movimientos retroactivos: un movimiento con id alto puede
-        //   tener fecha antigua. Si ordenamos sólo por `id`, podríamos
-        //   tomar como "anterior" un movimiento cronológicamente
-        //   POSTERIOR, corrompiendo la cadena CPP.
+        // Localiza el movimiento anterior por ID (id < $desdeMovimientoId).
+        // Sus campos `stock_nuevo` y `costo_nuevo` sirven como semilla del bucle CPP.
         // ────────────────────────────────────────────────────────────
-        $movimientoAnterior = Movimiento::where('producto_id', $productoId)
-            ->where('fecha', '<', $fechaDesde)
-            ->orderBy('fecha', 'desc')
-            ->orderBy('id', 'desc')
-            ->first();
+        $movimientoInicial = Movimiento::where('producto_id', $productoId)
+            ->find($desdeMovimientoId);
 
-        // Traer TODOS los movimientos desde la fecha dada en orden cronológico
-        $movimientos = Movimiento::where('producto_id', $productoId)
-            ->where('fecha', '>=', $fechaDesde)
-            ->orderBy('fecha', 'asc')
-            ->orderBy('id', 'asc')
-            ->get();
+        if ($movimientoInicial) {
+            $movimientoAnterior = Movimiento::where('producto_id', $productoId)
+                ->where(function ($query) use ($movimientoInicial): void {
+                    $query->where('fecha', '<', $movimientoInicial->fecha)
+                        ->orWhere(function ($sameDateQuery) use ($movimientoInicial): void {
+                            $sameDateQuery->where('fecha', $movimientoInicial->fecha)
+                                ->where('id', '<', $movimientoInicial->id);
+                        });
+                })
+                ->orderBy('fecha', 'desc')
+                ->orderBy('id', 'desc')
+                ->first();
+
+            $movimientos = Movimiento::where('producto_id', $productoId)
+                ->where(function ($query) use ($movimientoInicial): void {
+                    $query->where('fecha', '>', $movimientoInicial->fecha)
+                        ->orWhere(function ($sameDateQuery) use ($movimientoInicial): void {
+                            $sameDateQuery->where('fecha', $movimientoInicial->fecha)
+                                ->where('id', '>=', $movimientoInicial->id);
+                        });
+                })
+                ->orderBy('fecha', 'asc')
+                ->orderBy('id', 'asc')
+                ->get();
+        } else {
+            $movimientoAnterior = Movimiento::where('producto_id', $productoId)
+                ->where('id', '<', $desdeMovimientoId)
+                ->orderBy('id', 'desc')
+                ->first();
+
+            $movimientos = Movimiento::where('producto_id', $productoId)
+                ->where('id', '>=', $desdeMovimientoId)
+                ->orderBy('id', 'asc')
+                ->get();
+        }
 
         if ($movimientos->isEmpty()) {
             return;
@@ -581,15 +598,10 @@ class MovimientoService
      *
      * A diferencia de recalcularKardexProducto(), este método:
      * 1. Toma stock_anterior y costo_actual del PRIMER movimiento excluido como punto de partida
-     *    (estos campos guardan el estado del inventario ANTES de la transacción original)
-     * 2. Recorre TODOS los movimientos desde ese punto en orden cronológico
+     * 2. Recorre TODOS los movimientos desde ese punto por ID asc
      * 3. Los movimientos excluidos se NEUTRALIZAN (entrada/salida → 0) para que no impacten el cálculo
      * 4. Los demás movimientos se recalculan normalmente con el CPP correcto
-     * 5. Si es VENTA, actualiza rentabilidad en venta_detalles
-     * 6. Al final, actualiza el producto con los saldos del último movimiento
-     *
-     * Caso de uso: Al anular una compra, los movimientos originales COMPRA se excluyen
-     * y todas las ventas/preparadas posteriores se recalculan con el CPP pre-compra.
+     * 5. Al final, actualiza el producto con los saldos del último movimiento
      *
      * @param  int  $productoId  ID del producto a recalcular
      * @param  array  $excluirMovIds  IDs de movimientos a excluir (neutralizar) del cálculo
@@ -606,7 +618,6 @@ class MovimientoService
 
             $movimientosExcluidos = Movimiento::where('producto_id', $productoId)
                 ->whereIn('id', $excluirMovIds)
-                ->orderBy('fecha', 'asc')
                 ->orderBy('id', 'asc')
                 ->get();
 
@@ -614,11 +625,10 @@ class MovimientoService
                 return;
             }
 
-            $fechaDesde = Carbon::parse($movimientosExcluidos->first()->fecha)
-                ->format('Y-m-d H:i:s');
+            $minMovId = (int) $movimientosExcluidos->min('id');
 
             // Neutralizar sin borrar registros. Después se reconstruye toda la
-            // cadena cronológica desde la fecha del primer movimiento afectado.
+            // cadena por ID desde el primer movimiento afectado.
             foreach ($movimientosExcluidos as $movimiento) {
                 $movimiento->update([
                     'entrada' => 0,
@@ -633,9 +643,9 @@ class MovimientoService
                 ]);
             }
 
-            $this->recalcularKardexProductoDesdeFechaBloqueado(
+            $this->recalcularKardexProductoBloqueado(
                 $productoId,
-                $fechaDesde,
+                $minMovId,
                 $actualizarStock
             );
         }, 3);
@@ -685,14 +695,7 @@ class MovimientoService
             ->findOrFail($desdeMovimientoId);
 
         $movimientoAnterior = Movimiento::where('producto_id', $productoId)
-            ->where(function ($query) use ($movimientoInicial): void {
-                $query->where('fecha', '<', $movimientoInicial->fecha)
-                    ->orWhere(function ($sameDateQuery) use ($movimientoInicial): void {
-                        $sameDateQuery->where('fecha', $movimientoInicial->fecha)
-                            ->where('id', '<', $movimientoInicial->id);
-                    });
-            })
-            ->orderBy('fecha', 'desc')
+            ->where('id', '<', $desdeMovimientoId)
             ->orderBy('id', 'desc')
             ->first();
 
@@ -700,16 +703,9 @@ class MovimientoService
             ? (float) $movimientoAnterior->costo_nuevo
             : (float) $movimientoInicial->costo_actual;
 
-        // Propagar desde la clave cronológica exacta (fecha, id).
+        // Propagar en estricto orden secuencial por ID
         $movimientos = Movimiento::where('producto_id', $productoId)
-            ->where(function ($query) use ($movimientoInicial): void {
-                $query->where('fecha', '>', $movimientoInicial->fecha)
-                    ->orWhere(function ($sameDateQuery) use ($movimientoInicial): void {
-                        $sameDateQuery->where('fecha', $movimientoInicial->fecha)
-                            ->where('id', '>=', $movimientoInicial->id);
-                    });
-            })
-            ->orderBy('fecha', 'asc')
+            ->where('id', '>=', $desdeMovimientoId)
             ->orderBy('id', 'asc')
             ->get();
 
