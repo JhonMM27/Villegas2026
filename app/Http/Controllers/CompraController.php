@@ -128,6 +128,7 @@ class CompraController extends Controller
                     if (! $row->fecha_vencimiento) {
                         return '';
                     }
+
                     return \Carbon\Carbon::parse($row->fecha_vencimiento)->format('Y-m-d');
                 })
                 ->make(true);

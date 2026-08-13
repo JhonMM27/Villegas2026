@@ -275,7 +275,7 @@ class CuentaCorrienteProveedorController extends Controller
             ->whereBetween('c.fecha_compra', [$ini, $fin])
             ->where('c.estado', '!=', 'anulada')
             ->when(! empty($proveedorIds), fn ($q) => $q->whereIn('c.proveedor_id', $proveedorIds))
-            ->whereRaw("GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0) > 0")
+            ->whereRaw('GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0) > 0')
             ->groupBy(
                 'c.id',
                 'c.fecha_compra',
@@ -451,7 +451,7 @@ class CuentaCorrienteProveedorController extends Controller
             ->whereBetween('compras.fecha_compra', [$ini, $fin])
             ->where('compras.estado', '!=', 'anulada')
             ->when(! empty($proveedorIds), fn ($q) => $q->whereIn('compras.proveedor_id', $proveedorIds))
-            ->whereRaw("GREATEST(compras.total - compras.acuenta - COALESCE(ab.total_abono, 0), 0) > 0")
+            ->whereRaw('GREATEST(compras.total - compras.acuenta - COALESCE(ab.total_abono, 0), 0) > 0')
             ->groupBy(
                 'compras.id',
                 'compras.fecha_compra',
@@ -898,14 +898,14 @@ class CuentaCorrienteProveedorController extends Controller
                 WHERE cp.fecha_provisional <= '{$fin->format('Y-m-d H:i:s')}'
                 GROUP BY cpd.compra_id
             ) as ab"), 'ab.compra_id', '=', 'c.id')
-            ->selectRaw("
+            ->selectRaw('
                 c.proveedor_id,
                 c.proveedor_nombre,
                 SUM(GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0)) as saldo,
                 COUNT(c.id) as items,
                 p.direccion as domicilio,
                 p.telefono
-            ")
+            ')
             ->where('c.estado', '!=', 'anulada')
             ->whereBetween('c.fecha_compra', [$ini, $fin])
             ->groupBy(
@@ -914,7 +914,7 @@ class CuentaCorrienteProveedorController extends Controller
                 'p.direccion',
                 'p.telefono'
             )
-            ->havingRaw("SUM(GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0)) > 0")
+            ->havingRaw('SUM(GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0)) > 0')
             ->orderBy('c.proveedor_nombre', 'asc')
             ->get();
 
@@ -1158,7 +1158,7 @@ class CuentaCorrienteProveedorController extends Controller
             ->withCount(['detalles as items'])
             ->whereBetween('compras.fecha_compra', [$ini, $fin])
             ->where('compras.estado', '!=', 'anulada')
-            ->whereRaw("GREATEST(compras.total - compras.acuenta - COALESCE(ab.total_abono, 0), 0) > 0")
+            ->whereRaw('GREATEST(compras.total - compras.acuenta - COALESCE(ab.total_abono, 0), 0) > 0')
             ->orderBy('compras.proveedor_nombre', 'asc')
             ->orderBy('compras.fecha_compra', 'asc')
             ->get();
@@ -1266,7 +1266,7 @@ class CuentaCorrienteProveedorController extends Controller
             ")
             ->whereBetween('c.fecha_compra', [$ini, $fin])
             ->where('c.estado', '!=', 'anulada')
-            ->whereRaw("GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0) > 0")
+            ->whereRaw('GREATEST(c.total - c.acuenta - COALESCE(ab.total_abono, 0), 0) > 0')
             ->groupBy(
                 'c.id',
                 'c.fecha_compra',

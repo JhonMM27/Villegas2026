@@ -27,8 +27,8 @@ namespace Tests\Scripts;
 
 use App\Models\Cliente;
 use App\Models\Movimiento;
-use App\Models\Prestamo;
 use App\Models\Preparada;
+use App\Models\Prestamo;
 use App\Models\Producto;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;

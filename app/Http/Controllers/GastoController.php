@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\NumeroALetras;
 use App\Models\Gasto;
+use App\Support\NumericStringOrder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
@@ -32,6 +33,9 @@ class GastoController extends Controller
             $data = Gasto::with(['gastoTipo', 'categoriaGasto'])->select(['id', 'fecha_gasto', 'user_nombre', 'descripcion', 'responsable', 'responsable_dni', 'categoria_gasto_id', 'numero_recibo', 'monto', 'gasto_tipo_id']);
 
             return DataTables::of($data)
+                ->orderColumn('numero_recibo', function ($query, $direction) {
+                    NumericStringOrder::apply($query, 'gastos.numero_recibo', 'gastos.id', $direction);
+                })
                 ->addColumn('action', function ($row) {
                     $editButton = '';
                     if (auth()->user()->can('gastos_edit')) {

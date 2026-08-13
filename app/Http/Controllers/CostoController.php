@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\NumeroALetras;
 use App\Models\Costo;
+use App\Support\NumericStringOrder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
@@ -32,6 +33,9 @@ class CostoController extends Controller
             $data = Costo::with(['costoTipo', 'categoriaCosto'])->select(['id', 'fecha_costo', 'user_nombre', 'descripcion', 'responsable', 'responsable_dni', 'categoria_costo_id', 'numero_recibo', 'monto', 'costo_tipo_id']);
 
             return DataTables::of($data)
+                ->orderColumn('numero_recibo', function ($query, $direction) {
+                    NumericStringOrder::apply($query, 'costos.numero_recibo', 'costos.id', $direction);
+                })
                 ->addColumn('action', function ($row) {
                     $editButton = '';
                     if (auth()->user()->can('costos_edit')) {

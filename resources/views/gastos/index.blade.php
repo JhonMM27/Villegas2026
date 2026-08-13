@@ -107,7 +107,7 @@ class GastoManager extends CrudManager {
                 { targets: 9, width: '10%' },
             ],
             responsive: true,
-            order: [[1, 'desc']]
+            order: [[8, 'desc']]
         });
     }
 

@@ -65,6 +65,7 @@ class CajaIngresoController extends Controller
                         'C' => 'warning',
                         default => 'secondary',
                     };
+
                     return '<span class="badge bg-'.$color.'">'.$row->caja_destino.' · '.$texto.'</span>';
                 })
                 ->editColumn('monto', fn ($row) => '<span class="text-end d-block fw-bold">S/ '.number_format((float) $row->monto, 2).'</span>')
@@ -95,6 +96,7 @@ class CajaIngresoController extends Controller
             throw $e;
         } catch (\Exception $e) {
             Log::error('Error creando ingreso caja', ['msg' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al registrar el ingreso: '.$e->getMessage(),
@@ -109,6 +111,7 @@ class CajaIngresoController extends Controller
     {
         try {
             $ingreso = CajaIngreso::findOrFail($id);
+
             return response()->json([
                 'success' => true,
                 'ingreso' => $ingreso,
@@ -137,6 +140,7 @@ class CajaIngresoController extends Controller
             throw $e;
         } catch (\Exception $e) {
             Log::error('Error actualizando ingreso caja', ['id' => $id, 'msg' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al actualizar el ingreso: '.$e->getMessage(),
@@ -157,6 +161,7 @@ class CajaIngresoController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Error eliminando ingreso caja', ['id' => $id, 'msg' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al eliminar el ingreso: '.$e->getMessage(),

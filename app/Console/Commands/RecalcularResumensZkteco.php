@@ -22,11 +22,11 @@ class RecalcularResumensZkteco extends Command
         $hasta = $this->option('hasta') ?? now()->toDateString();
         $deviceFilter = $this->option('device');
 
-        $this->info("Recalculando resúmenes desde {$desde} hasta {$hasta}" . ($deviceFilter ? " (device: {$deviceFilter})" : ''));
+        $this->info("Recalculando resúmenes desde {$desde} hasta {$hasta}".($deviceFilter ? " (device: {$deviceFilter})" : ''));
 
         $query = ZktecoAttLog::query()
             ->select('device_sn', 'pin', 'punch_time')
-            ->whereBetween('punch_time', [$desde . ' 00:00:00', $hasta . ' 23:59:59']);
+            ->whereBetween('punch_time', [$desde.' 00:00:00', $hasta.' 23:59:59']);
 
         if ($deviceFilter) {
             $query->where('device_sn', $deviceFilter);
@@ -34,7 +34,7 @@ class RecalcularResumensZkteco extends Command
 
         $punches = $query->get();
 
-        $combinaciones = $punches->groupBy(fn ($p) => $p->device_sn . '|' . $p->pin)
+        $combinaciones = $punches->groupBy(fn ($p) => $p->device_sn.'|'.$p->pin)
             ->map(fn ($group) => $group->map(fn ($p) => Carbon::parse($p->punch_time)->toDateString())->unique()->values());
 
         $total = $combinaciones->count();
@@ -51,7 +51,7 @@ class RecalcularResumensZkteco extends Command
                     $procesados++;
                 } catch (\Throwable $e) {
                     $errores++;
-                    $this->error("\nError recalculando {$deviceSn}/{$pin}/{$fecha}: " . $e->getMessage());
+                    $this->error("\nError recalculando {$deviceSn}/{$pin}/{$fecha}: ".$e->getMessage());
                 }
             }
             $this->output->progressAdvance();

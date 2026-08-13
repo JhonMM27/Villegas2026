@@ -15,7 +15,7 @@ use Yajra\DataTables\DataTables;
 
 class CuentaCorrienteClienteController extends Controller
 {
-    #region Configuración y navegación
+    // region Configuración y navegación
 
     public function __construct()
     {
@@ -45,9 +45,9 @@ class CuentaCorrienteClienteController extends Controller
         return view('kardex.reportes.stock_general', compact('reportes', 'fecha'));
     }
 
-    #endregion
+    // endregion
 
-    #region Reportes de ventas por cliente
+    // region Reportes de ventas por cliente
 
     public function ventasAgrupadaProductoClientePdf(Request $request)
     {
@@ -222,9 +222,9 @@ class CuentaCorrienteClienteController extends Controller
         return $pdf->stream('reporte_cliente_ventas_detalle.pdf');
     }
 
-    #endregion
+    // endregion
 
-    #region Reportes de rentabilidad
+    // region Reportes de rentabilidad
 
     public function rentabilidadClienteFechas(Request $request)
     {
@@ -428,9 +428,9 @@ class CuentaCorrienteClienteController extends Controller
         return $pdf->stream('reporte_rentabilidad_todos_clientes.pdf');
     }
 
-    #endregion
+    // endregion
 
-    #region Créditos por cobrar del cliente
+    // region Créditos por cobrar del cliente
 
     public function detalleCreditosPorCobrarPdf(Request $request)
     {
@@ -508,42 +508,42 @@ class CuentaCorrienteClienteController extends Controller
         return $pdf->stream('detalle_creditos_por_cobrar.pdf');
     }
 
-   #region Créditos por Cobrar del Cliente
+    // region Créditos por Cobrar del Cliente
 
-public function creditosPorCobrarClienteTodosPdf(
-    Request $request
-) {
-    $data = $request->validate([
-        'cliente_ids' => [
-            'required',
-            'array',
-            'size:1',
-        ],
-        'cliente_ids.0' => [
-            'required',
-            'integer',
-        ],
-    ]);
+    public function creditosPorCobrarClienteTodosPdf(
+        Request $request
+    ) {
+        $data = $request->validate([
+            'cliente_ids' => [
+                'required',
+                'array',
+                'size:1',
+            ],
+            'cliente_ids.0' => [
+                'required',
+                'integer',
+            ],
+        ]);
 
-    $clienteId = (int) $data['cliente_ids'][0];
+        $clienteId = (int) $data['cliente_ids'][0];
 
-    $cliente = Cliente::query()
-        ->select('id', 'razon_social')
-        ->findOrFail($clienteId);
+        $cliente = Cliente::query()
+            ->select('id', 'razon_social')
+            ->findOrFail($clienteId);
 
-    $clienteNombre = $cliente->id
-        . ' - '
-        . $cliente->razon_social;
+        $clienteNombre = $cliente->id
+            .' - '
+            .$cliente->razon_social;
 
-    $fechaCorte = now()->endOfDay();
+        $fechaCorte = now()->endOfDay();
 
-    #region Ventas con saldo pendiente
+        // region Ventas con saldo pendiente
 
-    $reportes = $this->consultaVentasPendientesCliente(
-        $clienteId,
-        $fechaCorte
-    )
-        ->selectRaw('
+        $reportes = $this->consultaVentasPendientesCliente(
+            $clienteId,
+            $fechaCorte
+        )
+            ->selectRaw('
             ventas.id,
             ventas.fecha_venta,
             ventas.fecha_vencimiento,
@@ -566,21 +566,21 @@ public function creditosPorCobrarClienteTodosPdf(
             ventas.cliente_nombre,
             ventas.user_nombre
         ')
-        ->withCount([
-            'detalles as items',
-        ])
-        ->orderBy('ventas.fecha_venta')
-        ->orderBy('ventas.id')
-        ->get();
+            ->withCount([
+                'detalles as items',
+            ])
+            ->orderBy('ventas.fecha_venta')
+            ->orderBy('ventas.id')
+            ->get();
 
-    #endregion
+        // endregion
 
-    #region Abonos sin venta asociada
+        // region Abonos sin venta asociada
 
-    $aplicadoPorProvisional = DB::table(
-        'venta_provisional_detalles as detalle'
-    )
-        ->selectRaw('
+        $aplicadoPorProvisional = DB::table(
+            'venta_provisional_detalles as detalle'
+        )
+            ->selectRaw('
             detalle.venta_provisional_id,
             COALESCE(
                 SUM(
@@ -593,21 +593,21 @@ public function creditosPorCobrarClienteTodosPdf(
                 0
             ) AS monto_aplicado
         ')
-        ->groupBy('detalle.venta_provisional_id');
+            ->groupBy('detalle.venta_provisional_id');
 
-    $abonosSueltos = DB::table('venta_provisionales as vp')
-        ->leftJoinSub(
-            $aplicadoPorProvisional,
-            'aplicado',
-            function ($join) {
-                $join->on(
-                    'aplicado.venta_provisional_id',
-                    '=',
-                    'vp.id'
-                );
-            }
-        )
-        ->selectRaw('
+        $abonosSueltos = DB::table('venta_provisionales as vp')
+            ->leftJoinSub(
+                $aplicadoPorProvisional,
+                'aplicado',
+                function ($join) {
+                    $join->on(
+                        'aplicado.venta_provisional_id',
+                        '=',
+                        'vp.id'
+                    );
+                }
+            )
+            ->selectRaw('
             vp.id,
             vp.fecha_provisional,
             vp.numero_recibo,
@@ -623,84 +623,84 @@ public function creditosPorCobrarClienteTodosPdf(
                 ELSE 0
             END AS monto
         ')
-        ->where('vp.cliente_id', $clienteId)
-        ->where(
-            'vp.fecha_provisional',
-            '<=',
-            $fechaCorte
-        )
-        ->whereRaw('
+            ->where('vp.cliente_id', $clienteId)
+            ->where(
+                'vp.fecha_provisional',
+                '<=',
+                $fechaCorte
+            )
+            ->whereRaw('
             (
                 COALESCE(vp.monto, 0)
                 - COALESCE(aplicado.monto_aplicado, 0)
             ) > 0
         ')
-        ->orderBy('vp.fecha_provisional')
-        ->orderBy('vp.id')
-        ->get();
+            ->orderBy('vp.fecha_provisional')
+            ->orderBy('vp.id')
+            ->get();
 
-    #endregion
+        // endregion
 
-    #region Totales
+        // region Totales
 
-    $totTotal = round(
-        (float) $reportes->sum('total'),
-        2
-    );
+        $totTotal = round(
+            (float) $reportes->sum('total'),
+            2
+        );
 
-    $totAcuenta = round(
-        (float) $reportes->sum('acuenta'),
-        2
-    );
+        $totAcuenta = round(
+            (float) $reportes->sum('acuenta'),
+            2
+        );
 
-    $totAbonos = round(
-        (float) $reportes->sum('abonos'),
-        2
-    );
+        $totAbonos = round(
+            (float) $reportes->sum('abonos'),
+            2
+        );
 
-    $totSaldo = round(
-        (float) $reportes->sum('saldo'),
-        2
-    );
+        $totSaldo = round(
+            (float) $reportes->sum('saldo'),
+            2
+        );
 
-    $totItems = (int) $reportes->sum('items');
+        $totItems = (int) $reportes->sum('items');
 
-    #endregion
+        // endregion
 
-    $pdf = Pdf::loadView(
-        'cuenta-cliente.reportes.creditos_por_cobrar_cliente_todos',
-        compact(
-            'reportes',
-            'clienteNombre',
-            'totTotal',
-            'totAcuenta',
-            'totAbonos',
-            'totSaldo',
-            'totItems',
-            'abonosSueltos'
-        )
-    )->setPaper('a4', 'portrait');
+        $pdf = Pdf::loadView(
+            'cuenta-cliente.reportes.creditos_por_cobrar_cliente_todos',
+            compact(
+                'reportes',
+                'clienteNombre',
+                'totTotal',
+                'totAcuenta',
+                'totAbonos',
+                'totSaldo',
+                'totItems',
+                'abonosSueltos'
+            )
+        )->setPaper('a4', 'portrait');
 
-    $nombreSanitizado = preg_replace(
-        '/[^a-zA-Z0-9\s\-]/',
-        '',
-        $clienteNombre
-    );
+        $nombreSanitizado = preg_replace(
+            '/[^a-zA-Z0-9\s\-]/',
+            '',
+            $clienteNombre
+        );
 
-    $nombreSanitizado = preg_replace(
-        '/\s+/',
-        '_',
-        trim($nombreSanitizado)
-    );
+        $nombreSanitizado = preg_replace(
+            '/\s+/',
+            '_',
+            trim($nombreSanitizado)
+        );
 
-    return $pdf->stream(
-        'creditos_por_cobrar_'
-        . $nombreSanitizado
-        . '.pdf'
-    );
-}
+        return $pdf->stream(
+            'creditos_por_cobrar_'
+            .$nombreSanitizado
+            .'.pdf'
+        );
+    }
 
-#endregion
+    // endregion
 
     public function creditosPorCobrarIndex(Request $request)
     {
@@ -840,9 +840,9 @@ public function creditosPorCobrarClienteTodosPdf(
         return $pdf->stream('creditos_por_cobrar_cliente_fechas.pdf');
     }
 
-    #endregion
+    // endregion
 
-    #region Ventas generales y saldos por cliente
+    // region Ventas generales y saldos por cliente
 
     public function ventasGeneralFechasPdf(Request $request)
     {
@@ -1024,9 +1024,9 @@ public function creditosPorCobrarClienteTodosPdf(
         return $pdf->stream('saldos_'.$nombreArchivo);
     }
 
-    #endregion
+    // endregion
 
-    #region Reportes generales de cuentas por cobrar
+    // region Reportes generales de cuentas por cobrar
 
     public function creditosPorCobrarFechasPdf(Request $request)
     {
@@ -1501,9 +1501,9 @@ public function creditosPorCobrarClienteTodosPdf(
         return $pdf->stream('resumen_creditos_por_cobrar.pdf');
     }
 
-    #endregion
+    // endregion
 
-    #region Estado de cuenta del cliente
+    // region Estado de cuenta del cliente
 
     /**
      * Genera el estado de cuenta detallado.
@@ -1512,190 +1512,190 @@ public function creditosPorCobrarClienteTodosPdf(
      * registrados hasta cada fecha de corte. No se utiliza ventas.saldo como
      * saldo histórico, porque ese campo representa el saldo actual.
      */
-#region Estado de Cuenta Detallado
+    // region Estado de Cuenta Detallado
 
-public function estadoCuentaClientePdf(Request $request)
-{
-    $data = $request->validate([
-        'fecha_inicio' => ['required', 'date'],
-        'fecha_fin' => [
-            'required',
-            'date',
-            'after_or_equal:fecha_inicio',
-        ],
-        'cliente_ids' => [
-            'required',
-            'array',
-            'size:1',
-        ],
-        'cliente_ids.0' => [
-            'required',
-            'integer',
-        ],
-    ]);
-
-    $ini = Carbon::parse(
-        $data['fecha_inicio']
-    )->startOfDay();
-
-    $fin = Carbon::parse(
-        $data['fecha_fin']
-    )->endOfDay();
-
-    $clienteId = (int) $data['cliente_ids'][0];
-
-    $clienteData = Cliente::query()
-        ->select(
-            'id',
-            'razon_social',
-            'direccion',
-            'telefono'
-        )
-        ->findOrFail($clienteId);
-
-    $clienteNombre = $clienteData->id
-        . ' - '
-        . $clienteData->razon_social;
-
-    $datosReporte = $this->prepararDatosEstadoCuentaCliente(
-        $clienteId,
-        $ini,
-        $fin
-    );
-
-    $pdf = Pdf::loadView(
-        'cuenta-cliente.reportes.estado_cuenta',
-        array_merge(
-            [
-                'ini' => $ini,
-                'fin' => $fin,
-                'clienteId' => $clienteId,
-                'clienteNombre' => $clienteNombre,
-                'clienteData' => $clienteData,
+    public function estadoCuentaClientePdf(Request $request)
+    {
+        $data = $request->validate([
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => [
+                'required',
+                'date',
+                'after_or_equal:fecha_inicio',
             ],
-            $datosReporte
-        )
-    )->setPaper('a4', 'portrait');
+            'cliente_ids' => [
+                'required',
+                'array',
+                'size:1',
+            ],
+            'cliente_ids.0' => [
+                'required',
+                'integer',
+            ],
+        ]);
 
-    $nombreSanitizado = preg_replace(
-        '/[^a-zA-Z0-9\s\-]/',
-        '',
-        $clienteNombre
-    );
+        $ini = Carbon::parse(
+            $data['fecha_inicio']
+        )->startOfDay();
 
-    $nombreSanitizado = preg_replace(
-        '/\s+/',
-        '_',
-        trim($nombreSanitizado)
-    );
+        $fin = Carbon::parse(
+            $data['fecha_fin']
+        )->endOfDay();
 
-    return $pdf->stream(
-        'estado_cuenta_'
-        . $nombreSanitizado
-        . '.pdf'
-    );
-}
+        $clienteId = (int) $data['cliente_ids'][0];
 
-#endregion
+        $clienteData = Cliente::query()
+            ->select(
+                'id',
+                'razon_social',
+                'direccion',
+                'telefono'
+            )
+            ->findOrFail($clienteId);
+
+        $clienteNombre = $clienteData->id
+            .' - '
+            .$clienteData->razon_social;
+
+        $datosReporte = $this->prepararDatosEstadoCuentaCliente(
+            $clienteId,
+            $ini,
+            $fin
+        );
+
+        $pdf = Pdf::loadView(
+            'cuenta-cliente.reportes.estado_cuenta',
+            array_merge(
+                [
+                    'ini' => $ini,
+                    'fin' => $fin,
+                    'clienteId' => $clienteId,
+                    'clienteNombre' => $clienteNombre,
+                    'clienteData' => $clienteData,
+                ],
+                $datosReporte
+            )
+        )->setPaper('a4', 'portrait');
+
+        $nombreSanitizado = preg_replace(
+            '/[^a-zA-Z0-9\s\-]/',
+            '',
+            $clienteNombre
+        );
+
+        $nombreSanitizado = preg_replace(
+            '/\s+/',
+            '_',
+            trim($nombreSanitizado)
+        );
+
+        return $pdf->stream(
+            'estado_cuenta_'
+            .$nombreSanitizado
+            .'.pdf'
+        );
+    }
+
+    // endregion
 
     /**
      * Genera el estado de cuenta simplificado utilizando exactamente la misma
      * información y los mismos saldos que el reporte detallado.
      */
-    #region Estado de Cuenta Simplificado
+    // region Estado de Cuenta Simplificado
 
-public function estadoCuentaSimplificadoClientePdf(
-    Request $request
-) {
-    $data = $request->validate([
-        'fecha_inicio' => ['required', 'date'],
-        'fecha_fin' => [
-            'required',
-            'date',
-            'after_or_equal:fecha_inicio',
-        ],
-        'cliente_ids' => [
-            'required',
-            'array',
-            'size:1',
-        ],
-        'cliente_ids.0' => [
-            'required',
-            'integer',
-        ],
-    ]);
-
-    $ini = Carbon::parse(
-        $data['fecha_inicio']
-    )->startOfDay();
-
-    $fin = Carbon::parse(
-        $data['fecha_fin']
-    )->endOfDay();
-
-    $clienteId = (int) $data['cliente_ids'][0];
-
-    $clienteData = Cliente::query()
-        ->select(
-            'id',
-            'razon_social',
-            'direccion',
-            'telefono'
-        )
-        ->findOrFail($clienteId);
-
-    $clienteNombre = $clienteData->id
-        . ' - '
-        . $clienteData->razon_social;
-
-    /*
-     * El simplificado usa exactamente la misma información
-     * que el estado de cuenta detallado.
-     */
-    $datosReporte = $this->prepararDatosEstadoCuentaCliente(
-        $clienteId,
-        $ini,
-        $fin
-    );
-
-    $pdf = Pdf::loadView(
-        'cuenta-cliente.reportes.estado_cuenta_simplificado',
-        array_merge(
-            [
-                'ini' => $ini,
-                'fin' => $fin,
-                'clienteId' => $clienteId,
-                'clienteNombre' => $clienteNombre,
-                'clienteData' => $clienteData,
+    public function estadoCuentaSimplificadoClientePdf(
+        Request $request
+    ) {
+        $data = $request->validate([
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin' => [
+                'required',
+                'date',
+                'after_or_equal:fecha_inicio',
             ],
-            $datosReporte
-        )
-    )->setPaper('a4', 'portrait');
+            'cliente_ids' => [
+                'required',
+                'array',
+                'size:1',
+            ],
+            'cliente_ids.0' => [
+                'required',
+                'integer',
+            ],
+        ]);
 
-    $nombreSanitizado = preg_replace(
-        '/[^a-zA-Z0-9\s\-]/',
-        '',
-        $clienteNombre
-    );
+        $ini = Carbon::parse(
+            $data['fecha_inicio']
+        )->startOfDay();
 
-    $nombreSanitizado = preg_replace(
-        '/\s+/',
-        '_',
-        trim($nombreSanitizado)
-    );
+        $fin = Carbon::parse(
+            $data['fecha_fin']
+        )->endOfDay();
 
-    return $pdf->stream(
-        'estado_cuenta_simplificado_'
-        . $nombreSanitizado
-        . '.pdf'
-    );
-}
+        $clienteId = (int) $data['cliente_ids'][0];
 
-#endregion
+        $clienteData = Cliente::query()
+            ->select(
+                'id',
+                'razon_social',
+                'direccion',
+                'telefono'
+            )
+            ->findOrFail($clienteId);
 
-    #endregion
+        $clienteNombre = $clienteData->id
+            .' - '
+            .$clienteData->razon_social;
 
-    #region Consultas auxiliares del estado de cuenta
+        /*
+         * El simplificado usa exactamente la misma información
+         * que el estado de cuenta detallado.
+         */
+        $datosReporte = $this->prepararDatosEstadoCuentaCliente(
+            $clienteId,
+            $ini,
+            $fin
+        );
+
+        $pdf = Pdf::loadView(
+            'cuenta-cliente.reportes.estado_cuenta_simplificado',
+            array_merge(
+                [
+                    'ini' => $ini,
+                    'fin' => $fin,
+                    'clienteId' => $clienteId,
+                    'clienteNombre' => $clienteNombre,
+                    'clienteData' => $clienteData,
+                ],
+                $datosReporte
+            )
+        )->setPaper('a4', 'portrait');
+
+        $nombreSanitizado = preg_replace(
+            '/[^a-zA-Z0-9\s\-]/',
+            '',
+            $clienteNombre
+        );
+
+        $nombreSanitizado = preg_replace(
+            '/\s+/',
+            '_',
+            trim($nombreSanitizado)
+        );
+
+        return $pdf->stream(
+            'estado_cuenta_simplificado_'
+            .$nombreSanitizado
+            .'.pdf'
+        );
+    }
+
+    // endregion
+
+    // endregion
+
+    // region Consultas auxiliares del estado de cuenta
 
     /**
      * Consulta única de documentos que mantienen deuda actual.
@@ -1752,7 +1752,7 @@ public function estadoCuentaSimplificadoClientePdf(
         Carbon $ini,
         Carbon $fin
     ): array {
-        #region Pagos aplicados dentro del rango
+        // region Pagos aplicados dentro del rango
 
         $provisionales = DB::table('venta_provisional_detalles as vpd')
             ->join(
@@ -1803,9 +1803,9 @@ public function estadoCuentaSimplificadoClientePdf(
             ->values()
             ->all();
 
-        #endregion
+        // endregion
 
-        #region Ventas visibles
+        // region Ventas visibles
 
         $ventas = DB::table('ventas as venta')
             ->select([
@@ -1846,9 +1846,9 @@ public function estadoCuentaSimplificadoClientePdf(
             ->orderBy('venta.id')
             ->get();
 
-        #endregion
+        // endregion
 
-        #region Reconstrucción visual de cada movimiento
+        // region Reconstrucción visual de cada movimiento
 
         $ventas = $ventas->map(function ($venta) use ($pagosPorVenta) {
             $venta->documento = trim(
@@ -1916,9 +1916,9 @@ public function estadoCuentaSimplificadoClientePdf(
             return $venta;
         })->values();
 
-        #endregion
+        // endregion
 
-        #region Saldos
+        // region Saldos
 
         /*
          * Saldo anterior visible: deuda de ventas anteriores al rango antes de
@@ -1937,9 +1937,9 @@ public function estadoCuentaSimplificadoClientePdf(
          */
         $saldoFinal = $this->calcularSaldoActualCliente($clienteId);
 
-        #endregion
+        // endregion
 
-        #region Adelantos sin venta asociada
+        // region Adelantos sin venta asociada
 
         $aplicadoPorProvisional = DB::table('venta_provisional_detalles as detalle')
             ->selectRaw('
@@ -1996,9 +1996,9 @@ public function estadoCuentaSimplificadoClientePdf(
             ->orderBy('vp.id')
             ->get();
 
-        #endregion
+        // endregion
 
-        #region Totales
+        // region Totales
 
         $totCreditoMostrado = round(
             (float) $ventas
@@ -2015,7 +2015,7 @@ public function estadoCuentaSimplificadoClientePdf(
         $totPagoRango = $totPagoVentas;
         $totAbonoSuelto = round((float) $abonosSueltos->sum('monto'), 2);
 
-        #endregion
+        // endregion
 
         return [
             'saldoInicial' => $saldoInicial,
@@ -2030,5 +2030,5 @@ public function estadoCuentaSimplificadoClientePdf(
         ];
     }
 
-    #endregion
+    // endregion
 }

@@ -387,10 +387,9 @@ class MovimientoService
      * @param  int  $desdeMovimientoId  ID del movimiento desde donde recalcular
      * @param  bool  $actualizarStock  Si true (default), actualiza productos.stock_almacen al final.
      *                                 Pasar FALSE cuando el recálculo solo propaga COSTOS     /**
-     * Recalcula el kardex completo de un producto desde un movimiento específico (por ID).
+     *                                 Recalcula el kardex completo de un producto desde un movimiento específico (por ID).
      *
      * Ordena estrictamente por ID (orden secuencial físico de inserción).
-     *
      * @param  int  $productoId  ID del producto a recalcular
      * @param  int  $desdeMovimientoId  ID del movimiento desde donde recalcular
      * @param  bool  $actualizarStock  Si true (default), actualiza productos.stock_almacen al final.

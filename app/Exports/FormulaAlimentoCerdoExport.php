@@ -87,7 +87,7 @@ class FormulaAlimentoCerdoExport implements WithEvents
             $sheet->setCellValue("I{$row}", (float) $ing['costo']);
             $row++;
         }
-        $sheet->getStyle("A".($headerRow + 1).":{$lastCol}".($row - 1))->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle('A'.($headerRow + 1).":{$lastCol}".($row - 1))->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
 
         $sheet->setCellValue("G{$row}", 'TOTAL');
         $sheet->setCellValue("H{$row}", array_sum(array_column($ingredientes, 'cantidad_kg')));

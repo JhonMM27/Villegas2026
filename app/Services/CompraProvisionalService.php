@@ -1,13 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Servicio de Compras Provisionales (Pagos Anticipados/Cobranzas a Proveedores).
  *
  * Concentra la lógica de negocio para la creación, actualización y eliminación
  * de pagos provisionales aplicados a compras, incluyendo:
  * - Generación de número de recibo correlativo
- * - Cálculo de montos aplicados vs libres
- * - Actualización de abonos/saldos en las compras vinculadas
+ * - Validación estricta de límites (distribuido <= pagado, monto <= saldo disponible)
+ * - Bloqueo pessimitic en orden ascendente de ID para evitar desbordes y deadlocks
+ * - Actualización limpia de abonos/saldos en las compras vinculadas
  */
 
 namespace App\Services;
@@ -16,20 +19,17 @@ use App\Models\Compra;
 use App\Models\CompraProvisional;
 use App\Models\Proveedor;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class CompraProvisionalService
 {
     /**
-     * Crea un pago provisional de compra dentro de una transacción:
-     * 1. Genera el siguiente número de recibo correlativo
-     * 2. Procesa datos de cabecera y detalles (montos por compra)
-     * 3. Crea el registro CompraProvisional + detalles
-     * 4. Aplica abonos a las compras vinculadas (suma abonos, resta saldo)
+     * Crea un pago provisional dentro de una transacción.
      *
      * @param  array  $data  Datos validados del request
      * @return CompraProvisional El registro recién creado
      *
-     * @throws \Exception Si ocurre cualquier error
+     * @throws ValidationException Si alguna regla de negocio falla (HTTP 422)
      */
     public function createProvisional(array $data): CompraProvisional
     {
@@ -41,8 +41,8 @@ class CompraProvisionalService
                 ->value('max_recibo');
             $data['numero_recibo'] = $ultimoRecibo ? ((int) $ultimoRecibo + 1) : 1;
 
-            // 2) Procesar datos (cabecera + detalles calculados)
-            $provisionalData = $this->processProvisionalData($data, true);
+            // 2) Procesar y validar datos (cabecera + detalles)
+            $provisionalData = $this->processProvisionalData($data, true, null);
 
             // 3) Persistir cabecera y detalles
             $provisional = CompraProvisional::create($provisionalData['provisional']);
@@ -56,24 +56,21 @@ class CompraProvisionalService
     }
 
     /**
-     * Actualiza un pago provisional de compra dentro de una transacción:
-     * 1. Revierte los abonos anteriores en las compras vinculadas
-     * 2. Recalcula cabecera y detalles con los nuevos datos
-     * 3. Reemplaza detalles y aplica nuevos abonos
+     * Actualiza un pago provisional dentro de una transacción.
      *
      * @param  int  $id  ID del provisional a actualizar
      * @param  array  $data  Datos validados del request
      * @return CompraProvisional El registro actualizado
      *
-     * @throws \Exception Si ocurre cualquier error
+     * @throws ValidationException Si alguna regla de negocio falla (HTTP 422)
      */
     public function updateProvisional(int $id, array $data): CompraProvisional
     {
         return DB::transaction(function () use ($id, $data) {
             $provisional = CompraProvisional::with('detalles')->findOrFail($id);
 
-            // 1) Procesar nuevos datos
-            $provisionalData = $this->processProvisionalData($data, false);
+            // 1) Procesar y validar nuevos datos
+            $provisionalData = $this->processProvisionalData($data, false, $provisional->id);
 
             // 2) Revertir abonos anteriores en compras
             $this->revertirDetallesEnCompras($provisional->id);
@@ -91,13 +88,9 @@ class CompraProvisionalService
     }
 
     /**
-     * Elimina un pago provisional de compra dentro de una transacción:
-     * 1. Revierte los abonos en las compras vinculadas
-     * 2. Elimina detalles y cabecera
+     * Elimina un pago provisional dentro de una transacción.
      *
      * @param  int  $id  ID del provisional a eliminar
-     *
-     * @throws \Exception Si ocurre cualquier error
      */
     public function deleteProvisional(int $id): void
     {
@@ -106,33 +99,7 @@ class CompraProvisionalService
 
             // Revertir impacto en compras si tiene detalles
             if ($provisional->detalles->isNotEmpty()) {
-                foreach ($provisional->detalles as $detalle) {
-                    if (! $detalle->compra_id || $detalle->monto <= 0) {
-                        continue;
-                    }
-
-                    $compra = Compra::where('id', $detalle->compra_id)
-                        ->where('estado', '!=', 'anulada')
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (! $compra) {
-                        continue;
-                    }
-
-                    $m = (float) $detalle->monto;
-
-                    // Restar abono
-                    $compra->abonos = (float) ($compra->abonos ?? 0) - $m;
-                    if ($compra->abonos < 0) {
-                        $compra->abonos = 0;
-                    }
-
-                    // Sumar saldo
-                    $compra->saldo = (float) ($compra->saldo ?? 0) + $m;
-
-                    $compra->save();
-                }
+                $this->revertirDetallesEnCompras($provisional->id);
             }
 
             // Eliminar detalles y cabecera
@@ -142,54 +109,138 @@ class CompraProvisionalService
     }
 
     /**
-     * Procesa y construye los datos del provisional (cabecera + detalles).
-     *
-     * Consulta el proveedor y las compras vinculadas, calcula el monto libre
-     * (no aplicado a ninguna compra) y determina el tipo (APLICADO o ADELANTO).
+     * Procesa y valida de manera estricta los datos del provisional.
      *
      * @param  array  $data  Datos validados del request
-     * @param  bool  $isNew  true=creación (asigna user_id, numero_recibo), false=edición
+     * @param  bool  $isNew  true=creación, false=edición
+     * @param  int|null  $provisionalId  ID del provisional si se está editando
      * @return array ['provisional' => [...], 'detalles' => [...]]
+     *
+     * @throws ValidationException
      */
-    private function processProvisionalData(array $data, bool $isNew = true): array
+    private function processProvisionalData(array $data, bool $isNew = true, ?int $provisionalId = null): array
     {
-        $proveedor = Proveedor::find($data['proveedor_id']);
+        $proveedor = Proveedor::findOrFail($data['proveedor_id']);
         $comprasInput = $data['compras'] ?? [];
 
-        // Cargar compras involucradas
-        $compras = Compra::whereIn('id', collect($comprasInput)->pluck('compra_id')->filter())
-            ->where('estado', '!=', 'anulada')
-            ->get()
-            ->keyBy('id');
+        // 1. Validar coincidencia exacta de medios de pago en centavos
+        $pCents = (int) round(((float) ($data['principal'] ?? 0)) * 100);
+        $dCents = (int) round(((float) ($data['deposito'] ?? 0)) * 100);
+        $cCents = (int) round(((float) ($data['consorcio'] ?? 0)) * 100);
+        $totalCents = (int) round(((float) ($data['total_cobranza'] ?? 0)) * 100);
 
-        // Calcular detalles (filtra montos <= 0 y compras inexistentes)
+        if (($pCents + $dCents + $cCents) !== $totalCents) {
+            throw ValidationException::withMessages([
+                'total_cobranza' => ['Los medios de pago (Principal, Depósito, Consorcio) deben sumar exactamente el total pagado.'],
+            ]);
+        }
+
+        // 2. Extraer e inspeccionar compras vinculadas
+        $compraIdsInput = [];
+        foreach ($comprasInput as $det) {
+            $cId = $det['compra_id'] ?? null;
+            $m = (float) ($det['monto'] ?? 0);
+            if ($cId && $m > 0) {
+                $compraIdsInput[] = (int) $cId;
+            }
+        }
+
+        // 3. Validar no duplicados en la lista enviada
+        if (count($compraIdsInput) !== count(array_unique($compraIdsInput))) {
+            throw ValidationException::withMessages([
+                'compras' => ['No se permiten compras duplicadas en la misma distribución.'],
+            ]);
+        }
+
+        // 4. Obtener aplicaciones previas de este recibo si es edición
+        $prevApplications = [];
+        if ($provisionalId) {
+            $prevDetalles = DB::table('compra_provisional_detalles')
+                ->where('compra_provisional_id', $provisionalId)
+                ->whereNotNull('compra_id')
+                ->get();
+            foreach ($prevDetalles as $pd) {
+                $prevApplications[(int) $pd->compra_id] = (int) round(((float) $pd->monto) * 100);
+            }
+        }
+
+        // 5. Cargar y bloquear compras en ORDEN ASCENDENTE DE ID para evitar deadlocks
+        $uniqueCompraIds = array_values(array_unique($compraIdsInput));
+        sort($uniqueCompraIds);
+
+        $compras = [];
+        if (! empty($uniqueCompraIds)) {
+            $compras = Compra::whereIn('id', $uniqueCompraIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+        }
+
         $detallesCalculados = [];
+        $totalDistribuidoCents = 0;
+
         foreach ($comprasInput as $detalle) {
             $monto = (float) ($detalle['monto'] ?? 0);
-            if ($monto <= 0) {
+            $montoCents = (int) round($monto * 100);
+            if ($montoCents <= 0) {
                 continue;
             }
 
-            $compraId = $detalle['compra_id'] ?? null;
+            $compraId = (int) ($detalle['compra_id'] ?? 0);
             if (! $compraId || ! isset($compras[$compraId])) {
-                continue;
+                throw ValidationException::withMessages([
+                    'compras' => ["La compra ID {$compraId} no existe o no es válida."],
+                ]);
             }
+
+            $compra = $compras[$compraId];
+
+            // Validar pertenencia al proveedor
+            if ((int) $compra->proveedor_id !== (int) $data['proveedor_id']) {
+                throw ValidationException::withMessages([
+                    'compras' => ["La compra {$compra->serie}-{$compra->correlativo} pertenece a otro proveedor."],
+                ]);
+            }
+
+            // Validar estado no anulado
+            if (strtolower(trim($compra->estado)) === 'anulada') {
+                throw ValidationException::withMessages([
+                    'compras' => ["La compra {$compra->serie}-{$compra->correlativo} se encuentra anulada y no puede recibir pagos."],
+                ]);
+            }
+
+            // Validar saldo disponible (saldo actual + aplicación previa del mismo recibo)
+            $saldoActualCents = (int) round(((float) $compra->saldo) * 100);
+            $aplicacionPreviaCents = $prevApplications[$compraId] ?? 0;
+            $saldoDisponibleCents = $saldoActualCents + $aplicacionPreviaCents;
+
+            if ($montoCents > $saldoDisponibleCents) {
+                $saldoDisponibleFmt = number_format($saldoDisponibleCents / 100, 2, '.', ',');
+                throw ValidationException::withMessages([
+                    'compras' => ['El monto asignado (S/ '.number_format($monto, 2).") a la compra {$compra->serie}-{$compra->correlativo} supera su saldo disponible (S/ {$saldoDisponibleFmt})."],
+                ]);
+            }
+
+            $totalDistribuidoCents += $montoCents;
 
             $detallesCalculados[] = $this->calculateDetail(
-                $compras[$compraId],
+                $compra,
                 $detalle,
                 $proveedor->razon_social ?? ''
             );
         }
 
-        // Calcular monto libre (total - aplicado)
-        $totalAplicado = collect($detallesCalculados)
-            ->sum(fn ($d) => (float) ($d['monto'] ?? 0));
+        // 6. Validar que la suma distribuida NO supere el total pagado
+        if ($totalDistribuidoCents > $totalCents) {
+            $distFmt = number_format($totalDistribuidoCents / 100, 2, '.', ',');
+            $recFmt = number_format($totalCents / 100, 2, '.', ',');
+            throw ValidationException::withMessages([
+                'compras' => ["La suma distribuida (S/ {$distFmt}) no puede superar el total pagado (S/ {$recFmt})."],
+            ]);
+        }
 
-        $totalProvisional = (float) ($data['total_cobranza'] ?? 0);
-        $montoLibre = $totalProvisional - $totalAplicado;
+        $montoLibre = round(($totalCents - $totalDistribuidoCents) / 100, 2);
 
-        // Construir cabecera
         $provisionalData = [
             'numero_interno' => $data['numero_interno'],
             'fecha_provisional' => $data['fecha_provisional'] ?? now(),
@@ -206,7 +257,7 @@ class CompraProvisionalService
         if ($isNew) {
             $provisionalData['numero_recibo'] = $data['numero_recibo'];
             $provisionalData['user_id'] = auth()->id();
-            $provisionalData['user_nombre'] = auth()->user()->name;
+            $provisionalData['user_nombre'] = auth()->user()?->name ?? 'SISTEMA';
         }
 
         return [
@@ -217,13 +268,10 @@ class CompraProvisionalService
 
     /**
      * Aplica los montos de los detalles como abonos en las compras vinculadas.
-     * Agrupa por compra_id y suma abonos / resta saldo con lockForUpdate.
-     *
-     * @param  int  $provisionalId  ID del provisional cuyos detalles se aplican
      */
     private function aplicarDetallesEnCompras(int $provisionalId): void
     {
-        $sumas = DB::table('compra_provisional_detalles')
+        $detalles = DB::table('compra_provisional_detalles')
             ->selectRaw('compra_id, SUM(monto) as total')
             ->where('compra_provisional_id', $provisionalId)
             ->whereNotNull('compra_id')
@@ -231,12 +279,24 @@ class CompraProvisionalService
             ->groupBy('compra_id')
             ->get();
 
-        foreach ($sumas as $s) {
-            $compra = Compra::where('id', $s->compra_id)
-                ->where('estado', '!=', 'anulada')
-                ->lockForUpdate()
-                ->firstOrFail();
+        $compraIds = $detalles->pluck('compra_id')->map(fn ($id) => (int) $id)->sort()->values()->all();
 
+        if (empty($compraIds)) {
+            return;
+        }
+
+        $compras = Compra::whereIn('id', $compraIds)
+            ->where('estado', '!=', 'anulada')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        foreach ($detalles as $s) {
+            $cId = (int) $s->compra_id;
+            if (! isset($compras[$cId])) {
+                continue;
+            }
+            $compra = $compras[$cId];
             $m = (float) $s->total;
 
             $compra->abonos = (float) ($compra->abonos ?? 0) + $m;
@@ -251,13 +311,10 @@ class CompraProvisionalService
 
     /**
      * Revierte los abonos previamente aplicados a las compras vinculadas.
-     * Agrupa por compra_id y resta abonos / suma saldo con lockForUpdate.
-     *
-     * @param  int  $provisionalId  ID del provisional cuyos detalles se revierten
      */
     private function revertirDetallesEnCompras(int $provisionalId): void
     {
-        $sumas = DB::table('compra_provisional_detalles')
+        $detalles = DB::table('compra_provisional_detalles')
             ->selectRaw('compra_id, SUM(monto) as total')
             ->where('compra_provisional_id', $provisionalId)
             ->whereNotNull('compra_id')
@@ -265,15 +322,24 @@ class CompraProvisionalService
             ->groupBy('compra_id')
             ->get();
 
-        foreach ($sumas as $s) {
-            $compra = Compra::where('id', $s->compra_id)
-                ->where('estado', '!=', 'anulada')
-                ->lockForUpdate()
-                ->first();
-            if (! $compra) {
+        $compraIds = $detalles->pluck('compra_id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+        if (empty($compraIds)) {
+            return;
+        }
+
+        $compras = Compra::whereIn('id', $compraIds)
+            ->where('estado', '!=', 'anulada')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        foreach ($detalles as $s) {
+            $cId = (int) $s->compra_id;
+            if (! isset($compras[$cId])) {
                 continue;
             }
-
+            $compra = $compras[$cId];
             $m = (float) $s->total;
 
             $compra->abonos = (float) ($compra->abonos ?? 0) - $m;
@@ -288,18 +354,13 @@ class CompraProvisionalService
     }
 
     /**
-     * Calcula un detalle individual del provisional (genera comentario automático).
-     *
-     * @param  Compra  $compra  Compra vinculada
-     * @param  array  $detalle  Datos del detalle desde el request
-     * @param  string  $proveedorNombre  Nombre del proveedor para el comentario
-     * @return array Detalle listo para createMany()
+     * Calcula un detalle individual del provisional.
      */
-    private function calculateDetail(Compra $compra, array $detalle, string $proveedorNombre): array
+    private function calculateDetail($compra, array $detalle, string $proveedorNombre): array
     {
         $comentarioBase = '';
-        $doc = trim(($detalle['comprobante_tipo_codigo'] ?? '').($detalle['serie'] && $detalle['correlativo'] ? "{$detalle['serie']}-{$detalle['correlativo']}" : ''));
-        $autoComentario = trim("COBRANZA A {$doc} {$proveedorNombre}");
+        $doc = trim(($detalle['comprobante_tipo_codigo'] ?? '').($detalle['serie'] && $detalle['correlativo'] ? " {$detalle['serie']}-{$detalle['correlativo']}" : ''));
+        $autoComentario = trim("PAGO A {$doc} {$proveedorNombre}");
         $comentarioFinal = $comentarioBase !== '' ? ($autoComentario.' - '.$comentarioBase) : $autoComentario;
 
         return [

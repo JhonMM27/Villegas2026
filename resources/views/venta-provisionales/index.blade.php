@@ -83,6 +83,7 @@ class VentaProvisionalManager extends CrudManager {
         super("{{ url('venta-provisionales') }}");
         this.consulta = 'T';
         this.TIPOS_VALIDOS = ['T', 'PL'];
+        this.currentProvisionalId = null;
         this.initializeDataTable();
 
         this.setupLiveSearchSelect({
@@ -104,11 +105,26 @@ class VentaProvisionalManager extends CrudManager {
         // Botón distribuir
         document.getElementById('btnDistribuir')?.addEventListener('click', () => this.distribuirCobranza());
 
-        // (Opcional) si cambia total_cobranza, vuelve a distribuir
-        document.getElementById('total_cobranza')?.addEventListener('input', () => this.distribuirSiHayVentas());
-        document.getElementById('consorcio')?.addEventListener('input', () => this.distribuirSiHayVentas());
-        document.getElementById('principal')?.addEventListener('input', () => this.distribuirSiHayVentas());
-        document.getElementById('deposito')?.addEventListener('input', () => this.distribuirSiHayVentas());
+        // Botón cargar pendientes
+        document.getElementById('btnCargarPendientes')?.addEventListener('click', () => {
+            const clienteId = document.getElementById('cliente_id')?.value;
+            if (clienteId) {
+                this.addVenta(clienteId);
+            } else {
+                this.showNotification('warning', 'Seleccione primero un cliente');
+            }
+        });
+
+        // Listeners para recálculo y validación en tiempo real
+        ['principal', 'deposito', 'consorcio', 'total_cobranza'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', () => this.updateResumenDistribucion());
+        });
+
+        document.querySelector('#tablaVentasSaldo')?.addEventListener('input', (e) => {
+            if (e.target && e.target.matches('input[name*="[monto]"]')) {
+                this.updateResumenDistribucion();
+            }
+        });
 
         window.addEventListener('popstate', () => {
             const tipo = provisionalManager.getTipoFromUrl();
@@ -172,9 +188,67 @@ class VentaProvisionalManager extends CrudManager {
         return document.querySelectorAll('#tablaVentasSaldo tbody input[name*="[monto]"]').length > 0;
     }
 
-    distribuirSiHayVentas() {
-        if (!this.tieneVentasEnTabla()) return;
-        this.distribuirCobranza();
+    updateResumenDistribucion() {
+        const p = parseFloat(document.getElementById('principal')?.value || 0);
+        const d = parseFloat(document.getElementById('deposito')?.value || 0);
+        const c = parseFloat(document.getElementById('consorcio')?.value || 0);
+        const recibido = Math.round((p + d + c + Number.EPSILON) * 100) / 100;
+
+        const totalCobranzaEl = document.getElementById('total_cobranza');
+        if (totalCobranzaEl) {
+            totalCobranzaEl.value = recibido.toFixed(2);
+        }
+
+        const tbody = document.querySelector('#tablaVentasSaldo tbody');
+        let distribuido = 0;
+        let tieneFilasExcedidas = false;
+
+        if (tbody) {
+            const montoInputs = tbody.querySelectorAll('input[name*="[monto]"]');
+            montoInputs.forEach(inp => {
+                const v = parseFloat(inp.value || 0);
+                const maxV = parseFloat(inp.getAttribute('max') || 99999999);
+                distribuido += v;
+                if (v > maxV + 0.001) {
+                    tieneFilasExcedidas = true;
+                    inp.classList.add('is-invalid');
+                } else {
+                    inp.classList.remove('is-invalid');
+                }
+            });
+        }
+
+        distribuido = Math.round((distribuido + Number.EPSILON) * 100) / 100;
+        const diferencia = Math.round((recibido - distribuido + Number.EPSILON) * 100) / 100;
+
+        const summaryRecibidoEl = document.getElementById('summary_recibido');
+        const summaryDistribuidoEl = document.getElementById('summary_distribuido');
+        const summaryEstadoEl = document.getElementById('summary_estado');
+        const btnSubmit = document.getElementById('btnSubmit');
+
+        if (summaryRecibidoEl) summaryRecibidoEl.textContent = recibido.toFixed(2);
+        if (summaryDistribuidoEl) summaryDistribuidoEl.textContent = distribuido.toFixed(2);
+
+        if (!summaryEstadoEl) return;
+
+        if (tieneFilasExcedidas) {
+            summaryEstadoEl.className = 'badge bg-danger fs-6 py-2 px-3';
+            summaryEstadoEl.textContent = 'Monto supera el saldo disponible del documento';
+            if (btnSubmit) btnSubmit.disabled = true;
+        } else if (diferencia < -0.001) {
+            const exceso = Math.abs(diferencia).toFixed(2);
+            summaryEstadoEl.className = 'badge bg-danger fs-6 py-2 px-3';
+            summaryEstadoEl.textContent = `Exceso de distribución S/ ${exceso}`;
+            if (btnSubmit) btnSubmit.disabled = true;
+        } else if (diferencia > 0.001) {
+            summaryEstadoEl.className = 'badge bg-info text-dark fs-6 py-2 px-3';
+            summaryEstadoEl.textContent = `Pendiente por distribuir S/ ${diferencia.toFixed(2)}`;
+            if (btnSubmit) btnSubmit.disabled = false;
+        } else {
+            summaryEstadoEl.className = 'badge bg-success fs-6 py-2 px-3';
+            summaryEstadoEl.textContent = 'Distribución completa';
+            if (btnSubmit) btnSubmit.disabled = false;
+        }
     }
 
     async addVenta(clienteId) {
@@ -193,8 +267,19 @@ class VentaProvisionalManager extends CrudManager {
             <tr>
                 <td colspan="8" class="text-muted text-center py-3">Seleccione un cliente…</td>
             </tr>`;
+            this.updateResumenDistribucion();
             return;
         }
+
+        // Preservar valores ingresados previamente
+        const existingValues = {};
+        tbody.querySelectorAll('tr[data-venta-id]').forEach(tr => {
+            const vId = tr.getAttribute('data-venta-id');
+            const inp = tr.querySelector('input[name*="[monto]"]');
+            if (vId && inp) {
+                existingValues[vId] = inp.value;
+            }
+        });
 
         tbody.innerHTML = `
         <tr>
@@ -202,8 +287,8 @@ class VentaProvisionalManager extends CrudManager {
         </tr>`;
 
         try {
-
-            const url = `{{ route('venta-provisionales.ventas-con-saldo') }}?cliente_id=${encodeURIComponent(clienteId)}`;
+            const provIdParam = this.currentProvisionalId ? `&provisional_id=${this.currentProvisionalId}` : '';
+            const url = `{{ route('venta-provisionales.ventas-con-saldo') }}?cliente_id=${encodeURIComponent(clienteId)}${provIdParam}`;
             const resp = await this.fetchData(url);
 
             const rows = Array.isArray(resp) ? resp : (resp.data ?? resp.ventas ?? []);
@@ -211,126 +296,109 @@ class VentaProvisionalManager extends CrudManager {
             if (!rows.length) {
                 tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-muted text-center py-3">
-                        Este cliente no tiene ventas con saldo.
+                    <td colspan="8" class="text-muted text-center py-3">
+                        Este cliente no tiene ventas con saldo disponible.
                     </td>
                 </tr>`;
+                this.updateResumenDistribucion();
                 return;
             }
 
             tbody.innerHTML = rows.map((r, i) => {
-
                 const doc = `${r.comprobante_tipo_codigo ?? ''} ${r.serie ?? ''}-${r.correlativo ?? ''}`.trim();
+                const saldoDisp = parseFloat(r.saldo_disponible ?? r.saldo ?? 0);
+                const valPrevio = existingValues[r.id] ?? (r.monto_aplicado_provisional ? parseFloat(r.monto_aplicado_provisional).toFixed(2) : '0.00');
 
                 return `
-                <tr>
-
+                <tr data-venta-id="${r.id}">
                     <td>
                         ${r.id}
-
                         <input type="hidden" name="ventas[${i}][venta_id]" value="${r.id}">
                         <input type="hidden" name="ventas[${i}][comprobante_tipo_codigo]" value="${r.comprobante_tipo_codigo}">
                         <input type="hidden" name="ventas[${i}][serie]" value="${r.serie}">
                         <input type="hidden" name="ventas[${i}][correlativo]" value="${r.correlativo}">
                     </td>
-
                     <td>${doc}</td>
                     <td>${r.fecha_venta ?? ''}</td>
-
                     <td class="text-end">${fmt(r.total)}</td>
                     <td class="text-end">${fmt(r.acuenta)}</td>
                     <td class="text-end">${fmt(r.abonos)}</td>
-
-                    <td class="text-end fw-bold">
-                        ${fmt(r.saldo)}
-                    </td>
-
+                    <td class="text-end fw-bold">${fmt(saldoDisp)}</td>
                     <td>
                         <input type="number"
                             step="0.01"
                             min="0"
-                            max="${r.saldo}"
-                            value="0.00"
+                            max="${saldoDisp.toFixed(2)}"
+                            value="${valPrevio}"
                             class="form-control form-control-sm text-end"
                             name="ventas[${i}][monto]">
                     </td>
-
                 </tr>`;
             }).join('');
-            this.distribuirCobranza();
+
+            this.updateResumenDistribucion();
 
         } catch (err) {
-
             console.error(err);
-
             tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-danger text-center py-3">
+                <td colspan="8" class="text-danger text-center py-3">
                     Error al cargar ventas con saldo.
                 </td>
             </tr>`;
+            this.updateResumenDistribucion();
         }
     }
 
     distribuirCobranza() {
-        const totalEl = document.getElementById('total_cobranza');
+        const p = parseFloat(document.getElementById('principal')?.value || 0);
+        const d = parseFloat(document.getElementById('deposito')?.value || 0);
+        const c = parseFloat(document.getElementById('consorcio')?.value || 0);
+        let disponible = Math.round((p + d + c + Number.EPSILON) * 100) / 100;
+
         const tbody = document.querySelector('#tablaVentasSaldo tbody');
+        if (!tbody) return;
 
-        if (!totalEl || !tbody) return;
-
-        const toNumber = (val) => {
-            return parseFloat(
-                (val ?? '0').toString()
-                    .replace(',', '.')
-                    .replace(/[^\d.-]/g, '')
-            ) || 0;
-        };
-
-        const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
-
-        // disponible = total_cobranza
-        let disponible = round2(toNumber(totalEl.value));
-
-        // Si no hay filas reales (solo el mensaje), salir
         const montoInputs = tbody.querySelectorAll('input[name*="[monto]"]');
         if (!montoInputs.length) return;
 
-        // Reset montos antes de distribuir
-        montoInputs.forEach(inp => inp.value = '0.00');
-
-        // Distribuir en orden de la tabla
+        // Asignación automática secuencial
         montoInputs.forEach(inp => {
-            if (disponible <= 0) return;
+            if (disponible <= 0) {
+                inp.value = '0.00';
+                return;
+            }
 
             const maxAttr = inp.getAttribute('max');
-            const saldo = round2(toNumber(maxAttr));
+            const saldo = Math.round((parseFloat(maxAttr || 0) + Number.EPSILON) * 100) / 100;
 
             if (saldo <= 0) {
                 inp.value = '0.00';
                 return;
             }
 
-            const asignado = round2(Math.min(disponible, saldo));
+            const asignado = Math.round(Math.min(disponible, saldo) * 100) / 100;
             inp.value = asignado.toFixed(2);
 
-            disponible = round2(disponible - asignado);
+            disponible = Math.round((disponible - asignado + Number.EPSILON) * 100) / 100;
         });
+
+        this.updateResumenDistribucion();
     }
 
     limpiarTablaVentas() {
         const tbody = document.querySelector('#tablaVentasSaldo tbody');
-
         if (!tbody) return;
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-muted text-center py-3">
+                <td colspan="8" class="text-muted text-center py-3">
                     Seleccione un cliente…
                 </td>
             </tr>
         `;
+        this.updateResumenDistribucion();
     }
-
 
     initializeDataTable() {
         this.tabla = $(this.elements.table).DataTable({
@@ -348,19 +416,16 @@ class VentaProvisionalManager extends CrudManager {
             },
             columns: [
                 { data: 'action', orderable: false, searchable: false },   // 1 Opciones
-
                 { data: 'user_nombre', name: 'user_nombre' },              // 2 Usuario
                 { data: 'fecha_provisional', name: 'fecha_provisional' },  // 3 Fecha
                 { data: 'tipo', name: 'tipo' },                            // 4 Tipo
                 { data: 'numero_recibo', name: 'numero_recibo' },          // 5 Recibo
                 { data: 'numero_interno', name: 'numero_interno' },        // 6 Interno
                 { data: 'cliente_nombre', name: 'cliente_nombre' },        // 7 Cliente
-
                 { data: 'monto', name: 'monto', className: 'text-end' },   // 8 Monto
                 { data: 'importe_p', name: 'importe_p', className: 'text-end' }, // 9 Principal
                 { data: 'importe_d', name: 'importe_d', className: 'text-end' }, // 10 Depósito
                 { data: 'importe_c', name: 'importe_c', className: 'text-end' }, // 11 Consorcio
-
                 { data: 'documentos', orderable: false, searchable: false } // 12 Documentos
             ],
             columnDefs: [
@@ -387,14 +452,13 @@ class VentaProvisionalManager extends CrudManager {
             const response = await this.fetchData(`${this.baseUrl}/${id}`);
 
             this.isEditing = true;
+            this.currentProvisionalId = id;
             this.resetForm();
 
             this.elements.modalTitle.textContent = 'Editar Provisional #' + response.numero_recibo;
             this.elements.methodField.value = 'PUT';
 
-            // Campos del modal (ajusta IDs según tu action.blade.php)
             this.setFieldValue('fecha_provisional', this.formatDateTimeLocal(response.fecha_provisional));
-            //document.getElementById('numero_recibo').value = response.numero_recibo || '';
             document.getElementById('numero_interno').value = response.numero_interno || '';
             document.getElementById('cliente_id').value = response.cliente_id || '';
             document.getElementById('cliente_nombre').value = response.cliente_nombre || '';
@@ -418,7 +482,6 @@ class VentaProvisionalManager extends CrudManager {
 
     cargarVentasEnTabla(detalles = []) {
         const tbody = document.querySelector('#tablaVentasSaldo tbody');
-
         const fmt = (n) => {
             const x = parseFloat(n ?? 0);
             return x.toLocaleString('es-PE', {
@@ -436,78 +499,62 @@ class VentaProvisionalManager extends CrudManager {
                     Este provisional no tiene ventas aplicadas.
                 </td>
             </tr>`;
+            this.updateResumenDistribucion();
             return;
         }
 
         tbody.innerHTML = detalles.map((d, i) => {
-
-            // Venta relacionada (traída desde backend con with('detalles.venta'))
             const v = d.venta ?? {};
-
-            // Documento desde la VENTA (más confiable que duplicarlo en detalle)
             const doc = `${v.comprobante_tipo_codigo ?? ''} ${v.serie ?? ''}-${v.correlativo ?? ''}`.trim();
-
-            // ✅ ESTE es el monto aplicado guardado en venta_provisional_detalles
             const montoDetalle = parseFloat(d.monto ?? 0);
+            const saldoDisp = Math.round((parseFloat(v.saldo ?? 0) + montoDetalle + Number.EPSILON) * 100) / 100;
 
             return `
             <tr data-venta-id="${d.venta_id}">
-
                 <td style="width:70px">
                     ${d.venta_id}
-
                     <input type="hidden" name="ventas[${i}][venta_id]" value="${d.venta_id}">
                     <input type="hidden" name="ventas[${i}][detalle_id]" value="${d.id ?? ''}">
                     <input type="hidden" name="ventas[${i}][comprobante_tipo_codigo]" value="${d.comprobante_tipo_codigo}">
                     <input type="hidden" name="ventas[${i}][serie]" value="${d.serie}">
                     <input type="hidden" name="ventas[${i}][correlativo]" value="${d.correlativo}">
                 </td>
-
                 <td>${doc}</td>
-
                 <td>${v.fecha_venta ?? ''}</td>
-
                 <td class="text-end">${fmt(v.total)}</td>
-
                 <td class="text-end">${fmt(v.acuenta)}</td>
-
                 <td class="text-end">${fmt(v.abonos)}</td>
-
-                <td class="text-end fw-bold">${fmt(v.saldo)}</td>
-
-                <!-- ✅ Monto = venta_provisional_detalle.monto -->
+                <td class="text-end fw-bold">${fmt(saldoDisp)}</td>
                 <td class="text-end">
                     <input type="number"
                         step="0.01"
                         min="0"
+                        max="${saldoDisp.toFixed(2)}"
                         value="${montoDetalle.toFixed(2)}"
                         class="form-control form-control-sm text-end"
                         name="ventas[${i}][monto]">
                 </td>
-
             </tr>`;
         }).join('');
-        if (typeof this.distribuirCobranza === 'function' && !this.isEditing) {
-            this.distribuirCobranza();
-        }
+
+        this.updateResumenDistribucion();
     }
 
     showCreateModal(){
         super.showCreateModal();
+        this.currentProvisionalId = null;
         this.elements.modalTitle.textContent = 'Nuevo Provisional';
         const usuarioNombre = @json(auth()->user()->name);
         document.getElementById('usuario_nombre').textContent = usuarioNombre;
 
-        // Defaults (si quieres)
         this.setFieldValue('fecha_provisional', this.obtenerFechaHoraActual());
         this.limpiarTablaVentas();
+        this.updateResumenDistribucion();
     }
 
     focusFirstField() {
         const modalEl = this.modal._element;
         modalEl.addEventListener('shown.bs.modal', () => {
-            // Se enfoca 'numero_interno' en lugar de 'fecha_provisional' para evitar
-            // que se abra automáticamente el selector de fecha (calendario).
             const input = document.getElementById('numero_interno');
             if (input) input.focus();
         }, { once: true });
@@ -555,13 +602,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 .catch(err => {
                     console.error(err);
-                    //this.showNotification('error', 'Error al cargar el detalle');
                 });
         }
     });
 });
 
-// Menú activo (ajusta IDs según tu sidebar)
 document.getElementById('mnuCaja')?.classList.add('menu-open');
 document.getElementById('itemVentaProvisionales')?.classList.add('active');
 </script>

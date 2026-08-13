@@ -20,6 +20,7 @@ use App\Models\Venta;
 use App\Models\VentaDetalle;
 use App\Models\VentaEntrega;
 use App\Services\VentaEntregaService;
+use App\Support\NumericStringOrder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -77,6 +78,9 @@ class VentaEntregaController extends Controller
                 })
                 ->filterColumn('numero_recibo', function ($query, $keyword) {
                     $query->where('ve.numero_recibo', 'like', "%{$keyword}%");
+                })
+                ->orderColumn('numero_recibo', function ($query, $direction) {
+                    NumericStringOrder::apply($query, 've.numero_recibo', 've.id', $direction);
                 })
                 ->addColumn('action', function ($row) {
                     $editButton = '';

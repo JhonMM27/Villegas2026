@@ -137,6 +137,10 @@ class CompraService
             $compraAnuladaId, $data
         ) {
             $compraAnulada = Compra::with('detalles')->findOrFail($compraAnuladaId);
+
+            // Validar que no tenga pagos provisionales aplicados ni abonos
+            $this->validarSinAbonosProvisionales($compraAnulada, 'rectificar');
+
             $productoIdsAnteriores = $compraAnulada->detalles->pluck('producto_id')->all();
 
             // Validar que esté anulada
@@ -292,6 +296,9 @@ class CompraService
     {
         return DB::transaction(function () use ($id) {
             $compra = Compra::with('detalles')->findOrFail($id);
+
+            // Validar que no tenga pagos provisionales aplicados ni abonos
+            $this->validarSinAbonosProvisionales($compra, 'anular');
 
             // Validar que no esté ya anulada
             if ($compra->estado === 'anulada') {
@@ -595,5 +602,44 @@ class CompraService
             'costo_total' => $costoTotalCompra,
             'costo_unitario_base' => $costoUnitarioBase,
         ];
+    }
+
+    /**
+     * Valida que una compra no tenga pagos provisionales o abonos aplicados antes de anular o rectificar.
+     *
+     * @param  Compra  $compra  Compra a validar
+     * @param  string  $accion  'anular' o 'rectificar'
+     *
+     * @throws \Exception Si existen abonos/pagos aplicados
+     */
+    private function validarSinAbonosProvisionales(Compra $compra, string $accion): void
+    {
+        $abonosHeader = round((float) ($compra->abonos ?? 0), 2);
+
+        $detallesProvisionales = DB::table('compra_provisional_detalles as d')
+            ->join('compra_provisionales as p', 'p.id', '=', 'd.compra_provisional_id')
+            ->where('d.compra_id', $compra->id)
+            ->where('d.monto', '>', 0)
+            ->select('p.numero_recibo', 'd.monto')
+            ->get();
+
+        if ($detallesProvisionales->isNotEmpty()) {
+            $recibosInfo = $detallesProvisionales->map(function ($d) {
+                return "Recibo #{$d->numero_recibo} (S/ ".number_format((float) $d->monto, 2, '.', '').')';
+            })->implode(', ');
+
+            throw new \Exception(
+                "No se puede {$accion} esta compra porque tiene pagos provisionales aplicados: {$recibosInfo}. "
+                .'Por favor, edite primero el pago provisional para retirar la aplicación y dejar el monto libre o pendiente.'
+            );
+        }
+
+        if ($abonosHeader > 0) {
+            throw new \Exception(
+                "No se puede {$accion} esta compra porque registra abonos por S/ ".number_format($abonosHeader, 2, '.', '')
+                .' de los cuales no hay detalle de recibo identificable (abonos históricos/migrados). '
+                ."Requiere revisión de auditoría contable antes de {$accion}."
+            );
+        }
     }
 }

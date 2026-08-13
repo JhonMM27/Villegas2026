@@ -284,19 +284,49 @@ class VentaProvisionalController extends Controller
     }
 
     /**
-     * Consulta ventas con saldo pendiente para un cliente.
+     * Consulta ventas con saldo pendiente para un cliente, soportando provisional_id opcional.
      *
-     * @param  Request  $request  Requiere 'cliente_id'
+     * @param  Request  $request  Requiere 'cliente_id', 'provisional_id' (opcional)
      * @return \Illuminate\Http\JsonResponse
      */
     public function ventasConSaldo(Request $request)
     {
-        $ventas = Venta::where('cliente_id', $request->cliente_id)
+        $clienteId = $request->input('cliente_id');
+        $provisionalId = $request->input('provisional_id');
+
+        if (! $clienteId) {
+            return response()->json([]);
+        }
+
+        $ventas = Venta::where('cliente_id', $clienteId)
             ->where('estado', '!=', 'anulada')
-            ->where('saldo', '>', 0)
             ->get();
 
-        return response()->json($ventas);
+        $aplicacionesPrevias = [];
+        if ($provisionalId) {
+            $detalles = DB::table('venta_provisional_detalles')
+                ->where('venta_provisional_id', $provisionalId)
+                ->whereNotNull('venta_id')
+                ->get();
+            foreach ($detalles as $d) {
+                $aplicacionesPrevias[(int) $d->venta_id] = (float) $d->monto;
+            }
+        }
+
+        $resultado = [];
+        foreach ($ventas as $v) {
+            $montoPrevio = $aplicacionesPrevias[$v->id] ?? 0.0;
+            $saldoDisponible = round((float) $v->saldo + $montoPrevio, 2);
+
+            if ($saldoDisponible > 0) {
+                $vArray = $v->toArray();
+                $vArray['saldo_disponible'] = $saldoDisponible;
+                $vArray['monto_aplicado_provisional'] = $montoPrevio;
+                $resultado[] = $vArray;
+            }
+        }
+
+        return response()->json($resultado);
     }
 
     /**

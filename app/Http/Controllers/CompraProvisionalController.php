@@ -283,19 +283,49 @@ class CompraProvisionalController extends Controller
     }
 
     /**
-     * Consulta compras con saldo pendiente para un proveedor.
+     * Consulta compras con saldo pendiente para un proveedor, soportando provisional_id opcional.
      *
-     * @param  Request  $request  Requiere 'proveedor_id'
+     * @param  Request  $request  Requiere 'proveedor_id', 'provisional_id' (opcional)
      * @return \Illuminate\Http\JsonResponse
      */
     public function comprasConSaldo(Request $request)
     {
-        $compras = Compra::where('proveedor_id', $request->proveedor_id)
-            ->where('saldo', '>', 0)
+        $proveedorId = $request->input('proveedor_id');
+        $provisionalId = $request->input('provisional_id');
+
+        if (! $proveedorId) {
+            return response()->json([]);
+        }
+
+        $compras = Compra::where('proveedor_id', $proveedorId)
             ->where('estado', '!=', 'anulada')
             ->get();
 
-        return response()->json($compras);
+        $aplicacionesPrevias = [];
+        if ($provisionalId) {
+            $detalles = DB::table('compra_provisional_detalles')
+                ->where('compra_provisional_id', $provisionalId)
+                ->whereNotNull('compra_id')
+                ->get();
+            foreach ($detalles as $d) {
+                $aplicacionesPrevias[(int) $d->compra_id] = (float) $d->monto;
+            }
+        }
+
+        $resultado = [];
+        foreach ($compras as $c) {
+            $montoPrevio = $aplicacionesPrevias[$c->id] ?? 0.0;
+            $saldoDisponible = round((float) $c->saldo + $montoPrevio, 2);
+
+            if ($saldoDisponible > 0) {
+                $cArray = $c->toArray();
+                $cArray['saldo_disponible'] = $saldoDisponible;
+                $cArray['monto_aplicado_provisional'] = $montoPrevio;
+                $resultado[] = $cArray;
+            }
+        }
+
+        return response()->json($resultado);
     }
 
     /**

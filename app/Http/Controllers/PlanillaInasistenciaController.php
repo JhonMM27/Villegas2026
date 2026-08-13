@@ -32,11 +32,11 @@ class PlanillaInasistenciaController extends Controller
             $mes = $request->get('mes');
             if ($mes && preg_match('/^(\d{4})-(\d{2})$/', $mes, $m)) {
                 $data->whereYear('fecha', (int) $m[1])
-                     ->whereMonth('fecha', (int) $m[2]);
+                    ->whereMonth('fecha', (int) $m[2]);
             }
 
             $data->orderByDesc('fecha')
-                 ->orderByDesc('id');
+                ->orderByDesc('id');
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {

@@ -155,6 +155,9 @@ class VentaService
         return DB::transaction(function () use ($id) {
             $venta = Venta::with('detalles')->findOrFail($id);
 
+            // Validar que no tenga cobranzas provisionales aplicadas ni abonos
+            $this->validarSinAbonosProvisionales($venta, 'anular');
+
             // Validar que no esté ya anulada
             if ($venta->estado === 'anulada') {
                 throw new \Exception('Esta venta ya fue anulada.');
@@ -211,6 +214,9 @@ class VentaService
             $venta = Venta::query()
                 ->lockForUpdate()
                 ->findOrFail($ventaId);
+
+            // Validar que no tenga cobranzas provisionales aplicadas ni abonos
+            $this->validarSinAbonosProvisionales($venta, 'rectificar');
 
             $clienteIdOriginal = (int) $venta->cliente_id;
             $abonosExistentes = round((float) $venta->abonos, 2);
@@ -647,5 +653,44 @@ class VentaService
             'salida' => $cantidadStock,
             'empaque' => $empaqueDetalle,
         ];
+    }
+
+    /**
+     * Valida que una venta no tenga cobranzas provisionales o abonos aplicados antes de anular o rectificar.
+     *
+     * @param  Venta  $venta  Venta a validar
+     * @param  string  $accion  'anular' o 'rectificar'
+     *
+     * @throws \Exception Si existen abonos/cobranzas aplicadas
+     */
+    private function validarSinAbonosProvisionales(Venta $venta, string $accion): void
+    {
+        $abonosHeader = round((float) ($venta->abonos ?? 0), 2);
+
+        $detallesProvisionales = DB::table('venta_provisional_detalles as d')
+            ->join('venta_provisionales as p', 'p.id', '=', 'd.venta_provisional_id')
+            ->where('d.venta_id', $venta->id)
+            ->where('d.monto', '>', 0)
+            ->select('p.numero_recibo', 'd.monto')
+            ->get();
+
+        if ($detallesProvisionales->isNotEmpty()) {
+            $recibosInfo = $detallesProvisionales->map(function ($d) {
+                return "Recibo #{$d->numero_recibo} (S/ ".number_format((float) $d->monto, 2, '.', '').')';
+            })->implode(', ');
+
+            throw new \Exception(
+                "No se puede {$accion} esta venta porque tiene cobranzas provisionales aplicadas: {$recibosInfo}. "
+                .'Por favor, edite primero la(s) cobranza(s) provisional(es) para retirar la aplicación y dejar el monto libre o pendiente.'
+            );
+        }
+
+        if ($abonosHeader > 0) {
+            throw new \Exception(
+                "No se puede {$accion} esta venta porque registra abonos por S/ ".number_format($abonosHeader, 2, '.', '')
+                .' de los cuales no hay detalle de recibo identificable (abonos históricos/migrados). '
+                ."Requiere revisión de auditoría contable antes de {$accion}."
+            );
+        }
     }
 }
