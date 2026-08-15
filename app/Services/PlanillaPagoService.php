@@ -23,7 +23,7 @@ class PlanillaPagoService
 
     public function getAll(): Collection
     {
-        return PlanillaPago::with('empleado')
+        return PlanillaPago::with(['empleado.sueldoActual', 'sueldoAplicado'])
             ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->orderByDesc('id')
             ->get();
@@ -31,7 +31,7 @@ class PlanillaPagoService
 
     public function getByMes(int $mes, int $anio): Collection
     {
-        return PlanillaPago::with('empleado')
+        return PlanillaPago::with(['empleado.sueldoActual', 'sueldoAplicado'])
             ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->delMes($mes, $anio)
             ->get();
@@ -65,7 +65,16 @@ class PlanillaPagoService
                 throw new \Exception('Empleado no encontrado');
             }
 
-            $sueldoReal = (float) $empleado->sueldo_real;
+            $sueldo = $this->empleadoService->sueldoParaPeriodo(
+                (int) $data['empleado_id'],
+                (int) $data['mes'],
+                (int) $data['anio']
+            );
+            if (! $sueldo) {
+                throw new \Exception('El empleado no tiene un sueldo vigente para el período seleccionado');
+            }
+
+            $sueldoReal = (float) $sueldo->sueldo_real;
             $disponible = $this->empleadoService->calcularDisponible(
                 (int) $data['empleado_id'],
                 (int) $data['mes'],
@@ -90,6 +99,7 @@ class PlanillaPagoService
 
             $pago = PlanillaPago::create([
                 'empleado_id' => (int) $data['empleado_id'],
+                'empleado_sueldo_id' => $sueldo->id,
                 'mes' => (int) $data['mes'],
                 'anio' => (int) $data['anio'],
                 'sueldo_base' => $disponible,
@@ -118,7 +128,7 @@ class PlanillaPagoService
 
             PlanillaPagoDetalle::create([
                 'planilla_pago_id' => $pago->id,
-                'concepto' => 'Disponible (Sueldo Real - Planilla)',
+                'concepto' => 'Sueldo base disponible',
                 'monto' => $disponible,
                 'tipo' => 'ingreso',
             ]);
@@ -150,8 +160,9 @@ class PlanillaPagoService
     public function update(PlanillaPago $pago, array $data): bool
     {
         return DB::transaction(function () use ($pago, $data) {
-            $empleado = $this->empleadoService->findById($pago->empleado_id);
-            $sueldoReal = $empleado ? (float) $empleado->sueldo_real : 0;
+            $sueldo = $pago->sueldoAplicado
+                ?? $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, $pago->mes, $pago->anio);
+            $sueldoReal = $sueldo ? (float) $sueldo->sueldo_real : 0;
 
             $horasExtras = (float) ($data['horas_extras'] ?? 0);
             $diasFaltados = (float) ($data['dias_faltados'] ?? 0);
@@ -203,7 +214,12 @@ class PlanillaPagoService
             return false;
         }
 
-        $sueldoReal = (float) $empleado->sueldo_real;
+        $sueldo = $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, $pago->mes, $pago->anio);
+        if (! $sueldo) {
+            return false;
+        }
+
+        $sueldoReal = (float) $sueldo->sueldo_real;
         $disponible = $this->empleadoService->calcularDisponible(
             $pago->empleado_id,
             $pago->mes,
@@ -223,6 +239,7 @@ class PlanillaPagoService
         $newTotal = $disponible + (float) $pago->horas_extras - $descuentoFaltas;
 
         $pago->sueldo_base = $disponible;
+        $pago->empleado_sueldo_id = $sueldo->id;
         $pago->adelantos = $totalAdelantos;
         $pago->dias_faltados = $diasFaltados;
         $pago->descuento_faltas = $descuentoFaltas;
@@ -291,14 +308,19 @@ class PlanillaPagoService
             }
 
             $disponible = $this->empleadoService->calcularDisponible($empleado->id, $mes, $anio);
+            $sueldo = $this->empleadoService->sueldoParaPeriodo($empleado->id, $mes, $anio);
+            if (! $sueldo) {
+                continue;
+            }
 
             $this->asistenciaService->syncDiasFaltadosFromInasistencias($empleado->id, $mes, $anio);
             $asistencia = $this->asistenciaService->getByEmpleadoMes($empleado->id, $mes, $anio);
             $diasFaltados = $asistencia ? (float) $asistencia->dias_faltados : 0.0;
-            $descuentoFaltas = $this->calcularDescuentoFaltas((float) $empleado->sueldo_real, $diasFaltados);
+            $descuentoFaltas = $this->calcularDescuentoFaltas((float) $sueldo->sueldo_real, $diasFaltados);
 
             PlanillaPago::create([
                 'empleado_id' => $empleado->id,
+                'empleado_sueldo_id' => $sueldo->id,
                 'mes' => $mes,
                 'anio' => $anio,
                 'sueldo_base' => $disponible,
@@ -401,7 +423,9 @@ class PlanillaPagoService
             return;
         }
 
-        $sueldoPlanilla = (float) $empleado->sueldo_planilla;
+        $sueldo = $pago->sueldoAplicado
+            ?? $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, $pago->mes, $pago->anio);
+        $sueldoPlanilla = (float) ($sueldo?->sueldo_planilla ?? 0);
         $totalPagar = (float) $pago->total_pagar;
         $montoGasto = $sueldoPlanilla + $totalPagar;
 
@@ -509,11 +533,14 @@ class PlanillaPagoService
 
     public function sincronizarGastoPlanilla(int $mes, int $anio): void
     {
-        $totalSueldos = PlanillaPago::where('planilla_pagos.mes', $mes)
+        $pagos = PlanillaPago::with('sueldoAplicado')
+            ->where('planilla_pagos.mes', $mes)
             ->where('planilla_pagos.anio', $anio)
             ->where('planilla_pagos.estado', 'pagado')
-            ->join('empleados', 'empleados.id', '=', 'planilla_pagos.empleado_id')
-            ->sum('empleados.sueldo_real');
+            ->get();
+        $totalSueldos = (float) $pagos->sum(
+            fn (PlanillaPago $pago): float => (float) ($pago->sueldoAplicado?->sueldo_real ?? 0)
+        );
 
         if ($totalSueldos <= 0) {
             Gasto::where('planilla_mes', $mes)

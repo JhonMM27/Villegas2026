@@ -584,6 +584,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reportes/planilla/empleado/pdf', [ReportePlanillaController::class, 'empleadoPdf'])->name('reportes.planilla.empleado_pdf');
     Route::get('/reportes/planilla/empleado-sueldo', [ReportePlanillaController::class, 'porEmpleadoConSueldo'])->name('reportes.planilla.empleado_sueldo');
     Route::get('/reportes/planilla/empleado-sueldo/pdf', [ReportePlanillaController::class, 'empleadoConSueldoPdf'])->name('reportes.planilla.empleado_sueldo_pdf');
+    Route::get('/reportes/planilla/historial-sueldos/pdf', [ReportePlanillaController::class, 'historialSueldosPdf'])->name('reportes.planilla.historial_sueldos_pdf');
     Route::get('/reportes/planilla/empleados/zip', [ReportePlanillaController::class, 'empleadosAllZipPdf'])->name('reportes.planilla.empleados_zip');
     Route::get('/reportes/planilla/inasistencias/pdf', [ReportePlanillaController::class, 'inasistenciasPdf'])->name('reportes.planilla.inasistencias');
     Route::get('/reportes/planilla/trabajadores/pdf', [ReportePlanillaController::class, 'trabajadoresPdf'])->name('reportes.planilla.trabajadores');

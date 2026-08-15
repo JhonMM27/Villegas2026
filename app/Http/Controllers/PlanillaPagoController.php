@@ -228,8 +228,9 @@ class PlanillaPagoController extends Controller
 
         $empleado = $this->empleadoService->findById($empleadoId);
         if ($empleado) {
-            $sueldoPlanilla = (float) $empleado->sueldo_planilla;
-            $sueldoReal = (float) $empleado->sueldo_real;
+            $sueldo = $this->empleadoService->sueldoParaPeriodo($empleadoId, $mes, $anio);
+            $sueldoPlanilla = (float) ($sueldo?->sueldo_planilla ?? 0);
+            $sueldoReal = (float) ($sueldo?->sueldo_real ?? 0);
 
             $asistencia = $this->asistenciaService->getByEmpleadoMes($empleadoId, $mes, $anio);
             if ($asistencia) {
@@ -267,8 +268,13 @@ class PlanillaPagoController extends Controller
             $empleado = $this->empleadoService->findById((int) $data['empleado_id']);
             $descuentoFaltas = 0;
             if ($empleado) {
+                $sueldo = $this->empleadoService->sueldoParaPeriodo(
+                    (int) $data['empleado_id'],
+                    (int) $data['mes'],
+                    (int) $data['anio']
+                );
                 $descuentoFaltas = $this->asistenciaService->calcularDescuentoFaltas(
-                    (float) $empleado->sueldo_real,
+                    (float) ($sueldo?->sueldo_real ?? 0),
                     (float) $data['dias_faltados']
                 );
             }

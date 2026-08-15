@@ -58,6 +58,15 @@
                                 <h6 class="text-success mb-3"><i class="bi bi-currency-dollar me-2"></i>Información
                                     Salarial</h6>
                                 <div class="mb-3">
+                                    <label for="sueldo_base" class="form-label">Sueldo Base <span class="text-danger">*</span></label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">S/</span>
+                                        <input type="number" id="sueldo_base" name="sueldo_base"
+                                            class="form-control form-control-sm" step="0.01" min="0" required>
+                                    </div>
+                                    <div class="invalid-feedback"></div>
+                                </div>
+                                <div class="mb-3">
                                     <label for="sueldo_planilla" class="form-label">Sueldo Planilla <span
                                             class="text-danger">*</span></label>
                                     <div class="input-group input-group-sm">
@@ -75,6 +84,22 @@
                                         <input type="number" id="sueldo_real" name="sueldo_real"
                                             class="form-control form-control-sm" step="0.01" min="0" required>
                                     </div>
+                                    <div class="invalid-feedback"></div>
+                                </div>
+                                <div class="mb-3">
+                                    <x-date-picker id="vigente_desde" label="Vigente desde" required />
+                                    <div class="form-text">Si cambia algún importe, se creará una nueva entrada en el historial.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="motivo" class="form-label">Motivo del cambio</label>
+                                    <input type="text" id="motivo" name="motivo" class="form-control form-control-sm"
+                                        maxlength="255" placeholder="Ingreso, aumento, reducción, regularización...">
+                                    <div class="invalid-feedback"></div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="observaciones_sueldo" class="form-label">Observaciones salariales</label>
+                                    <textarea id="observaciones_sueldo" name="observaciones_sueldo"
+                                        class="form-control form-control-sm" rows="2"></textarea>
                                     <div class="invalid-feedback"></div>
                                 </div>
                             </div>

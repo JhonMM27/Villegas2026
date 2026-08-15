@@ -5,46 +5,66 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Empleado;
+use App\Models\EmpleadoSueldo;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 
 class EmpleadoService
 {
+    public function __construct(
+        protected EmpleadoSueldoService $sueldoService
+    ) {}
+
     public function getAll(): Collection
     {
-        return Empleado::orderBy('nombre')->get();
+        return Empleado::with('sueldoActual')->orderBy('nombre')->get();
     }
 
     public function getActivos(): Collection
     {
-        return Empleado::activos()->orderBy('nombre')->get();
+        return Empleado::with('sueldoActual')->activos()->orderBy('nombre')->get();
     }
 
     public function findById(int $id): ?Empleado
     {
-        return Empleado::find($id);
+        return Empleado::with('sueldoActual')->find($id);
     }
 
     public function create(array $data): Empleado
     {
-        return Empleado::create($data);
+        return DB::transaction(function () use ($data): Empleado {
+            $empleado = Empleado::create(Arr::except($data, $this->camposSueldo()));
+            $this->sueldoService->crearInicial($empleado, $this->datosSueldo($data));
+
+            return $empleado->load('sueldoActual');
+        });
     }
 
     public function update(Empleado $empleado, array $data): bool
     {
-        $oldSueldoReal = (float) $empleado->sueldo_real;
-        $oldSueldoPlanilla = (float) $empleado->sueldo_planilla;
         $oldFechaIngreso = $empleado->fecha_ingreso?->format('Y-m-d');
         $oldFechaSalida = $empleado->fecha_salida?->format('Y-m-d');
 
-        $result = $empleado->update($data);
+        $sueldoAnterior = $empleado->sueldoActual;
+        $datosSueldo = $this->datosSueldo($data);
+        $sueldoChanged = ! $sueldoAnterior || ! $this->sueldoService->mismosImportes($sueldoAnterior, $datosSueldo);
+
+        $result = DB::transaction(function () use ($empleado, $data, $datosSueldo, $sueldoChanged): bool {
+            $actualizado = $empleado->update(Arr::except($data, $this->camposSueldo()));
+
+            if ($sueldoChanged) {
+                $this->sueldoService->registrarCambio($empleado, $datosSueldo);
+            }
+
+            return $actualizado;
+        });
 
         if ($result) {
-            $sueldoRealChanged = isset($data['sueldo_real']) && (float) $data['sueldo_real'] !== $oldSueldoReal;
-            $sueldoPlanillaChanged = isset($data['sueldo_planilla']) && (float) $data['sueldo_planilla'] !== $oldSueldoPlanilla;
             $fechaIngresoChanged = array_key_exists('fecha_ingreso', $data) && $oldFechaIngreso !== $data['fecha_ingreso'];
             $fechaSalidaChanged = array_key_exists('fecha_salida', $data) && $oldFechaSalida !== $data['fecha_salida'];
 
-            if ($sueldoRealChanged || $sueldoPlanillaChanged || $fechaIngresoChanged || $fechaSalidaChanged) {
+            if ($sueldoChanged || $fechaIngresoChanged || $fechaSalidaChanged) {
                 $pagoService = app(\App\Services\PlanillaPagoService::class);
                 $pagoService->recalcularPagosDelEmpleado($empleado->id);
             }
@@ -55,12 +75,16 @@ class EmpleadoService
 
     public function delete(Empleado $empleado): bool
     {
-        return $empleado->delete();
+        return $empleado->update([
+            'estado' => 'inactivo',
+            'fecha_salida' => $empleado->fecha_salida?->toDateString() ?? now()->toDateString(),
+        ]);
     }
 
     public function buscar(string $termino): Collection
     {
         return Empleado::buscar($termino)
+            ->with('sueldoActual')
             ->activos()
             ->limit(20)
             ->get();
@@ -73,9 +97,15 @@ class EmpleadoService
             return 0.0;
         }
 
-        $sueldoReal = (float) $empleado->sueldo_real;
-        $sueldoPlanilla = (float) $empleado->sueldo_planilla;
-        $baseDisponible = $sueldoReal - $sueldoPlanilla;
+        $fechaSueldo = $mes && $anio
+            ? now()->setDate($anio, $mes, 1)->endOfMonth()
+            : now();
+        $sueldo = $this->sueldoService->vigenteEn($empleado, $fechaSueldo);
+        if (! $sueldo) {
+            return 0.0;
+        }
+
+        $baseDisponible = (float) $sueldo->sueldo_base;
 
         if ($mes && $anio) {
             $fechaIngreso = $empleado->fecha_ingreso;
@@ -91,11 +121,11 @@ class EmpleadoService
                     $diasTrabajados = $fechaSalida->day;
                 }
                 $factor = $diasTrabajados / 30;
-                $baseDisponible = $sueldoReal * $factor;
+                $baseDisponible = (float) $sueldo->sueldo_base * $factor;
             } elseif ($ingresoEnMes && $fechaIngreso->day > 1) {
                 $diasTrabajados = 30 - $fechaIngreso->day + 1;
                 $factor = $diasTrabajados / 30;
-                $baseDisponible = $sueldoReal * $factor;
+                $baseDisponible = (float) $sueldo->sueldo_base * $factor;
             }
         }
 
@@ -111,5 +141,37 @@ class EmpleadoService
         $totalAdelantos = (float) $query->sum('monto');
 
         return max(0, $baseDisponible - $totalAdelantos);
+    }
+
+    public function sueldoParaPeriodo(int $empleadoId, int $mes, int $anio): ?EmpleadoSueldo
+    {
+        return $this->sueldoService->vigenteEn(
+            $empleadoId,
+            now()->setDate($anio, $mes, 1)->endOfMonth()
+        );
+    }
+
+    private function datosSueldo(array $data): array
+    {
+        return Arr::only($data, [
+            'sueldo_base',
+            'sueldo_real',
+            'sueldo_planilla',
+            'vigente_desde',
+            'motivo',
+            'observaciones_sueldo',
+        ]);
+    }
+
+    private function camposSueldo(): array
+    {
+        return [
+            'sueldo_base',
+            'sueldo_real',
+            'sueldo_planilla',
+            'vigente_desde',
+            'motivo',
+            'observaciones_sueldo',
+        ];
     }
 }

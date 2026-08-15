@@ -14,6 +14,7 @@ class PlanillaPago extends Model
 
     protected $fillable = [
         'empleado_id',
+        'empleado_sueldo_id',
         'mes',
         'anio',
         'sueldo_base',
@@ -42,9 +43,29 @@ class PlanillaPago extends Model
         'fecha_pago' => 'date',
     ];
 
+    public function getSueldoBaseContractualAttribute(): string
+    {
+        return $this->sueldoAplicado?->sueldo_base ?? '0.00';
+    }
+
+    public function getSueldoRealHistoricoAttribute(): string
+    {
+        return $this->sueldoAplicado?->sueldo_real ?? '0.00';
+    }
+
+    public function getSueldoPlanillaHistoricoAttribute(): string
+    {
+        return $this->sueldoAplicado?->sueldo_planilla ?? '0.00';
+    }
+
     public function empleado(): BelongsTo
     {
         return $this->belongsTo(Empleado::class);
+    }
+
+    public function sueldoAplicado(): BelongsTo
+    {
+        return $this->belongsTo(EmpleadoSueldo::class, 'empleado_sueldo_id');
     }
 
     public function detalles(): HasMany

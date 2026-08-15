@@ -15,8 +15,9 @@
                             <div class="col-md-12">
                                 <h4>{{ $empleado->nombre }}</h4>
                                 <p class="text-muted mb-1">DNI: {{ $empleado->dni }}</p>
-                                <p class="text-muted mb-1">Sueldo Planilla: S/
-                                    {{ number_format($empleado->sueldo_planilla, 2) }} | Sueldo Real: S/
+                                <p class="text-muted mb-1">Sueldo actual — Base: S/
+                                    {{ number_format($empleado->sueldo_base, 2) }} | Planilla: S/
+                                    {{ number_format($empleado->sueldo_planilla, 2) }} | Real: S/
                                     {{ number_format($empleado->sueldo_real, 2) }}</p>
                                 <p class="text-muted mb-1">Estado: <span
                                         class="badge bg-{{ $empleado->estado === 'activo' ? 'success' : 'secondary' }}">{{ ucfirst($empleado->estado) }}</span>
@@ -33,7 +34,7 @@
                             <div class="col-md-3">
                                 <div class="card bg-primary text-white">
                                     <div class="card-body py-2">
-                                        <h6 class="card-title mb-1">Total Sueldo Planilla</h6>
+                                        <h6 class="card-title mb-1">Sueldo Planilla del período</h6>
                                         <h4 class="mb-0">S/ {{ number_format($resumen['total_sueldo_planilla'], 2) }}</h4>
                                     </div>
                                 </div>
@@ -41,7 +42,7 @@
                             <div class="col-md-3">
                                 <div class="card bg-success text-white">
                                     <div class="card-body py-2">
-                                        <h6 class="card-title mb-1">Total Sueldo Real</h6>
+                                        <h6 class="card-title mb-1">Sueldo Real del período</h6>
                                         <h4 class="mb-0">S/ {{ number_format($resumen['total_sueldo_real'], 2) }}</h4>
                                     </div>
                                 </div>
@@ -192,7 +193,10 @@
                                             <tr>
                                                 <th>ID</th>
                                                 <th>Período</th>
-                                                <th class="text-end">Sueldo Base</th>
+                                                <th class="text-end">Sueldo Planilla</th>
+                                                <th class="text-end">Sueldo Real</th>
+                                                <th class="text-end">Sueldo Base Histórico</th>
+                                                <th class="text-end">Base Disponible</th>
                                                 <th class="text-end">H. Extras</th>
                                                 <th class="text-end">Días Faltas</th>
                                                 <th class="text-end">Desc. Faltas</th>
@@ -219,6 +223,13 @@
                                                             <span class="badge bg-secondary ms-1" title="Prorrateo por fecha de ingreso">Ing.</span>
                                                         @endif
                                                     </td>
+                                                    @if($pago->sueldo_historico_disponible)
+                                                        <td class="text-end">S/ {{ number_format($pago->sueldo_planilla_historico_reporte, 2) }}</td>
+                                                        <td class="text-end">S/ {{ number_format($pago->sueldo_real_historico_reporte, 2) }}</td>
+                                                        <td class="text-end">S/ {{ number_format($pago->sueldo_base_historico, 2) }}</td>
+                                                    @else
+                                                        <td colspan="3" class="text-center text-muted">Histórico no disponible</td>
+                                                    @endif
                                                     <td class="text-end">S/
                                                         {{ number_format((float) $pago->sueldo_base_mostrar, 2) }}</td>
                                                     <td class="text-end">S/
@@ -244,7 +255,7 @@
                                                 </tr>
                                             @empty
                                                 <tr>
-                                                    <td colspan="12" class="text-center">No hay pagos registrados para
+                                                    <td colspan="14" class="text-center">No hay pagos registrados para
                                                         este empleado</td>
                                                 </tr>
                                             @endforelse
@@ -252,6 +263,9 @@
                                         <tfoot class="table-light">
                                             <tr>
                                                 <th colspan="2" class="text-end">TOTALES:</th>
+                                                <th class="text-end">S/ {{ number_format($resumen['total_sueldo_planilla'], 2) }}</th>
+                                                <th class="text-end">S/ {{ number_format($resumen['total_sueldo_real'], 2) }}</th>
+                                                <th class="text-end">S/ {{ number_format($resumen['total_sueldo_base_historico'], 2) }}</th>
                                                 <th class="text-end">S/
                                                     {{ number_format($resumen['total_sueldo_base'], 2) }}</th>
                                                 <th class="text-end">S/

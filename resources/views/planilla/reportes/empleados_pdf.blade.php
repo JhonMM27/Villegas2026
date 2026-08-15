@@ -337,11 +337,13 @@
                             <tr>
                                 <td class="text-center">{{ $pago->id }}</td>
                                 <td>{{ str_pad($pago->mes, 2, '0', STR_PAD_LEFT) }}/{{ $pago->anio }}</td>
-                                <td class="text-right">S/
-                                    {{ number_format((float) ($pago->sueldo_planilla_proporcional ?? 0), 2) }}
-                                </td>
-                                <td class="text-right">S/ {{ number_format((float) $empleado->sueldo_real, 2) }}</td>
-                                <td class="text-right">S/ {{ number_format((float) $pago->sueldo_base, 2) }}</td>
+                                @if($pago->sueldo_historico_disponible)
+                                    <td class="text-right">S/ {{ number_format($pago->sueldo_planilla_historico_reporte, 2) }}</td>
+                                    <td class="text-right">S/ {{ number_format($pago->sueldo_real_historico_reporte, 2) }}</td>
+                                    <td class="text-right">S/ {{ number_format($pago->sueldo_base_historico, 2) }}</td>
+                                @else
+                                    <td colspan="3" class="text-center">Histórico no disponible</td>
+                                @endif
                                 <td class="text-right">S/ {{ number_format((float) $pago->horas_extras, 2) }}</td>
                                 <td class="text-right">{{ number_format((float) ($pago->dias_faltados ?? 0), 2) }}</td>
                                 <td class="text-right" style="color: red;">S/
@@ -363,9 +365,9 @@
                     <tfoot>
                         <tr>
                             <th colspan="2" class="text-right">TOTALES:</th>
-                            <th></th>
-                            <th></th>
-                            <th class="text-right">S/ {{ number_format($resumen['total_sueldo_base'] ?? 0, 2) }}</th>
+                            <th class="text-right">S/ {{ number_format($resumen['total_sueldo_planilla'] ?? 0, 2) }}</th>
+                            <th class="text-right">S/ {{ number_format($resumen['total_sueldo_real'] ?? 0, 2) }}</th>
+                            <th class="text-right">S/ {{ number_format($resumen['total_sueldo_base_historico'] ?? 0, 2) }}</th>
                             <th class="text-right">S/ {{ number_format($resumen['total_horas_extras'] ?? 0, 2) }}</th>
                             <th></th>
                             <th class="text-right">S/ {{ number_format($resumen['total_descuento_faltas'] ?? 0, 2) }}

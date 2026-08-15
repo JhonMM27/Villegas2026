@@ -28,17 +28,30 @@ class ReportePlanillaControllerTest extends TestCase
             $table->string('nombre');
             $table->string('dni')->nullable();
             $table->string('telefono')->nullable();
-            $table->decimal('sueldo_planilla', 10, 2);
-            $table->decimal('sueldo_real', 10, 2);
             $table->date('fecha_ingreso')->nullable();
             $table->date('fecha_salida')->nullable();
             $table->string('estado')->default('activo');
             $table->timestamps();
         });
 
+        Schema::create('empleado_sueldos', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('empleado_id');
+            $table->decimal('sueldo_base', 10, 2);
+            $table->decimal('sueldo_real', 10, 2);
+            $table->decimal('sueldo_planilla', 10, 2);
+            $table->date('vigente_desde');
+            $table->date('vigente_hasta')->nullable();
+            $table->string('motivo')->nullable();
+            $table->text('observaciones')->nullable();
+            $table->unsignedInteger('registrado_por')->nullable();
+            $table->timestamps();
+        });
+
         Schema::create('planilla_pagos', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedInteger('empleado_id');
+            $table->unsignedInteger('empleado_sueldo_id')->nullable();
             $table->unsignedTinyInteger('mes');
             $table->unsignedSmallInteger('anio');
             $table->decimal('sueldo_base', 10, 2)->default(0);
@@ -163,6 +176,7 @@ class ReportePlanillaControllerTest extends TestCase
     {
         DB::table('planilla_pagos')->insert([
             'empleado_id' => 6,
+            'empleado_sueldo_id' => 1,
             'mes' => 8,
             'anio' => 2026,
             'sueldo_base' => 300,
@@ -197,6 +211,113 @@ class ReportePlanillaControllerTest extends TestCase
         $html = $view->render();
         $this->assertSame(2, substr_count($html, 'value="2026-07-01"'));
         $this->assertSame(2, substr_count($html, 'value="2026-07-31"'));
+        $this->assertStringContainsString(route('reportes.planilla.historial_sueldos_pdf'), $html);
+        $this->assertStringContainsString('data-allow-long-range="true"', $html);
+        $this->assertStringContainsString('Historial de sueldos', $html);
+    }
+
+    public function test_historial_clasifica_aumentos_y_muestra_los_tres_sueldos(): void
+    {
+        DB::table('empleado_sueldos')->where('id', 1)->update([
+            'vigente_hasta' => '2026-07-31',
+        ]);
+        DB::table('empleado_sueldos')->insert([
+            'id' => 2,
+            'empleado_id' => 6,
+            'sueldo_base' => 1270,
+            'sueldo_planilla' => 1130,
+            'sueldo_real' => 2400,
+            'vigente_desde' => '2026-08-01',
+            'motivo' => 'Aumento',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $controller = app(ReportePlanillaController::class);
+        $method = new ReflectionMethod($controller, 'prepararHistorialSueldos');
+        $method->setAccessible(true);
+        $datos = $method->invoke($controller, 6, null, null);
+
+        $this->assertCount(2, $datos['historial']);
+        $this->assertSame('Inicial', $datos['historial'][0]->tipo_cambio);
+        $this->assertSame('Aumento', $datos['historial'][1]->tipo_cambio);
+        $this->assertSame(200.0, $datos['historial'][1]->variacion_base);
+        $this->assertSame(200.0, $datos['historial'][1]->variacion_real);
+        $this->assertSame(0.0, $datos['historial'][1]->variacion_planilla);
+    }
+
+    public function test_reporte_muestra_el_sueldo_vigente_de_cada_mes(): void
+    {
+        DB::table('empleado_sueldos')->where('id', 1)->update([
+            'vigente_hasta' => '2026-07-31',
+        ]);
+        DB::table('empleado_sueldos')->insert([
+            'id' => 2,
+            'empleado_id' => 6,
+            'sueldo_base' => 1270,
+            'sueldo_planilla' => 1130,
+            'sueldo_real' => 2400,
+            'vigente_desde' => '2026-08-01',
+            'motivo' => 'Aumento',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('planilla_pagos')->insert([
+            'empleado_id' => 6,
+            'empleado_sueldo_id' => 2,
+            'mes' => 8,
+            'anio' => 2026,
+            'sueldo_base' => 1270,
+            'horas_extras' => 0,
+            'adelantos' => 0,
+            'dias_faltados' => 0,
+            'descuento_faltas' => 0,
+            'total_pagar' => 1270,
+            'estado' => 'pendiente',
+            'importe_p' => 1270,
+            'importe_d' => 0,
+            'importe_c' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $datos = $this->prepararReporte('2026-07-01', '2026-08-31');
+        $julio = $datos['pagos']->firstWhere('mes', 7);
+        $agosto = $datos['pagos']->firstWhere('mes', 8);
+
+        $this->assertSame(2200.0, $julio->sueldo_real_historico_reporte);
+        $this->assertSame(1070.0, $julio->sueldo_base_historico);
+        $this->assertSame(2400.0, $agosto->sueldo_real_historico_reporte);
+        $this->assertSame(1270.0, $agosto->sueldo_base_historico);
+        $this->assertSame(2260.0, $datos['resumen']['total_sueldo_planilla']);
+        $this->assertSame(4600.0, $datos['resumen']['total_sueldo_real']);
+        $this->assertSame(2340.0, $datos['resumen']['total_sueldo_base_historico']);
+
+        $html = view('planilla.reportes.empleados_pdf', array_merge($datos, [
+            'empresa' => (object) [
+                'razon_social' => 'CONSORCIOS VILLEGAS E.I.R.L.',
+                'direccion' => 'Carretera Pomalca KM 3',
+                'ruc' => '20538937321',
+            ],
+        ]))->render();
+
+        $this->assertStringContainsString('2,400.00', $html);
+        $this->assertStringContainsString('1,270.00', $html);
+    }
+
+    public function test_reporte_resuelve_por_vigencia_si_un_pago_legacy_no_tiene_relacion(): void
+    {
+        DB::table('planilla_pagos')->where('id', 79)->update([
+            'empleado_sueldo_id' => null,
+        ]);
+
+        $datos = $this->prepararReporte('2026-07-01', '2026-07-31');
+        $pago = $datos['pagos']->first();
+
+        $this->assertTrue($pago->sueldo_historico_disponible);
+        $this->assertSame(1070.0, $pago->sueldo_base_historico);
+        $this->assertSame(2200.0, $pago->sueldo_real_historico_reporte);
+        $this->assertSame(1130.0, $pago->sueldo_planilla_historico_reporte);
     }
 
     private function prepararReporte(string $inicio, string $fin): array
@@ -214,10 +335,20 @@ class ReportePlanillaControllerTest extends TestCase
             'id' => 6,
             'nombre' => 'JHONATAN ELIACER RODRIGUEZ VASQUEZ',
             'dni' => '63390350',
-            'sueldo_planilla' => 1130,
-            'sueldo_real' => 2200,
             'fecha_ingreso' => '2026-03-20',
             'estado' => 'activo',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('empleado_sueldos')->insert([
+            'id' => 1,
+            'empleado_id' => 6,
+            'sueldo_base' => 1070,
+            'sueldo_planilla' => 1130,
+            'sueldo_real' => 2200,
+            'vigente_desde' => '2026-03-20',
+            'motivo' => 'Carga inicial',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -225,6 +356,7 @@ class ReportePlanillaControllerTest extends TestCase
         DB::table('planilla_pagos')->insert([
             'id' => 79,
             'empleado_id' => 6,
+            'empleado_sueldo_id' => 1,
             'mes' => 7,
             'anio' => 2026,
             'sueldo_base' => 920,

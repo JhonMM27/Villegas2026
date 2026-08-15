@@ -87,12 +87,19 @@
                                     <div class="d-flex flex-wrap gap-2">
                                         <button type="button" class="btn btn-primary btn-sm btn-report"
                                             data-tab="1"
+                                            data-allow-long-range="true"
                                             data-url="{{ route('reportes.planilla.empleado_pdf') }}">
                                             <i class="bi bi-file-earmark-pdf"></i> Ver Reporte PDF
                                         </button>
                                         <button type="button" class="btn btn-warning btn-sm" id="btnDescargarTodos"
                                             data-tab="1">
                                             <i class="bi bi-file-earmark-pdf"></i> Descargar PDFs
+                                        </button>
+                                        <button type="button" class="btn btn-success btn-sm btn-report"
+                                            data-tab="1"
+                                            data-allow-long-range="true"
+                                            data-url="{{ route('reportes.planilla.historial_sueldos_pdf') }}">
+                                            <i class="bi bi-graph-up-arrow"></i> Historial de sueldos
                                         </button>
                                         <button type="button" class="btn btn-secondary btn-sm btn-report"
                                             data-tab="1"
@@ -193,7 +200,7 @@
 
     }
 
-    function getParams(tab, skipEmployeeValidation = false) {
+    function getParams(tab, skipEmployeeValidation = false, allowLongRange = false) {
         const params = new URLSearchParams();
 
         if (tab === 1) {
@@ -218,7 +225,7 @@
                 showError('La fecha final no puede ser anterior a la fecha inicial');
                 return null;
             }
-            if (dias > 31) {
+            if (dias > 31 && !allowLongRange) {
                 showError('El rango de fechas no puede exceder 31 días');
                 return null;
             }
@@ -275,8 +282,9 @@
             const url = btn.dataset.url;
             const tab = parseInt(btn.dataset.tab, 10);
             const skipEmployeeValidation = btn.dataset.skipEmployee === 'true';
+            const allowLongRange = btn.dataset.allowLongRange === 'true';
 
-            const params = getParams(tab, skipEmployeeValidation);
+            const params = getParams(tab, skipEmployeeValidation, allowLongRange);
             if (!params) return;
 
             const finalUrl = url + '?' + params.toString();

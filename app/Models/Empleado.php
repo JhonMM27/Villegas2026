@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Empleado extends Model
 {
@@ -16,8 +17,6 @@ class Empleado extends Model
         'dni',
         'telefono',
         'correo',
-        'sueldo_planilla',
-        'sueldo_real',
         'observaciones',
         'estado',
         'fecha_ingreso',
@@ -25,11 +24,46 @@ class Empleado extends Model
     ];
 
     protected $casts = [
-        'sueldo_planilla' => 'decimal:2',
-        'sueldo_real' => 'decimal:2',
         'fecha_ingreso' => 'date',
         'fecha_salida' => 'date',
     ];
+
+    protected $appends = [
+        'sueldo_base',
+        'sueldo_planilla',
+        'sueldo_real',
+    ];
+
+    public function sueldos(): HasMany
+    {
+        return $this->hasMany(EmpleadoSueldo::class)->orderByDesc('vigente_desde');
+    }
+
+    public function sueldoActual(): HasOne
+    {
+        return $this->hasOne(EmpleadoSueldo::class)
+            ->whereDate('vigente_desde', '<=', now()->toDateString())
+            ->where(function ($query): void {
+                $query->whereNull('vigente_hasta')
+                    ->orWhereDate('vigente_hasta', '>=', now()->toDateString());
+            })
+            ->ofMany('vigente_desde', 'max');
+    }
+
+    public function getSueldoBaseAttribute(): string
+    {
+        return $this->sueldoActual?->sueldo_base ?? '0.00';
+    }
+
+    public function getSueldoPlanillaAttribute(): string
+    {
+        return $this->sueldoActual?->sueldo_planilla ?? '0.00';
+    }
+
+    public function getSueldoRealAttribute(): string
+    {
+        return $this->sueldoActual?->sueldo_real ?? '0.00';
+    }
 
     public function getEstaActivoAttribute(): bool
     {
@@ -77,7 +111,7 @@ class Empleado extends Model
             ->whereMonth('fecha', now()->month)
             ->sum('monto');
 
-        return (float) $this->sueldo_real - (float) $this->sueldo_planilla - (float) $totalAdelantado;
+        return (float) $this->sueldo_base - (float) $totalAdelantado;
     }
 
     public function getSaldoDisponibleAttribute(): float

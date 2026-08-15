@@ -10,6 +10,7 @@ use App\Models\PlanillaInasistencia;
 use App\Models\PlanillaPago;
 use App\Models\PlanillaPrestamo;
 use App\Services\EmpleadoService;
+use App\Services\EmpleadoSueldoService;
 use App\Services\PlanillaPagoService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -20,9 +21,81 @@ class ReportePlanillaController extends Controller
 {
     public function __construct(
         protected PlanillaPagoService $pagoService,
-        protected EmpleadoService $empleadoService
+        protected EmpleadoService $empleadoService,
+        protected EmpleadoSueldoService $sueldoService
     ) {
-        $this->middleware('can:planilla_report')->only(['index', 'mensual', 'porEmpleado', 'adelantosPdf', 'prestamosPdf', 'pagosPendientesPdf', 'empleadoPdf', 'inasistenciasPdf', 'trabajadoresPdf']);
+        $this->middleware('can:planilla_report')->only(['index', 'mensual', 'porEmpleado', 'adelantosPdf', 'prestamosPdf', 'pagosPendientesPdf', 'empleadoPdf', 'inasistenciasPdf', 'trabajadoresPdf', 'historialSueldosPdf']);
+    }
+
+    public function historialSueldosPdf(Request $request)
+    {
+        $data = $request->validate([
+            'empleado_id' => 'required|integer|exists:empleados,id',
+            'fecha_inicio' => 'nullable|date',
+            'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
+        ]);
+        $datos = $this->prepararHistorialSueldos(
+            (int) $data['empleado_id'],
+            $data['fecha_inicio'] ?? null,
+            $data['fecha_fin'] ?? null
+        );
+
+        if ($datos === null) {
+            return redirect()->back()->with('error', 'Empleado no encontrado');
+        }
+
+        $titulo = 'Historial de sueldos - '.$datos['empleado']->nombre;
+        $nombreArchivo = 'historial_sueldos_'.preg_replace(
+            '/[^a-zA-Z0-9_-]+/',
+            '_',
+            $datos['empleado']->nombre
+        ).'.pdf';
+
+        return PDF::loadView('planilla.reportes.historial_sueldos_pdf', $datos + [
+            'empresa' => $this->getEmpresa(),
+        ])->addInfo([
+            'Title' => $titulo,
+            'Subject' => 'Historial salarial del empleado',
+            'Author' => 'CONSORCIOS VILLEGAS E.I.R.L.',
+        ])->stream($nombreArchivo);
+    }
+
+    private function prepararHistorialSueldos(
+        int $empleadoId,
+        ?string $fechaInicio,
+        ?string $fechaFin
+    ): ?array {
+        $empleado = $this->empleadoService->findById($empleadoId);
+        if (! $empleado) {
+            return null;
+        }
+
+        $historialCompleto = $this->sueldoService->historial($empleadoId);
+        $anterior = null;
+        foreach ($historialCompleto as $sueldo) {
+            $sueldo->variacion_base = $anterior ? (float) $sueldo->sueldo_base - (float) $anterior->sueldo_base : 0.0;
+            $sueldo->variacion_real = $anterior ? (float) $sueldo->sueldo_real - (float) $anterior->sueldo_real : 0.0;
+            $sueldo->variacion_planilla = $anterior ? (float) $sueldo->sueldo_planilla - (float) $anterior->sueldo_planilla : 0.0;
+            $variaciones = [$sueldo->variacion_base, $sueldo->variacion_real, $sueldo->variacion_planilla];
+            $sueldo->tipo_cambio = ! $anterior ? 'Inicial'
+                : (max($variaciones) > 0 && min($variaciones) >= 0 ? 'Aumento'
+                    : (min($variaciones) < 0 && max($variaciones) <= 0 ? 'Reducción' : 'Cambio mixto'));
+            $anterior = $sueldo;
+        }
+
+        $historial = $historialCompleto
+            ->filter(function ($sueldo) use ($fechaInicio, $fechaFin): bool {
+                $coincideInicio = ! $fechaInicio
+                    || ! $sueldo->vigente_hasta
+                    || $sueldo->vigente_hasta->toDateString() >= $fechaInicio;
+                $coincideFin = ! $fechaFin
+                    || $sueldo->vigente_desde->toDateString() <= $fechaFin;
+
+                return $coincideInicio && $coincideFin;
+            })
+            ->values();
+
+        return compact('empleado', 'historial', 'fechaInicio', 'fechaFin');
     }
 
     public function index()
@@ -64,20 +137,19 @@ class ReportePlanillaController extends Controller
             return redirect()->back()->with('error', 'Empleado no encontrado');
         }
 
-        $pagos = PlanillaPago::with('adelantos')
+        $pagos = PlanillaPago::with(['adelantos', 'sueldoAplicado'])
             ->where('empleado_id', $empleadoId)
             ->orderByDesc('anio')
             ->orderByDesc('mes')
             ->get();
+        $totalesSalariales = $this->prepararSueldosHistoricos($pagos);
 
         $adelantos = PlanillaAdelanto::where('empleado_id', $empleadoId)
             ->orderBy('fecha', 'asc')
             ->get();
 
-        $sueldoReal = (float) $empleado->sueldo_real;
-        $sueldoPlanilla = (float) $empleado->sueldo_planilla;
-
-        $pagos->each(function ($pago) use ($empleado, $sueldoReal) {
+        $pagos->each(function ($pago) use ($empleado) {
+            $sueldoBase = (float) $pago->sueldo_base_contractual;
             $pago->prorrateo_ingreso = false;
             $pago->prorrateo_salida = false;
             $pago->sueldo_base_mostrar = (float) $pago->sueldo_base;
@@ -88,7 +160,7 @@ class ReportePlanillaController extends Controller
                 if ($fs->year === $pago->anio && $fs->month === $pago->mes && $fs->day < 30) {
                     $diasTrabajados = $fs->day;
                     $factor = $diasTrabajados / 30;
-                    $baseDisponible = $sueldoReal * $factor;
+                    $baseDisponible = $sueldoBase * $factor;
                     $pago->prorrateo_salida = true;
                     $pago->sueldo_base_mostrar = $baseDisponible;
                     $pago->total_pagar_mostrar = $baseDisponible + (float) $pago->horas_extras - (float) $pago->descuento_faltas;
@@ -100,7 +172,7 @@ class ReportePlanillaController extends Controller
                 if ($fi->year === $pago->anio && $fi->month === $pago->mes && $fi->day > 1) {
                     $diasTrabajados = 30 - $fi->day + 1;
                     $factor = $diasTrabajados / 30;
-                    $baseDisponible = $sueldoReal * $factor;
+                    $baseDisponible = $sueldoBase * $factor;
                     $pago->prorrateo_ingreso = true;
                     $pago->sueldo_base_mostrar = $baseDisponible;
                     $pago->total_pagar_mostrar = $baseDisponible + (float) $pago->horas_extras - (float) $pago->descuento_faltas;
@@ -113,8 +185,9 @@ class ReportePlanillaController extends Controller
         $totalPendienteMostrar = $pagos->where('estado', 'pendiente')->sum('total_pagar_mostrar');
 
         $resumen = [
-            'total_sueldo_planilla' => (float) $empleado->sueldo_planilla,
-            'total_sueldo_real' => (float) $empleado->sueldo_real,
+            'total_sueldo_planilla' => $totalesSalariales['planilla'],
+            'total_sueldo_real' => $totalesSalariales['real'],
+            'total_sueldo_base_historico' => $totalesSalariales['base'],
             'total_sueldo_base' => $totalSueldoBaseMostrar,
             'total_horas_extras' => $pagos->sum('horas_extras'),
             'total_adelantos' => $adelantos->sum('monto'),
@@ -175,7 +248,7 @@ class ReportePlanillaController extends Controller
     {
         $empresa = $this->getEmpresa();
 
-        $query = PlanillaPago::with(['empleado'])
+        $query = PlanillaPago::with(['empleado.sueldoActual', 'sueldoAplicado'])
             ->where('estado', 'pendiente')
             ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
             ->orderByDesc('anio')
@@ -216,8 +289,8 @@ class ReportePlanillaController extends Controller
                 ->sum('monto');
             $pago->adelantos_calculado = $adelantos;
 
-            $sueldoReal = (float) $pago->empleado->sueldo_real;
-            $sueldoPlanilla = (float) $pago->empleado->sueldo_planilla;
+            $sueldoReal = (float) $pago->sueldo_real_historico;
+            $sueldoPlanilla = (float) $pago->sueldo_planilla_historico;
             $diasEnMes = (int) cal_days_in_month(CAL_GREGORIAN, (int) $pago->mes, (int) $pago->anio);
 
             $pago->prorrateo_ingreso = false;
@@ -542,7 +615,7 @@ class ReportePlanillaController extends Controller
         $mesFin = (int) date('m', strtotime($fechaFin));
         $anioFin = (int) date('Y', strtotime($fechaFin));
 
-        $query = PlanillaPago::with('adelantos')
+        $query = PlanillaPago::with(['adelantos', 'sueldoAplicado'])
             ->where('empleado_id', $empleadoId);
 
         if ($anioInicio == $anioFin) {
@@ -561,14 +634,16 @@ class ReportePlanillaController extends Controller
         }
 
         $pagos = $query->orderByDesc('anio')->orderByDesc('mes')->get();
+        $totalesSalariales = $this->prepararSueldosHistoricos($pagos);
 
         $adelantosQuery = PlanillaAdelanto::whereBetween('fecha', [$fechaInicio, $fechaFin])
             ->where('empleado_id', $empleadoId);
         $adelantos = $adelantosQuery->orderBy('fecha', 'asc')->get();
 
         $resumen = [
-            'total_sueldo_planilla' => (float) $empleado->sueldo_planilla,
-            'total_sueldo_real' => (float) $empleado->sueldo_real,
+            'total_sueldo_planilla' => $totalesSalariales['planilla'],
+            'total_sueldo_real' => $totalesSalariales['real'],
+            'total_sueldo_base_historico' => $totalesSalariales['base'],
             'total_sueldo_base' => $pagos->sum('sueldo_base'),
             'total_horas_extras' => $pagos->sum('horas_extras'),
             'total_adelantos' => $adelantos->sum('monto'),
@@ -686,13 +761,14 @@ class ReportePlanillaController extends Controller
         }
 
         $pagos = $this->aplicarFiltroPeriodo(
-            PlanillaPago::query()->where('empleado_id', $empleadoId),
+            PlanillaPago::query()->with('sueldoAplicado')->where('empleado_id', $empleadoId),
             $fechaInicio,
             $fechaFin
         )
             ->orderByDesc('anio')
             ->orderByDesc('mes')
             ->get();
+        $totalesSalariales = $this->prepararSueldosHistoricos($pagos);
 
         $adelantos = PlanillaAdelanto::where('empleado_id', $empleadoId)
             ->whereBetween('fecha', [$fechaInicio, $fechaFin])
@@ -709,7 +785,7 @@ class ReportePlanillaController extends Controller
             // Los importes del período ya fueron calculados al generar la planilla.
             // El rango del reporte selecciona períodos, pero no vuelve a prorratearlos.
             $pago->monto_proporcional = (float) $pago->total_pagar;
-            $pago->sueldo_planilla_proporcional = (float) $empleado->sueldo_planilla;
+            $pago->sueldo_planilla_proporcional = (float) $pago->sueldo_planilla_historico;
             $pago->dias_trabajados_reporte = $diasTrabajados;
         }
 
@@ -722,8 +798,9 @@ class ReportePlanillaController extends Controller
         $totalGeneral = (float) $pagos->sum('total_pagar');
 
         $resumen = [
-            'total_sueldo_planilla' => (float) $empleado->sueldo_planilla,
-            'total_sueldo_real' => (float) $empleado->sueldo_real,
+            'total_sueldo_planilla' => $totalesSalariales['planilla'],
+            'total_sueldo_real' => $totalesSalariales['real'],
+            'total_sueldo_base_historico' => $totalesSalariales['base'],
             'total_sueldo_base' => (float) $pagos->sum('sueldo_base'),
             'total_horas_extras' => (float) $pagos->sum('horas_extras'),
             'total_adelantos' => (float) $adelantos->sum('monto'),
@@ -749,6 +826,41 @@ class ReportePlanillaController extends Controller
             'fechaInicio' => $fechaInicio,
             'fechaFin' => $fechaFin,
         ];
+    }
+
+    /**
+     * Resuelve la versión salarial usada en cada pago y acumula los importes
+     * históricos del período. La relación guardada en el pago es prioritaria.
+     */
+    private function prepararSueldosHistoricos($pagos): array
+    {
+        $totales = ['base' => 0.0, 'real' => 0.0, 'planilla' => 0.0];
+
+        foreach ($pagos as $pago) {
+            $sueldo = $pago->sueldoAplicado;
+
+            if (! $sueldo) {
+                $fechaPeriodo = Carbon::create((int) $pago->anio, (int) $pago->mes, 1)->endOfMonth();
+                $sueldo = $this->sueldoService->vigenteEn((int) $pago->empleado_id, $fechaPeriodo);
+
+                if ($sueldo) {
+                    $pago->setRelation('sueldoAplicado', $sueldo);
+                }
+            }
+
+            $pago->sueldo_historico_disponible = $sueldo !== null;
+            $pago->sueldo_base_historico = $sueldo ? (float) $sueldo->sueldo_base : null;
+            $pago->sueldo_real_historico_reporte = $sueldo ? (float) $sueldo->sueldo_real : null;
+            $pago->sueldo_planilla_historico_reporte = $sueldo ? (float) $sueldo->sueldo_planilla : null;
+
+            if ($sueldo) {
+                $totales['base'] += (float) $sueldo->sueldo_base;
+                $totales['real'] += (float) $sueldo->sueldo_real;
+                $totales['planilla'] += (float) $sueldo->sueldo_planilla;
+            }
+        }
+
+        return $totales;
     }
 
     private function aplicarFiltroPeriodo(
@@ -818,15 +930,6 @@ class ReportePlanillaController extends Controller
                     'after_or_equal:fecha_inicio',
                 ],
             ]
-        )->validate();
-
-        $diasEnRango = (int) Carbon::parse($fechaInicio)
-            ->diffInDays(Carbon::parse($fechaFin)) + 1;
-
-        validator(
-            ['dias_en_rango' => $diasEnRango],
-            ['dias_en_rango' => ['integer', 'max:31']],
-            ['dias_en_rango.max' => 'El rango de fechas no puede exceder 31 días.']
         )->validate();
 
         return [$fechaInicio, $fechaFin];

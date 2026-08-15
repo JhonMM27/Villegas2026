@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Empleado;
 use App\Services\EmpleadoService;
 use Illuminate\Http\Request;
+use InvalidArgumentException;
 use Yajra\DataTables\DataTables;
 
 class EmpleadoController extends Controller
@@ -24,7 +25,8 @@ class EmpleadoController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $data = Empleado::select(['id', 'nombre', 'dni', 'telefono', 'sueldo_planilla', 'sueldo_real', 'estado']);
+            $data = Empleado::with('sueldoActual')
+                ->select(['id', 'nombre', 'dni', 'telefono', 'estado']);
 
             return DataTables::of($data)
                 ->addColumn('action', function ($row) {
@@ -44,8 +46,9 @@ class EmpleadoController extends Controller
 
                     return '<div class="btn-group">'.$buttons.'</div>';
                 })
-                ->editColumn('sueldo_planilla', fn ($row) => 'S/'.number_format((float) $row->sueldo_planilla, 2))
-                ->editColumn('sueldo_real', fn ($row) => 'S/'.number_format((float) $row->sueldo_real, 2))
+                ->addColumn('sueldo_base', fn ($row) => 'S/'.number_format((float) $row->sueldo_base, 2))
+                ->addColumn('sueldo_planilla', fn ($row) => 'S/'.number_format((float) $row->sueldo_planilla, 2))
+                ->addColumn('sueldo_real', fn ($row) => 'S/'.number_format((float) $row->sueldo_real, 2))
                 ->editColumn('estado', fn ($row) => $row->estado === 'activo'
                     ? '<span class="badge bg-success">Activo</span>'
                     : '<span class="badge bg-secondary">Inactivo</span>')
@@ -80,7 +83,15 @@ class EmpleadoController extends Controller
             $data['fecha_salida'] = now()->toDateString();
         }
 
-        $this->empleadoService->update($empleado, $data);
+        try {
+            $this->empleadoService->update($empleado, $data);
+        } catch (InvalidArgumentException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+                'errors' => ['vigente_desde' => [$exception->getMessage()]],
+            ], 422);
+        }
 
         return response()->json([
             'success' => true,
@@ -102,8 +113,10 @@ class EmpleadoController extends Controller
                 'dni' => $empleado->dni,
                 'telefono' => $empleado->telefono,
                 'correo' => $empleado->correo,
+                'sueldo_base' => $empleado->sueldo_base,
                 'sueldo_planilla' => $empleado->sueldo_planilla,
                 'sueldo_real' => $empleado->sueldo_real,
+                'vigente_desde' => $empleado->sueldoActual?->vigente_desde?->format('Y-m-d'),
                 'estado' => $empleado->estado,
                 'fecha_ingreso' => $empleado->fecha_ingreso?->format('Y-m-d'),
                 'fecha_salida' => $empleado->fecha_salida?->format('Y-m-d'),
@@ -133,7 +146,7 @@ class EmpleadoController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Empleado eliminado correctamente',
+            'message' => 'Empleado inactivado correctamente; su historial fue conservado',
         ]);
     }
 
@@ -158,8 +171,12 @@ class EmpleadoController extends Controller
             'dni' => 'required|string|max:8|unique:empleados,dni,'.$id,
             'telefono' => 'nullable|string|max:20',
             'correo' => 'nullable|email|max:255',
+            'sueldo_base' => 'required|numeric|min:0',
             'sueldo_planilla' => 'required|numeric|min:0',
             'sueldo_real' => 'required|numeric|min:0',
+            'vigente_desde' => 'required|date',
+            'motivo' => 'nullable|string|max:255',
+            'observaciones_sueldo' => 'nullable|string|max:1000',
             'observaciones' => 'nullable|string',
             'estado' => 'required|in:activo,inactivo',
             'fecha_ingreso' => 'nullable|date|before_or_equal:today',

@@ -22,6 +22,7 @@
                                     <th>Nombre</th>
                                     <th>DNI</th>
                                     <th>Teléfono</th>
+                                    <th>Sueldo Base</th>
                                     <th>Sueldo Planilla</th>
                                     <th>Sueldo Real</th>
                                     <th>Estado</th>
@@ -58,8 +59,9 @@ class EmpleadoManager extends CrudManager {
                 { data: 'nombre', name: 'nombre' },
                 { data: 'dni', name: 'dni' },
                 { data: 'telefono', name: 'telefono' },
-                { data: 'sueldo_planilla', name: 'sueldo_planilla' },
-                { data: 'sueldo_real', name: 'sueldo_real' },
+                { data: 'sueldo_base', name: 'sueldo_base', orderable: false, searchable: false },
+                { data: 'sueldo_planilla', name: 'sueldo_planilla', orderable: false, searchable: false },
+                { data: 'sueldo_real', name: 'sueldo_real', orderable: false, searchable: false },
                 { data: 'estado', name: 'estado' }
             ]
         });
@@ -68,6 +70,7 @@ class EmpleadoManager extends CrudManager {
     showCreateModal() {
         super.showCreateModal();
         this.elements.modalTitle.textContent = 'Nuevo Empleado';
+        this.setFieldValue('vigente_desde', '{{ now()->toDateString() }}');
     }
 
     showEditModal(id) {
@@ -76,8 +79,10 @@ class EmpleadoManager extends CrudManager {
             document.getElementById('dni').value = data.empleado.dni;
             document.getElementById('telefono').value = data.empleado.telefono || '';
             document.getElementById('correo').value = data.empleado.correo || '';
+            document.getElementById('sueldo_base').value = data.empleado.sueldo_base;
             document.getElementById('sueldo_planilla').value = data.empleado.sueldo_planilla;
             document.getElementById('sueldo_real').value = data.empleado.sueldo_real;
+            this.setFieldValue('vigente_desde', '{{ now()->toDateString() }}');
             document.getElementById('estado').value = data.empleado.estado;
             if (data.empleado.fecha_ingreso) {
                 this.setFieldValue('fecha_ingreso', data.empleado.fecha_ingreso);
@@ -152,6 +157,10 @@ class EmpleadoManager extends CrudManager {
                                         <h6 class="text-success mb-3"><i class="bi bi-currency-dollar me-2"></i>Información Salarial</h6>
                                         <div class="row mb-2">
                                             <div class="col-md-6">
+                                                <label class="form-label text-muted small mb-1">Sueldo Base</label>
+                                                <p class="fw-bold mb-0">S/ ${parseFloat(data.empleado.sueldo_base).toFixed(2)}</p>
+                                            </div>
+                                            <div class="col-md-6">
                                                 <label class="form-label text-muted small mb-1">Sueldo Planilla</label>
                                                 <p class="fw-bold mb-0">S/ ${parseFloat(data.empleado.sueldo_planilla).toFixed(2)}</p>
                                             </div>
@@ -210,8 +219,8 @@ class EmpleadoManager extends CrudManager {
 
     confirmDelete(id) {
         Swal.fire({
-            title: '¿Eliminar Empleado?',
-            text: '¿Está seguro de eliminar este empleado? Esta acción no se puede deshacer.',
+            title: '¿Inactivar empleado?',
+            text: 'El empleado quedará inactivo y se conservarán sus pagos e historial salarial.',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#dc3545',
@@ -237,7 +246,7 @@ class EmpleadoManager extends CrudManager {
 
                     const result = await response.json();
                     if (result.success) {
-                        this.showNotification('success', 'Empleado eliminado correctamente');
+                        this.showNotification('success', 'Empleado inactivado correctamente');
                         this.tabla.ajax.reload(null, false);
                     } else {
                         this.showNotification('error', result.message);
