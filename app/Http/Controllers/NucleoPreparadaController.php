@@ -32,7 +32,7 @@ class NucleoPreparadaController extends Controller
         $this->middleware('can:nucleo_preparadas_list')->only(['index', 'view', 'printTicket']);
         $this->middleware('can:nucleo_preparadas_create')->only(['store']);
         $this->middleware('can:nucleo_preparadas_edit')->only(['show', 'update']);
-        $this->middleware('can:nucleo_preparadas_delete')->only(['destroy']);
+        $this->middleware('can:nucleo_preparadas_delete')->only(['destroy', 'anular']);
     }
 
     /**
@@ -138,6 +138,12 @@ class NucleoPreparadaController extends Controller
 
         $data = $this->validateData($request);
 
+        if ($request->input('es_rectificacion') == '1') {
+            $data['rectificacion_motivo'] = $request->validate([
+                'rectificacion_motivo' => 'nullable|string|max:500',
+            ])['rectificacion_motivo'] ?? null;
+        }
+
         try {
             $esRectificacion = $request->input('es_rectificacion') == '1';
             $preparadaAnuladaId = $request->input('preparada_anulada_id');
@@ -201,10 +207,12 @@ class NucleoPreparadaController extends Controller
      *
      * @param  int  $id  ID de la nucleo_preparada a anular
      */
-    public function anular(int $id): JsonResponse
+    public function anular(Request $request, int $id): JsonResponse
     {
+        $data = $request->validate(['motivo' => 'nullable|string|max:500']);
+
         try {
-            $this->service->anularNucleoPreparada($id);
+            $this->service->anularNucleoPreparada($id, $data['motivo'] ?? null);
 
             return response()->json([
                 'success' => true,

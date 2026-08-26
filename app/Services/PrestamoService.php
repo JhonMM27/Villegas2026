@@ -267,10 +267,11 @@ class PrestamoService
      *
      * @throws \Exception
      */
-    public function anularPrestamo(int $id): Prestamo
+    public function anularPrestamo(int $id, ?string $motivo): Prestamo
     {
-        return DB::transaction(function () use ($id) {
-            $prestamo = Prestamo::with('detalles')->findOrFail($id);
+        return DB::transaction(function () use ($id, $motivo) {
+            $prestamo = Prestamo::query()->with(['detalles', 'clienteOrigen', 'clienteDestino'])
+                ->lockForUpdate()->findOrFail($id);
 
             if ($prestamo->estado === 'anulada') {
                 throw new \Exception('Este préstamo ya fue anulado.');
@@ -283,6 +284,9 @@ class PrestamoService
                 }
                 // Permitir: se volverá a 'anulada' para poder rectificar de nuevo
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('prestamos', $prestamo);
 
             $prestamo->update(['estado' => 'anulada']);
 
@@ -315,6 +319,10 @@ class PrestamoService
                 $this->actualizarEstadoPrestamoReferencia($prestamo->prestamo_referencia_id);
             }
 
+            $prestamo->refresh()->load(['detalles', 'clienteOrigen', 'clienteDestino']);
+            $auditoria->registrarAnulacion('prestamos', $prestamo, $datosAnteriores,
+                $auditoria->capturar('prestamos', $prestamo), $motivo);
+
             return $prestamo;
         });
     }
@@ -344,7 +352,8 @@ class PrestamoService
         return DB::transaction(function () use (
             $prestamoId, $data, $comprobanteTipoCodigo
         ) {
-            $prestamo = Prestamo::findOrFail($prestamoId);
+            $prestamo = Prestamo::query()->with(['detalles', 'clienteOrigen', 'clienteDestino'])
+                ->lockForUpdate()->findOrFail($prestamoId);
             $productoIdsAnteriores = $prestamo->detalles()->pluck('producto_id')->all();
 
             if ($prestamo->estado !== 'anulada') {
@@ -354,6 +363,10 @@ class PrestamoService
             if ($prestamo->rectificacion_count >= 3) {
                 throw new \Exception('Este préstamo ya no puede ser rectificado. Máximo 3 rectificaciones permitidas.');
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('prestamos', $prestamo);
+            $numeroRectificacion = (int) $prestamo->rectificacion_count + 1;
 
             $prestamoDataRaw = $this->processPrestamoData($data, false);
             $prestamoData = $prestamoDataRaw['prestamo'];
@@ -375,7 +388,7 @@ class PrestamoService
             $prestamo->update($prestamoData);
 
             // Incrementar contador de rectificaciones
-            $prestamo->update(['rectificacion_count' => $prestamo->rectificacion_count + 1]);
+            $prestamo->update(['rectificacion_count' => $numeroRectificacion]);
 
             // 2) Reemplazar detalles
             $prestamo->detalles()->delete();
@@ -478,6 +491,10 @@ class PrestamoService
             if ($prestamo->prestamo_referencia_id) {
                 $this->actualizarEstadoPrestamoReferencia($prestamo->prestamo_referencia_id);
             }
+
+            $prestamo->refresh()->load(['detalles', 'clienteOrigen', 'clienteDestino']);
+            $auditoria->registrarRectificacion('prestamos', $prestamo, $numeroRectificacion, $datosAnteriores,
+                $auditoria->capturar('prestamos', $prestamo), $data['rectificacion_motivo'] ?? null);
 
             return [
                 'prestamo' => $prestamo,

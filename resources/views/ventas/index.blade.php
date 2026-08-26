@@ -220,6 +220,11 @@
                 }
 
                 const formData = new FormData(this.form);
+                if (this.isRectifying) {
+                    const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Este motivo quedará registrado permanentemente en Auditoría.');
+                    if (motivo === null) return;
+                    formData.set('rectificacion_motivo', motivo);
+                }
                 this.setSubmitButtonState(true);
                 this.clearFormErrors();
 
@@ -1495,6 +1500,10 @@
                     Swal.fire({
                         title: '¿Anular venta?',
                         text: 'Esta acción revertirá el stock vendido y recalculará el CPP en cascada. No se puede deshacer.',
+                        input: 'textarea',
+                        inputLabel: 'Motivo (opcional)',
+                        inputPlaceholder: 'Puede describir el motivo o dejarlo vacío',
+                        inputAttributes: { maxlength: 500 },
                         icon: 'warning',
                         showCancelButton: true,
                         confirmButtonColor: '#dc3545',
@@ -1514,7 +1523,8 @@
                                     'X-CSRF-TOKEN': csrfToken,
                                     'Accept': 'application/json',
                                     'Content-Type': 'application/json'
-                                }
+                                },
+                                body: JSON.stringify({ motivo: String(result.value).trim() })
                             })
                             .then(function(response) {
                                 return response.json();

@@ -664,6 +664,7 @@
 
             showCreateModal() {
                 super.showCreateModal();
+                this.isRectifying = false;
                 this.elements.modalTitle.textContent = 'Nuevo Préstamo';
                 document.getElementById('es_rectificacion').value = '0';
                 document.getElementById('prestamo_anulado_id').value = '';
@@ -1109,6 +1110,17 @@
                 }
             }
 
+            async handleSubmit(e) {
+                if (this.isRectifying) {
+                    e.preventDefault();
+                    const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Este motivo quedará registrado permanentemente en Auditoría.');
+                    if (motivo === null) return;
+                    asignarMotivoAuditoria(this.form, motivo);
+                }
+
+                return super.handleSubmit(e);
+            }
+
             async showRectifyModal(id) {
                 try {
                     const response = await this.fetchData(`${this.baseUrl}/${id}`);
@@ -1247,6 +1259,10 @@
                     Swal.fire({
                         title: '¿Anular este préstamo?',
                         text: 'Se revertirá el stock y se ajustarán los registros. Esta acción no se puede deshacer.',
+                        input: 'textarea',
+                        inputLabel: 'Motivo (opcional)',
+                        inputPlaceholder: 'Puede describir el motivo o dejarlo vacío',
+                        inputAttributes: { maxlength: 500 },
                         icon: 'warning',
                         showCancelButton: true,
                         confirmButtonColor: '#d33',
@@ -1265,7 +1281,8 @@
                                         'Accept': 'application/json',
                                         'Content-Type': 'application/json',
                                         'X-CSRF-TOKEN': csrfToken
-                                    }
+                                    },
+                                    body: JSON.stringify({ motivo: String(result.value).trim() })
                                 });
 
                                 const data = await response.json();

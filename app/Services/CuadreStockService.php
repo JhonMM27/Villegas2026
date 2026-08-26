@@ -156,14 +156,17 @@ class CuadreStockService
         });
     }
 
-    public function anularCuadreStock(int $id): CuadreStock
+    public function anularCuadreStock(int $id, ?string $motivo): CuadreStock
     {
-        return DB::transaction(function () use ($id) {
-            $cuadre = CuadreStock::with('detalles')->findOrFail($id);
+        return DB::transaction(function () use ($id, $motivo) {
+            $cuadre = CuadreStock::query()->with('detalles.producto')->lockForUpdate()->findOrFail($id);
 
             if ($cuadre->estado === 'anulado') {
                 throw new \Exception('Este cuadre de stock ya fue anulado.');
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('cuadre_stocks', $cuadre);
 
             $productosAfectados = [];
             foreach ($cuadre->detalles as $detalle) {
@@ -188,6 +191,10 @@ class CuadreStockService
                 }
             }
 
+            $cuadre->refresh()->load('detalles.producto');
+            $auditoria->registrarAnulacion('cuadre_stocks', $cuadre, $datosAnteriores,
+                $auditoria->capturar('cuadre_stocks', $cuadre), $motivo);
+
             return $cuadre;
         });
     }
@@ -195,7 +202,7 @@ class CuadreStockService
     public function rectificarCuadreStock(int $id, array $data): CuadreStock
     {
         return DB::transaction(function () use ($id, $data) {
-            $cuadre = CuadreStock::with('detalles')->findOrFail($id);
+            $cuadre = CuadreStock::query()->with('detalles.producto')->lockForUpdate()->findOrFail($id);
 
             if ($cuadre->estado !== 'anulado') {
                 throw new \Exception('Solo se pueden rectificar cuadres en estado anulado.');
@@ -204,6 +211,10 @@ class CuadreStockService
             if ($cuadre->rectificacion_count >= 3) {
                 throw new \Exception('Este cuadre ya no puede ser rectificado. Máximo 3 rectificaciones permitidas.');
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('cuadre_stocks', $cuadre);
+            $numeroRectificacion = (int) $cuadre->rectificacion_count + 1;
 
             $productosAfectados = [];
             foreach ($cuadre->detalles as $detalle) {
@@ -221,7 +232,7 @@ class CuadreStockService
             $cuadre->update([
                 'estado' => 'completado',
                 'notas' => trim(($cuadre->notas ?? '').' | Rectificado el '.now()->format('d/m/Y H:i')),
-                'rectificacion_count' => $cuadre->rectificacion_count + 1,
+                'rectificacion_count' => $numeroRectificacion,
             ]);
 
             $cuadre->detalles()->delete();
@@ -316,6 +327,9 @@ class CuadreStockService
             }
 
             $cuadre->load('detalles.producto');
+
+            $auditoria->registrarRectificacion('cuadre_stocks', $cuadre, $numeroRectificacion, $datosAnteriores,
+                $auditoria->capturar('cuadre_stocks', $cuadre), $data['rectificacion_motivo'] ?? null);
 
             return $cuadre;
         });

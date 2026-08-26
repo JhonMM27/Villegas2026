@@ -151,10 +151,10 @@ class VentaService
      *
      * @throws \Exception Si la venta ya está anulada o si ocurre error
      */
-    public function anularVenta(int $id): Venta
+    public function anularVenta(int $id, ?string $motivo): Venta
     {
-        return DB::transaction(function () use ($id) {
-            $venta = Venta::with('detalles')->findOrFail($id);
+        return DB::transaction(function () use ($id, $motivo) {
+            $venta = Venta::query()->with('detalles')->lockForUpdate()->findOrFail($id);
 
             // Validar que no tenga cobranzas provisionales aplicadas ni abonos
             $this->validarSinAbonosProvisionales($venta, 'anular');
@@ -171,6 +171,9 @@ class VentaService
                 }
                 // Permitir: se volverá a 'anulada' para poder rectificar de nuevo
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('ventas', $venta);
 
             // 1) Cambiar estado a 'anulada'
             $venta->update(['estado' => 'anulada']);
@@ -200,6 +203,10 @@ class VentaService
                     );
                 }
             }
+
+            $venta->refresh()->load('detalles');
+            $auditoria->registrarAnulacion('ventas', $venta, $datosAnteriores,
+                $auditoria->capturar('ventas', $venta), $motivo);
 
             return $venta;
         });
@@ -235,6 +242,11 @@ class VentaService
             if ($venta->rectificacion_count >= 3) {
                 throw new \Exception('Esta venta ya no puede ser rectificada. Máximo 3 rectificaciones permitidas.');
             }
+
+            $venta->load('detalles');
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('ventas', $venta);
+            $numeroRectificacion = (int) $venta->rectificacion_count + 1;
 
             $clienteIdNuevo = (int) $data['cliente_id'];
             if ($tieneCobranzasAplicadas && $clienteIdNuevo !== $clienteIdOriginal) {
@@ -277,7 +289,7 @@ class VentaService
             $venta->update($ventaData);
 
             // Incrementar contador de rectificaciones
-            $venta->update(['rectificacion_count' => $venta->rectificacion_count + 1]);
+            $venta->update(['rectificacion_count' => $numeroRectificacion]);
 
             // 3) Gestionar detalles y movimientos
             // Eliminamos detalles antiguos para reemplazarlos (más limpio que update individual)
@@ -386,6 +398,10 @@ class VentaService
                     );
                 }
             }
+
+            $venta->refresh()->load('detalles');
+            $auditoria->registrarRectificacion('ventas', $venta, $numeroRectificacion, $datosAnteriores,
+                $auditoria->capturar('ventas', $venta), $data['rectificacion_motivo'] ?? null);
 
             return $venta;
         });

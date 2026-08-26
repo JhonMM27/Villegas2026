@@ -27,6 +27,9 @@ yarn-error.log
 !database/sql/corregir_cuentas_clientes_45_53_131.sql
 !database/sql/corregir_proveedor_102_molinorte.sql
 !database/sql/2026_08_13_historial_sueldos_empleados.sql
+!database/sql/2026_08_26_rectificacion_historiales.sql
+!database/sql/2026_08_27_auditoria_eventos.sql
+!database/sql/2026_08_27_auditoria_motivo_nullable.sql
 
 
 # === OPENCODE ===

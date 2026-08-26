@@ -116,10 +116,10 @@ class NucleoPreparadaService
      *
      * @throws \Exception Si ya está anulada o si ocurre error
      */
-    public function anularNucleoPreparada(int $id): NucleoPreparada
+    public function anularNucleoPreparada(int $id, ?string $motivo): NucleoPreparada
     {
-        return DB::transaction(function () use ($id) {
-            $preparada = NucleoPreparada::with('detalles')->findOrFail($id);
+        return DB::transaction(function () use ($id, $motivo) {
+            $preparada = NucleoPreparada::query()->with('detalles')->lockForUpdate()->findOrFail($id);
 
             if ($preparada->estado === 'anulada') {
                 throw new \Exception('Esta preparación de núcleo ya fue anulada.');
@@ -132,6 +132,9 @@ class NucleoPreparadaService
                 }
                 // Permitir: se volverá a 'anulada' para poder rectificar de nuevo
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('nucleo_preparadas', $preparada);
 
             // 1) Cambiar estado a 'anulada'
             $preparada->update(['estado' => 'anulada']);
@@ -172,6 +175,10 @@ class NucleoPreparadaService
                 }
             }
 
+            $preparada->refresh()->load('detalles');
+            $auditoria->registrarAnulacion('nucleo_preparadas', $preparada, $datosAnteriores,
+                $auditoria->capturar('nucleo_preparadas', $preparada), $motivo);
+
             return $preparada;
         });
     }
@@ -185,7 +192,7 @@ class NucleoPreparadaService
     public function rectificarNucleoPreparada(int $preparadaId, array $data): array
     {
         return DB::transaction(function () use ($preparadaId, $data) {
-            $preparada = NucleoPreparada::findOrFail($preparadaId);
+            $preparada = NucleoPreparada::query()->with('detalles')->lockForUpdate()->findOrFail($preparadaId);
             $productoIdsAnteriores = $preparada->detalles()->pluck('producto_id')->all();
             $productoIdsAnteriores[] = $preparada->nucleo_id;
 
@@ -196,6 +203,10 @@ class NucleoPreparadaService
             if ($preparada->rectificacion_count >= 3) {
                 throw new \Exception('Esta preparación de núcleo ya no puede ser rectificada. Máximo 3 rectificaciones permitidas.');
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('nucleo_preparadas', $preparada);
+            $numeroRectificacion = (int) $preparada->rectificacion_count + 1;
 
             // 1) Procesar datos
             $preparadaDataRaw = $this->processNucleoPreparadaData($data, false);
@@ -209,7 +220,7 @@ class NucleoPreparadaService
             $preparada->update($preparadaData);
 
             // Incrementar contador de rectificaciones
-            $preparada->update(['rectificacion_count' => $preparada->rectificacion_count + 1]);
+            $preparada->update(['rectificacion_count' => $numeroRectificacion]);
 
             // 3) Reemplazar detalles
             $preparada->detalles()->delete();
@@ -290,6 +301,10 @@ class NucleoPreparadaService
                     );
                 }
             }
+
+            $preparada->refresh()->load('detalles');
+            $auditoria->registrarRectificacion('nucleo_preparadas', $preparada, $numeroRectificacion, $datosAnteriores,
+                $auditoria->capturar('nucleo_preparadas', $preparada), $data['rectificacion_motivo'] ?? null);
 
             return [
                 'preparada' => $preparada,

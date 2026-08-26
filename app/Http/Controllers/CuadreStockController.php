@@ -34,7 +34,7 @@ class CuadreStockController extends Controller
                         <i class="bi bi-eye"></i>
                     </button>';
 
-                    if ($row->estado === 'completado' && $row->rectificacion_count < 3) {
+                    if ($row->estado === 'anulado' && $row->rectificacion_count < 3 && auth()->user()->can('cuadre_stock_edit')) {
                         $buttons .= '<button class="btn btn-sm btn-warning me-1" onclick="cuadreStockManager.showRectifyModal('.$row->id.')">
                             <i class="bi bi-arrow-repeat"></i>
                         </button>';
@@ -124,10 +124,12 @@ class CuadreStockController extends Controller
         ]);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
+        $data = $request->validate(['motivo' => 'nullable|string|max:500']);
+
         try {
-            $cuadre = $this->cuadreService->anularCuadreStock((int) $id);
+            $cuadre = $this->cuadreService->anularCuadreStock((int) $id, $data['motivo'] ?? null);
 
             return response()->json([
                 'success' => true,
@@ -148,6 +150,7 @@ class CuadreStockController extends Controller
                 'detalles' => 'required|array|min:1',
                 'detalles.*.producto_id' => 'required|exists:productos,id',
                 'detalles.*.stock_fisico' => 'required|numeric|min:0',
+                'rectificacion_motivo' => 'nullable|string|max:500',
             ]);
 
             $cuadre = $this->cuadreService->rectificarCuadreStock((int) $id, $data);

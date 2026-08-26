@@ -499,6 +499,7 @@ class PreparadaManager extends CrudManager {
 
     showCreateModal(){
         super.showCreateModal();
+        this.isRectifying = false;
         document.getElementById('es_rectificacion').value = '0';
         document.getElementById('preparada_anulada_id').value = '';
 
@@ -581,6 +582,17 @@ class PreparadaManager extends CrudManager {
             this.showNotification('error', 'Error al cargar los datos');
             console.error('Error al cargar datos:', error);
         }
+    }
+
+    async handleSubmit(e) {
+        if (this.isRectifying) {
+            e.preventDefault();
+            const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Este motivo quedará registrado permanentemente en Auditoría.');
+            if (motivo === null) return;
+            asignarMotivoAuditoria(this.form, motivo);
+        }
+
+        return super.handleSubmit(e);
     }
 
     async showRectifyModal(id) {
@@ -805,6 +817,10 @@ document.addEventListener('DOMContentLoaded', () => {
             Swal.fire({
                 title: '¿Anular preparada?',
                 text: 'Esta acción revertirá los insumos consumidos y el producto final producido. El kardex se recalculará en cascada.',
+                input: 'textarea',
+                inputLabel: 'Motivo (opcional)',
+                inputPlaceholder: 'Puede describir el motivo o dejarlo vacío',
+                inputAttributes: { maxlength: 500 },
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#dc3545',
@@ -823,7 +839,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         'X-CSRF-TOKEN': csrfToken,
                         'Accept': 'application/json',
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({ motivo: String(result.value).trim() })
                 })
                 .then(function(response) { return response.json(); })
                 .then(function(data) {

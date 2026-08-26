@@ -137,7 +137,7 @@ class CompraService
         return DB::transaction(function () use (
             $compraAnuladaId, $data
         ) {
-            $compraAnulada = Compra::with('detalles')->findOrFail($compraAnuladaId);
+            $compraAnulada = Compra::query()->with('detalles')->lockForUpdate()->findOrFail($compraAnuladaId);
 
             // Validar que no tenga pagos provisionales aplicados ni abonos
             $this->validarSinAbonosProvisionales($compraAnulada, 'rectificar');
@@ -152,6 +152,10 @@ class CompraService
             if ($compraAnulada->rectificacion_count >= 3) {
                 throw new \Exception('Esta compra ya no puede ser rectificada. Máximo 3 rectificaciones permitidas.');
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('compras', $compraAnulada);
+            $numeroRectificacion = (int) $compraAnulada->rectificacion_count + 1;
 
             // Fuente de verdad: Sumar los abonos reales desde los detalles provisionales
             $abonosTotales = (float) CompraProvisionalDetalle::where('compra_id', $compraAnuladaId)->sum('monto');
@@ -169,7 +173,7 @@ class CompraService
             ]));
 
             // Incrementar contador de rectificaciones
-            $compraAnulada->update(['rectificacion_count' => $compraAnulada->rectificacion_count + 1]);
+            $compraAnulada->update(['rectificacion_count' => $numeroRectificacion]);
 
             // 2) Reemplazar detalles: eliminamos los anteriores y creamos los nuevos
             $compraAnulada->detalles()->delete();
@@ -277,6 +281,10 @@ class CompraService
                 }
             }
 
+            $compraAnulada->refresh()->load('detalles');
+            $auditoria->registrarRectificacion('compras', $compraAnulada, $numeroRectificacion, $datosAnteriores,
+                $auditoria->capturar('compras', $compraAnulada), $data['rectificacion_motivo'] ?? null);
+
             return $compraAnulada;
         });
     }
@@ -293,10 +301,10 @@ class CompraService
      *
      * @throws \Exception Si la compra ya está anulada o si ocurre error
      */
-    public function anularCompra(int $id): Compra
+    public function anularCompra(int $id, ?string $motivo): Compra
     {
-        return DB::transaction(function () use ($id) {
-            $compra = Compra::with('detalles')->findOrFail($id);
+        return DB::transaction(function () use ($id, $motivo) {
+            $compra = Compra::query()->with('detalles')->lockForUpdate()->findOrFail($id);
 
             // Validar que no tenga pagos provisionales aplicados ni abonos
             $this->validarSinAbonosProvisionales($compra, 'anular');
@@ -313,6 +321,9 @@ class CompraService
                 }
                 // Permitir: se volverá a 'anulada' para poder rectificar de nuevo
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('compras', $compra);
 
             // 1) Cambiar estado a 'anulada'
             $compra->update(['estado' => 'anulada']);
@@ -345,6 +356,10 @@ class CompraService
                     );
                 }
             }
+
+            $compra->refresh()->load('detalles');
+            $auditoria->registrarAnulacion('compras', $compra, $datosAnteriores,
+                $auditoria->capturar('compras', $compra), $motivo);
 
             return $compra;
         });

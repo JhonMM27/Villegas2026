@@ -478,6 +478,10 @@ class CuadreStockManager extends CrudManager {
         Swal.fire({
             title: '¿Anular Cuadre?',
             text: 'Esta acción marcará el cuadre como anulado. Los movimientos en el kardex serán marcados como anulados también.',
+            input: 'textarea',
+            inputLabel: 'Motivo (opcional)',
+            inputPlaceholder: 'Puede describir el motivo o dejarlo vacío',
+            inputAttributes: { maxlength: 500 },
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#dc3545',
@@ -490,8 +494,10 @@ class CuadreStockManager extends CrudManager {
                         method: 'DELETE',
                         headers: {
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                            'Accept': 'application/json'
-                        }
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ motivo: String(result.value).trim() })
                     });
 
                     const data = await response.json();
@@ -571,9 +577,13 @@ class CuadreStockManager extends CrudManager {
             return;
         }
 
+        const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Este motivo quedará registrado permanentemente en Auditoría.');
+        if (motivo === null) return;
+
         const formData = {
             notas: document.getElementById('rectificarNotas').value,
-            detalles: detalles
+            detalles: detalles,
+            rectificacion_motivo: motivo
         };
 
         try {

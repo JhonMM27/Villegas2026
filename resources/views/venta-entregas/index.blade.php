@@ -75,7 +75,7 @@ class VentaEntregaManager extends CrudManager {
             delay : 300,
             onSelect: (item) => this.addVenta(item.id)
         });
-        document.body.addEventListener('click', (e) => {
+        document.body.addEventListener('click', async (e) => {
             const btnAdd = e.target.closest('.btn-add-venta');
             if (btnAdd) {
                 e.preventDefault();
@@ -118,6 +118,38 @@ class VentaEntregaManager extends CrudManager {
                     .catch(err => console.error(err));
 
                 return;
+            }
+
+            const btnAnular = e.target.closest('.btn-anular-entrega');
+            if (btnAnular) {
+                e.preventDefault();
+                const motivo = await solicitarMotivoAuditoria('Anular entrega', 'Se revertirá el impacto de esta entrega. El motivo quedará registrado en Auditoría.');
+                if (motivo === null) return;
+
+                try {
+                    const response = await fetch(`${this.baseUrl}/${btnAnular.dataset.id}/anular`, {
+                        method: 'PUT',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ motivo })
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) throw new Error(data.message || 'No se pudo anular la entrega.');
+                    this.showNotification('success', data.message);
+                    this.tabla.ajax.reload(null, false);
+                } catch (error) {
+                    this.showNotification('error', error.message);
+                }
+                return;
+            }
+
+            const btnRectificar = e.target.closest('.btn-rectificar-entrega');
+            if (btnRectificar) {
+                e.preventDefault();
+                await this.showRectifyModal(btnRectificar.dataset.id);
             }
         });
     }
@@ -368,6 +400,26 @@ class VentaEntregaManager extends CrudManager {
         }
     }
 
+    async showRectifyModal(id) {
+        await this.showEditModal(id);
+        this.isEditing = false;
+        this.isRectifying = true;
+        this.elements.modalTitle.textContent = `Rectificar Entrega #${id}`;
+        this.elements.methodField.value = 'PUT';
+        this.form.action = `${this.baseUrl}/${id}/rectificar`;
+    }
+
+    async handleSubmit(e) {
+        if (this.isRectifying) {
+            e.preventDefault();
+            const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Este motivo quedará registrado permanentemente en Auditoría.');
+            if (motivo === null) return;
+            asignarMotivoAuditoria(this.form, motivo);
+        }
+
+        return super.handleSubmit(e);
+    }
+
     cargarDetallesEnTabla(detalles = []) {
         const tbody = document.querySelector('#tablaDetalles tbody');
         if (!tbody) return;
@@ -389,39 +441,34 @@ class VentaEntregaManager extends CrudManager {
 
         tbody.innerHTML = detalles.map((d, i) => {
 
-            const entregaEsta = parseFloat(d.entregado_esta ?? 0);
-            const empaque = parseFloat(d.venta_detalle.producto_empaque ?? 0);
-            const salidaKg = empaque * entregaEsta;
-
             return `
                 <tr>
                     <td>${i + 1}</td>
                     <td>
                         ${d.producto_nombre ?? ''} 
                         <input type="hidden" name="detalles[${i}][producto_id]" value="${d.producto_id}">
-                        <input type="hidden" name="detalles[${i}][producto_nombre]" value="${d.venta_detalle.producto_nombre ?? ''}">
+                        <input type="hidden" name="detalles[${i}][producto_nombre]" value="${d.producto_nombre ?? ''}">
                     </td>
-                    <td class="text-center">${d.venta_detalle.unidad_codigo ?? ''}</td>
+                    <td class="text-center">${d.unidad_codigo ?? ''}</td>
                     <td class="text-center">
                         ${d.producto_empaque ?? ''}
                         <input type="hidden" name="detalles[${i}][producto_empaque]" value="${d.producto_empaque ?? ''}">
                     </td>
-                    <td class="text-end">${fmt(d.venta_detalle.cantidad)}</td>
-                    <td class="text-end">${fmt(d.venta_detalle.precio_unitario ?? 0)}</td>
-                    <td class="text-end">${fmt(d.venta_detalle.entregado)}</td>
-                    <td class="text-end text-danger">${fmt(d.venta_detalle.saldo)}</td>
+                    <td class="text-end">${fmt(d.vendido)}</td>
+                    <td class="text-end">${fmt(d.precio_unitario ?? 0)}</td>
+                    <td class="text-end">${fmt(d.entregado_total)}</td>
+                    <td class="text-end text-danger">${fmt(d.pendiente)}</td>
                     <td>
                         <input type="number"
                             class="form-control form-control-sm text-end"
                             name="detalles[${i}][cantidad]"
                             min="0"
                            max="${(
-                                parseFloat(d.cantidad ?? 0) +
-                                parseFloat(d.venta_detalle?.saldo ?? 0)
+                                parseFloat(d.max_editable ?? 0)
                             ).toFixed(2)}"
                             step="0.01"
-                            value="${parseFloat(d.cantidad?? 0)}">
-                        <input type="hidden" name="detalles[${i}][venta_detalle_id]" value="${d.venta_detalle.id}">
+                            value="${parseFloat(d.entregado_esta ?? 0)}">
+                        <input type="hidden" name="detalles[${i}][venta_detalle_id]" value="${d.venta_detalle_id}">
                     </td>
                 </tr>
             `;
@@ -430,6 +477,7 @@ class VentaEntregaManager extends CrudManager {
 
     showCreateModal(){
         super.showCreateModal();
+        this.isRectifying = false;
         this.elements.modalTitle.textContent = 'Nueva entrega';
         const usuarioNombre = @json(auth()->user()->name);
         document.getElementById('usuario_nombre').textContent = usuarioNombre;

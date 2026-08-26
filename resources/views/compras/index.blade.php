@@ -169,6 +169,13 @@ class CompraManager extends CrudManager {
             return;
         }
 
+        if (this.isRectifying) {
+            e.preventDefault();
+            const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Este motivo quedará registrado permanentemente en Auditoría.');
+            if (motivo === null) return;
+            asignarMotivoAuditoria(this.form, motivo);
+        }
+
         return super.handleSubmit(e);
     }
 
@@ -1187,6 +1194,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await Swal.fire({
                 title: '¿Anular esta compra?',
                 text: 'Se revertirá el stock y se recalculará el CPP. Esta acción no se puede deshacer.',
+                input: 'textarea',
+                inputLabel: 'Motivo (opcional)',
+                inputPlaceholder: 'Puede describir el motivo o dejarlo vacío',
+                inputAttributes: { maxlength: 500 },
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
@@ -1207,7 +1218,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Accept': 'application/json',
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': csrfToken
-                    }
+                    },
+                    body: JSON.stringify({ motivo: String(result.value).trim() })
                 });
 
                 const data = await response.json();

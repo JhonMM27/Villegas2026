@@ -119,10 +119,10 @@ class PreparadaService
      *
      * @throws \Exception Si la preparada ya está anulada o si ocurre error
      */
-    public function anularPreparada(int $id): Preparada
+    public function anularPreparada(int $id, ?string $motivo): Preparada
     {
-        return DB::transaction(function () use ($id) {
-            $preparada = Preparada::with('detalles')->findOrFail($id);
+        return DB::transaction(function () use ($id, $motivo) {
+            $preparada = Preparada::query()->with('detalles')->lockForUpdate()->findOrFail($id);
 
             // Validar estado
             if ($preparada->estado === 'anulada') {
@@ -136,6 +136,9 @@ class PreparadaService
                 }
                 // Permitir: se volverá a 'anulada' para poder rectificar de nuevo
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('preparadas', $preparada);
 
             // 1) Cambiar estado a 'anulada'
             $preparada->update(['estado' => 'anulada']);
@@ -179,6 +182,10 @@ class PreparadaService
                 }
             }
 
+            $preparada->refresh()->load('detalles');
+            $auditoria->registrarAnulacion('preparadas', $preparada, $datosAnteriores,
+                $auditoria->capturar('preparadas', $preparada), $motivo);
+
             return $preparada;
         });
     }
@@ -193,7 +200,7 @@ class PreparadaService
     public function rectificarPreparada(int $preparadaId, array $data): array
     {
         return DB::transaction(function () use ($preparadaId, $data) {
-            $preparada = Preparada::findOrFail($preparadaId);
+            $preparada = Preparada::query()->with('detalles')->lockForUpdate()->findOrFail($preparadaId);
             $productoIdsAnteriores = $preparada->detalles()->pluck('producto_id')->all();
             $productoIdsAnteriores[] = $preparada->producto_id;
 
@@ -204,6 +211,10 @@ class PreparadaService
             if ($preparada->rectificacion_count >= 3) {
                 throw new \Exception('Esta preparada ya no puede ser rectificada. Máximo 3 rectificaciones permitidas.');
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('preparadas', $preparada);
+            $numeroRectificacion = (int) $preparada->rectificacion_count + 1;
 
             // 1) Procesar datos (cabecera + detalles calculados)
             $preparadaDataRaw = $this->proccessPreparadaData($data, false);
@@ -217,7 +228,7 @@ class PreparadaService
             $preparada->update($preparadaData);
 
             // Incrementar contador de rectificaciones
-            $preparada->update(['rectificacion_count' => $preparada->rectificacion_count + 1]);
+            $preparada->update(['rectificacion_count' => $numeroRectificacion]);
 
             // 3) Reemplazar detalles
             $preparada->detalles()->delete();
@@ -393,6 +404,10 @@ class PreparadaService
                     );
                 }
             }
+
+            $preparada->refresh()->load('detalles');
+            $auditoria->registrarRectificacion('preparadas', $preparada, $numeroRectificacion, $datosAnteriores,
+                $auditoria->capturar('preparadas', $preparada), $data['rectificacion_motivo'] ?? null);
 
             return [
                 'preparada' => $preparada,

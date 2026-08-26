@@ -37,9 +37,9 @@ class VentaController extends Controller
         protected VentaService $ventaService
     ) {
         $this->middleware('can:ventas_list')->only(['index', 'view', 'printTicket']);
-        $this->middleware('can:ventas_create')->only(['store']);
+        $this->middleware('can:ventas_create')->only(['store', 'rectificar']);
         $this->middleware('can:ventas_edit')->only(['show', 'update']);
-        $this->middleware('can:ventas_delete')->only(['destroy']);
+        $this->middleware('can:ventas_delete')->only(['destroy', 'anular']);
     }
 
     /**
@@ -215,10 +215,12 @@ class VentaController extends Controller
      *
      * @param  int  $id  ID de la venta a anular
      */
-    public function anular(int $id): JsonResponse
+    public function anular(Request $request, int $id): JsonResponse
     {
+        $data = $request->validate(['motivo' => 'nullable|string|max:500']);
+
         try {
-            $venta = $this->ventaService->anularVenta($id);
+            $venta = $this->ventaService->anularVenta($id, $data['motivo'] ?? null);
 
             return response()->json([
                 'success' => true,
@@ -391,6 +393,9 @@ class VentaController extends Controller
         }
 
         $data = $this->validateData($request);
+        $data['rectificacion_motivo'] = $request->validate([
+            'rectificacion_motivo' => 'nullable|string|max:500',
+        ])['rectificacion_motivo'] ?? null;
 
         try {
             $venta = $this->ventaService->rectificarVenta((int) $id, $data);

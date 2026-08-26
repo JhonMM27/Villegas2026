@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AfectacionTipoController;
+use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CajaIngresoController;
 use App\Http\Controllers\CajaPagoController;
@@ -73,6 +74,11 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::middleware('role:admin')->prefix('auditoria')->name('auditoria.')->group(function () {
+        Route::get('/', [AuditoriaController::class, 'index'])->name('index');
+        Route::get('/data', [AuditoriaController::class, 'data'])->name('data');
+        Route::get('/{evento}', [AuditoriaController::class, 'show'])->whereNumber('evento')->name('show');
+    });
     Route::get('/afectacion-tipos/select', [AfectacionTipoController::class, 'select'])->name('afectacion-tipos.select');
     Route::resource('afectacion-tipos', AfectacionTipoController::class)->except(['create', 'edit']);
     Route::get('/unidades/select', [UnidadController::class, 'select'])->name('unidades.select');
@@ -210,7 +216,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/venta-entregas/ventas-por-entregar-detalle/{ventaId}', [VentaEntregaController::class, 'ventasPorEntregarDetalle'])->name('venta-entregas.ventas-por-entregar-detalle');
     Route::put('/venta-entregas/{id}/anular', [VentaEntregaController::class, 'anular'])->name('venta-entregas.anular');
     Route::put('/venta-entregas/{id}/rectificar', [VentaEntregaController::class, 'rectificar'])->name('venta-entregas.rectificar');
-    Route::resource('venta-entregas', VentaEntregaController::class)->except(['create', 'edit']);
+    Route::resource('venta-entregas', VentaEntregaController::class)->except(['create', 'edit', 'update', 'destroy']);
 
     Route::get('/compra-provisionales/{id}/imprimir', [CompraProvisionalController::class, 'printTicket'])->name('compra-provisionales.imprimir');
     Route::get('/compra-provisionales/{id}/ver', [CompraProvisionalController::class, 'view'])->name('compra-provisionales.ver');

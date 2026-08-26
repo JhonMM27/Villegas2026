@@ -34,7 +34,7 @@ class PreparadaController extends Controller
         $this->middleware('can:preparadas_list')->only(['index', 'view', 'printTicket']);
         $this->middleware('can:preparadas_create')->only(['store']);
         $this->middleware('can:preparadas_edit')->only(['show', 'update']);
-        $this->middleware('can:preparadas_delete')->only(['destroy']);
+        $this->middleware('can:preparadas_delete')->only(['destroy', 'anular']);
     }
 
     /**
@@ -150,6 +150,12 @@ class PreparadaController extends Controller
 
         $data = $this->validateData($request);
 
+        if ($request->input('es_rectificacion') == '1') {
+            $data['rectificacion_motivo'] = $request->validate([
+                'rectificacion_motivo' => 'nullable|string|max:500',
+            ])['rectificacion_motivo'] ?? null;
+        }
+
         try {
             if ($request->input('es_rectificacion') == '1') {
                 $preparadaAnuladaId = $request->input('preparada_anulada_id');
@@ -213,10 +219,12 @@ class PreparadaController extends Controller
      *
      * @param  int  $id  ID de la preparada a anular
      */
-    public function anular(int $id): JsonResponse
+    public function anular(Request $request, int $id): JsonResponse
     {
+        $data = $request->validate(['motivo' => 'nullable|string|max:500']);
+
         try {
-            $this->preparadaService->anularPreparada($id);
+            $this->preparadaService->anularPreparada($id, $data['motivo'] ?? null);
 
             return response()->json([
                 'success' => true,

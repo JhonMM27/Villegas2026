@@ -286,6 +286,7 @@
     <script src="{{asset('datatables/dataTables.js')}}"></script>
     <script src="{{asset('datatables/dataTables.bootstrap5.js')}}"></script>
     <script src="{{asset('js/sweetalert2.js')}}"></script>
+    <script src="{{asset('js/auditoria-motivo.js')}}"></script>
     <script src="{{asset('js/crud.js')}}"></script>
     <!--begin::Flatpickr (selector de fecha/hora)-->
     <script src="{{asset('js/flatpickr.min.js')}}"></script>

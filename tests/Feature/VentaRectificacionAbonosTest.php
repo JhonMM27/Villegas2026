@@ -62,7 +62,7 @@ class VentaRectificacionAbonosTest extends TestCase
         $this->insertarCobranza();
 
         try {
-            app(VentaService::class)->anularVenta(1);
+            app(VentaService::class)->anularVenta(1, 'Anulación de prueba');
             $this->fail('La anulación con cobranzas aplicadas debió ser rechazada.');
         } catch (\Exception $e) {
             $this->assertStringContainsString('tiene cobranzas provisionales aplicadas: Recibo #43341 (S/ 3762.00)', $e->getMessage());
@@ -76,7 +76,7 @@ class VentaRectificacionAbonosTest extends TestCase
 
         // 1. Intentar anular la venta -> falla porque tiene cobranza
         try {
-            app(VentaService::class)->anularVenta(1);
+            app(VentaService::class)->anularVenta(1, 'Anulación de prueba');
             $this->fail('Debió bloquear anulación');
         } catch (\Exception $e) {
             $this->assertStringContainsString('tiene cobranzas provisionales aplicadas', $e->getMessage());
@@ -92,7 +92,7 @@ class VentaRectificacionAbonosTest extends TestCase
         ]);
 
         // 3. Ahora anular la venta y luego rectificarla
-        app(VentaService::class)->anularVenta(1);
+        app(VentaService::class)->anularVenta(1, 'Anulación de prueba');
         app(VentaService::class)->rectificarVenta(1, $this->datosRectificacion());
 
         $this->assertDatabaseHas('ventas', [
@@ -104,6 +104,17 @@ class VentaRectificacionAbonosTest extends TestCase
             'saldo' => 0,
             'rectificacion_count' => 1,
         ]);
+        $this->assertDatabaseHas('auditoria_eventos', [
+            'tipo_evento' => 'rectificacion',
+            'modulo' => 'ventas',
+            'registro_id' => 1,
+            'numero_rectificacion' => 1,
+            'user_nombre' => 'Sistema',
+        ]);
+
+        $historial = DB::table('auditoria_eventos')->where('tipo_evento', 'rectificacion')->first();
+        $cambios = json_decode($historial->cambios, true, flags: JSON_THROW_ON_ERROR);
+        $this->assertContains('Pago inicial', array_column($cambios['cabecera'], 'campo'));
     }
 
     public function test_rectificar_sin_abonos_mantiene_el_comportamiento_normal(): void
@@ -317,6 +328,38 @@ class VentaRectificacionAbonosTest extends TestCase
             $table->unsignedInteger('correlativo')->nullable();
             $table->decimal('monto', 12, 2);
             $table->string('comentario')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('rectificacion_historiales', function (Blueprint $table) {
+            $table->id();
+            $table->string('modulo', 50);
+            $table->unsignedBigInteger('registro_id');
+            $table->unsignedTinyInteger('numero_rectificacion');
+            $table->string('registro_referencia', 150);
+            $table->unsignedSmallInteger('user_id')->nullable();
+            $table->string('user_nombre', 100);
+            $table->string('motivo', 500)->nullable();
+            $table->json('datos_anteriores');
+            $table->json('datos_nuevos');
+            $table->json('cambios');
+            $table->timestamps();
+            $table->unique(['modulo', 'registro_id', 'numero_rectificacion']);
+        });
+
+        Schema::create('auditoria_eventos', function (Blueprint $table) {
+            $table->id();
+            $table->string('tipo_evento', 20);
+            $table->string('modulo', 50);
+            $table->unsignedBigInteger('registro_id');
+            $table->unsignedTinyInteger('numero_rectificacion')->nullable();
+            $table->string('registro_referencia', 150);
+            $table->unsignedSmallInteger('user_id')->nullable();
+            $table->string('user_nombre', 100);
+            $table->string('motivo', 500);
+            $table->json('datos_anteriores');
+            $table->json('datos_nuevos');
+            $table->json('cambios');
             $table->timestamps();
         });
     }

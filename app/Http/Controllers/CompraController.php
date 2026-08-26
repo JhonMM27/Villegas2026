@@ -37,7 +37,7 @@ class CompraController extends Controller
         $this->middleware('can:compras_list')->only(['index', 'view', 'printTicket', 'getSerie']);
         $this->middleware('can:compras_create')->only(['store']);
         $this->middleware('can:compras_edit')->only(['show', 'update']);
-        $this->middleware('can:compras_delete')->only(['destroy']);
+        $this->middleware('can:compras_delete')->only(['destroy', 'anular']);
     }
 
     /**
@@ -99,7 +99,6 @@ class CompraController extends Controller
                         </button>';
                     }
 
-                    // Combinar ambos botones en una cadena y devolverla
                     return '<div class="btn-group">'.$ver.$ticketButton.$anularButton.$rectificarButton.'</div>';
                 })
                 ->filterColumn('proveedor', function ($query, $keyword) {
@@ -167,6 +166,12 @@ class CompraController extends Controller
             ]);
         }
         $data = $this->validateData($request);
+
+        if ($request->boolean('es_rectificacion')) {
+            $data['rectificacion_motivo'] = $request->validate([
+                'rectificacion_motivo' => 'nullable|string|max:500',
+            ])['rectificacion_motivo'] ?? null;
+        }
 
         // Si es rectificación, el estado será rectificada, en caso contrario, registrada.
         $estadoInicial = $request->boolean('es_rectificacion') ? 'rectificada' : 'registrada';
@@ -264,10 +269,12 @@ class CompraController extends Controller
      * @param  int  $id  ID de la compra a anular
      * @return \Illuminate\Http\JsonResponse
      */
-    public function anular($id)
+    public function anular(Request $request, $id)
     {
+        $data = $request->validate(['motivo' => 'nullable|string|max:500']);
+
         try {
-            $compra = $this->compraService->anularCompra((int) $id);
+            $compra = $this->compraService->anularCompra((int) $id, $data['motivo'] ?? null);
 
             return response()->json([
                 'success' => true,

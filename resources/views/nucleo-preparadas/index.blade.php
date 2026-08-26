@@ -436,6 +436,7 @@ class NucleoPreparadaManager extends CrudManager {
 
     showCreateModal(){
         this.isEditing = false;
+        this.isRectifying = false;
         this.resetForm();
 
         // Forzar limpieza de los hidden de rectificación (defensa contra residuos de sesión)
@@ -482,6 +483,17 @@ class NucleoPreparadaManager extends CrudManager {
         const minutes = String(now.getMinutes()).padStart(2, '0');
 
         return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+
+    async handleSubmit(e) {
+        if (this.isRectifying) {
+            e.preventDefault();
+            const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Este motivo quedará registrado permanentemente en Auditoría.');
+            if (motivo === null) return;
+            asignarMotivoAuditoria(this.form, motivo);
+        }
+
+        return super.handleSubmit(e);
     }
 
     async showEditModal(id) {
@@ -728,6 +740,10 @@ document.addEventListener('DOMContentLoaded', () => {
             Swal.fire({
                 title: '¿Anular preparación de núcleo?',
                 text: 'Esta acción revertirá los insumos consumidos y el producto final producido. El kardex se recalculará en cascada.',
+                input: 'textarea',
+                inputLabel: 'Motivo (opcional)',
+                inputPlaceholder: 'Puede describir el motivo o dejarlo vacío',
+                inputAttributes: { maxlength: 500 },
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#dc3545',
@@ -746,7 +762,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         'X-CSRF-TOKEN': csrfToken,
                         'Accept': 'application/json',
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({ motivo: String(result.value).trim() })
                 })
                 .then(function(response) { return response.json(); })
                 .then(function(data) {

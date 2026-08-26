@@ -36,7 +36,7 @@ class PrestamoController extends Controller
         protected PrestamoService $prestamoService
     ) {
         $this->middleware('can:prestamos_list')->only(['index', 'view', 'printTicket', 'getSerie']);
-        $this->middleware('can:prestamos_create')->only(['store']);
+        $this->middleware('can:prestamos_create')->only(['store', 'rectificar']);
         $this->middleware('can:prestamos_edit')->only(['show', 'update']);
         $this->middleware('can:prestamos_delete')->only(['destroy']);
         $this->middleware('can:prestamos_delete')->only(['anular']);
@@ -194,6 +194,12 @@ class PrestamoController extends Controller
         }
 
         $data = $this->validateData($request);
+
+        if ($request->boolean('es_rectificacion')) {
+            $data['rectificacion_motivo'] = $request->validate([
+                'rectificacion_motivo' => 'nullable|string|max:500',
+            ])['rectificacion_motivo'] ?? null;
+        }
 
         try {
             if ($request->boolean('es_rectificacion') && $request->filled('prestamo_anulado_id')) {
@@ -354,10 +360,12 @@ class PrestamoController extends Controller
      *
      * @param  int  $id  ID del préstamo a anular
      */
-    public function anular($id): JsonResponse
+    public function anular(Request $request, $id): JsonResponse
     {
+        $data = $request->validate(['motivo' => 'nullable|string|max:500']);
+
         try {
-            $prestamo = $this->prestamoService->anularPrestamo((int) $id);
+            $prestamo = $this->prestamoService->anularPrestamo((int) $id, $data['motivo'] ?? null);
 
             return response()->json([
                 'success' => true,

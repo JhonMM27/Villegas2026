@@ -18,11 +18,13 @@ class VentaEntrega extends Model
         'numero_recibo',
         'fecha_entrega',
         'estado',
+        'rectificacion_count',
         'comentario',
     ];
 
     protected $casts = [
         'fecha_entrega' => 'datetime',
+        'rectificacion_count' => 'integer',
     ];
 
     protected function serializeDate(\DateTimeInterface $date)

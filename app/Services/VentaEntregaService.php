@@ -373,14 +373,17 @@ class VentaEntregaService
      *
      * @throws \Exception Si la entrega ya está anulada
      */
-    public function anularEntrega(int $id): VentaEntrega
+    public function anularEntrega(int $id, ?string $motivo): VentaEntrega
     {
-        return DB::transaction(function () use ($id) {
-            $entrega = VentaEntrega::with('detalles')->findOrFail($id);
+        return DB::transaction(function () use ($id, $motivo) {
+            $entrega = VentaEntrega::query()->with('detalles')->lockForUpdate()->findOrFail($id);
 
             if ($entrega->estado === 'ANULADO') {
                 throw new \Exception('Esta entrega ya fue anulada.');
             }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('venta_entregas', $entrega);
 
             // 1) Cambiar estado a 'ANULADO'
             $entrega->update(['estado' => 'ANULADO']);
@@ -392,6 +395,10 @@ class VentaEntregaService
             if ($entrega->detalles->isNotEmpty()) {
                 $this->revertirDetallesEnVentas($entrega->id);
             }
+
+            $entrega->refresh()->load('detalles');
+            $auditoria->registrarAnulacion('venta_entregas', $entrega, $datosAnteriores,
+                $auditoria->capturar('venta_entregas', $entrega), $motivo);
 
             return $entrega;
         });
@@ -410,11 +417,19 @@ class VentaEntregaService
     public function rectificarEntrega(int $id, array $data): VentaEntrega
     {
         return DB::transaction(function () use ($id, $data) {
-            $entrega = VentaEntrega::with('detalles')->findOrFail($id);
+            $entrega = VentaEntrega::query()->with('detalles')->lockForUpdate()->findOrFail($id);
 
             if ($entrega->estado !== 'ANULADO') {
                 throw new \Exception('Solo se pueden rectificar entregas anuladas.');
             }
+
+            if ($entrega->rectificacion_count >= 3) {
+                throw new \Exception('Esta entrega ya no puede ser rectificada. Máximo 3 rectificaciones permitidas.');
+            }
+
+            $auditoria = app(AuditoriaService::class);
+            $datosAnteriores = $auditoria->capturar('venta_entregas', $entrega);
+            $numeroRectificacion = (int) $entrega->rectificacion_count + 1;
 
             // 1) Neutralizar movimientos anteriores
             $this->neutralizarMovimientosEntrega($entrega->id);
@@ -430,6 +445,7 @@ class VentaEntregaService
             // 4) Actualizar cabecera y recrear detalles
             $entrega->update(array_merge($entregaData['entrega'], [
                 'estado' => 'ENTREGADO',
+                'rectificacion_count' => $numeroRectificacion,
             ]));
             $entrega->detalles()->delete();
             if (! empty($entregaData['detalles'])) {
@@ -454,6 +470,10 @@ class VentaEntregaService
                     ]);
                 }
             }
+
+            $entrega->refresh()->load('detalles');
+            $auditoria->registrarRectificacion('venta_entregas', $entrega, $numeroRectificacion, $datosAnteriores,
+                $auditoria->capturar('venta_entregas', $entrega), $data['rectificacion_motivo'] ?? null);
 
             return $entrega;
         });

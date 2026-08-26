@@ -39,8 +39,8 @@ class VentaEntregaController extends Controller
     ) {
         $this->middleware('can:venta_entregas_list')->only(['index', 'imprimir', 'view']);
         $this->middleware('can:venta_entregas_create')->only(['store']);
-        $this->middleware('can:venta_entregas_edit')->only(['show', 'update']);
-        $this->middleware('can:venta_entregas_delete')->only(['destroy']);
+        $this->middleware('can:venta_entregas_edit')->only(['show', 'rectificar']);
+        $this->middleware('can:venta_entregas_delete')->only(['anular']);
     }
 
     /**
@@ -57,6 +57,8 @@ class VentaEntregaController extends Controller
                     've.user_nombre',
                     've.fecha_entrega',
                     've.numero_recibo',
+                    've.estado',
+                    've.rectificacion_count',
                     'v.comprobante_tipo_codigo',
                     'v.serie',
                     'v.correlativo',
@@ -83,14 +85,11 @@ class VentaEntregaController extends Controller
                     NumericStringOrder::apply($query, 've.numero_recibo', 've.id', $direction);
                 })
                 ->addColumn('action', function ($row) {
-                    $editButton = '';
-                    if (auth()->user()->can('venta_entregas_edit')) {
-                        $editButton = view('components.button-edit', ['id' => $row->id])->render();
-                    }
-                    $deleteButton = '';
-                    if (auth()->user()->can('venta_entregas_delete')) {
-                        $texto = trim(($row->cliente_nombre ?? '').' - '.($row->numero_recibo ?? ''));
-                        $deleteButton = view('components.button-delete', ['id' => $row->id, 'texto' => $texto])->render();
+                    $actionButton = '';
+                    if ($row->estado !== 'ANULADO' && auth()->user()->can('venta_entregas_delete')) {
+                        $actionButton = '<button type="button" class="btn btn-sm btn-danger btn-anular-entrega" data-id="'.$row->id.'" title="Anular entrega"><i class="bi bi-x-circle"></i></button>';
+                    } elseif ($row->estado === 'ANULADO' && (int) $row->rectificacion_count < 3 && auth()->user()->can('venta_entregas_edit')) {
+                        $actionButton = '<button type="button" class="btn btn-sm btn-warning btn-rectificar-entrega" data-id="'.$row->id.'" title="Rectificar entrega"><i class="bi bi-arrow-repeat"></i></button>';
                     }
                     $ticketButton = '<a href="'.route('venta-entregas.imprimir', $row->id).'" 
                         target="_blank" 
@@ -102,7 +101,7 @@ class VentaEntregaController extends Controller
                         <i class="bi bi-eye"></i>
                      </button>';
 
-                    return '<div class="btn-group">'.$editButton.$deleteButton.$ver.$ticketButton.'</div>';
+                    return '<div class="btn-group">'.$actionButton.$ver.$ticketButton.'</div>';
                 })
                 ->rawColumns(['action'])
                 ->make(true);
@@ -425,10 +424,12 @@ class VentaEntregaController extends Controller
      * @param  int  $id  ID de la entrega a anular
      * @return JsonResponse
      */
-    public function anular($id)
+    public function anular(Request $request, $id)
     {
+        $data = $request->validate(['motivo' => 'nullable|string|max:500']);
+
         try {
-            $entrega = $this->ventaEntregaService->anularEntrega($id);
+            $entrega = $this->ventaEntregaService->anularEntrega($id, $data['motivo'] ?? null);
 
             return response()->json([
                 'success' => true,
@@ -457,6 +458,9 @@ class VentaEntregaController extends Controller
         }
 
         $data = $this->validateData($request, $id);
+        $data['rectificacion_motivo'] = $request->validate([
+            'rectificacion_motivo' => 'nullable|string|max:500',
+        ])['rectificacion_motivo'] ?? null;
 
         try {
             $entrega = $this->ventaEntregaService->rectificarEntrega($id, $data);

@@ -15,12 +15,14 @@ class CuadreStock extends Model
     protected $fillable = [
         'fecha',
         'estado',
+        'rectificacion_count',
         'notas',
         'user_id',
     ];
 
     protected $casts = [
         'fecha' => 'date',
+        'rectificacion_count' => 'integer',
     ];
 
     public function detalles(): HasMany
