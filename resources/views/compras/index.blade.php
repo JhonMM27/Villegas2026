@@ -163,6 +163,15 @@ class CompraManager extends CrudManager {
         }
     }
 
+    async handleSubmit(e) {
+        if (!this.validarDistribucionCobranza()) {
+            e.preventDefault();
+            return;
+        }
+
+        return super.handleSubmit(e);
+    }
+
      buildUnidadSelect(fracciones, unidadActual) {
         return `
             <select class="form-select form-select-sm selectUnidad">
@@ -389,8 +398,18 @@ class CompraManager extends CrudManager {
                 tr.dataset.totalManual = "0";
                 recalcularFilaAuto();
             });
+
+            // Configurar limpiador de errores y prevención de wheel scroll en inputs numéricos
             const allInputs = tr.querySelectorAll('input[type="number"]');
-            allInputs.forEach(input => this.setupInputErrorClear(input));
+            allInputs.forEach(input => {
+                this.setupInputErrorClear(input);
+                // Evitar que la rueda del mouse altere la cantidad, precios o totales al enfocar el input
+                input.addEventListener('wheel', (e) => {
+                    if (document.activeElement === e.target) {
+                        e.target.blur();
+                    }
+                }, { passive: true });
+            });
 
             tbody.appendChild(tr);
         }
@@ -557,7 +576,11 @@ class CompraManager extends CrudManager {
         select.dataset.boundCobranza = '1';
 
         select.addEventListener('change', () => {
-            this.updateCobranza();
+            if (select.value === '1') {
+                this.updateCobranza();
+            } else {
+                this.limpiarCobranza();
+            }
         });
     }
 
@@ -569,16 +592,13 @@ class CompraManager extends CrudManager {
         const consorcioEl = document.getElementById('consorcio');
         const totalCobranzaEl = document.getElementById('total_cobranza');
 
-        // 🔴 SI NO ES FORMA 1 → TODO EN CERO
+        // En crédito se conserva la distribución manual ingresada por el usuario.
         if (pagoForma !== '1') {
-            depositoEl.value = '0.00';
-            principalEl.value = '0.00';
-            consorcioEl.value = '0.00';
-            totalCobranzaEl.value = '0.00';
+            this.recalcularTotalCobranza();
             return;
         }
 
-        // 🟢 SI ES 1 → aplicar lógica normal
+        // En contado se distribuye automáticamente el total en la caja elegida.
         tipo = tipo ?? document.getElementById('cobranza_tipo_id')?.value;
         if (!tipo) return;
 
@@ -600,6 +620,15 @@ class CompraManager extends CrudManager {
         }
 
         totalCobranzaEl.value = total.toFixed(2);
+        this.recalcularTotalCobranza();
+    }
+
+    limpiarCobranza() {
+        ['principal', 'deposito', 'consorcio'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) input.value = '0.00';
+        });
+        this.recalcularTotalCobranza();
     }
 
 
@@ -725,11 +754,8 @@ class CompraManager extends CrudManager {
             document.getElementById('consorcio').value = originalConsorcio;
             document.getElementById('total_cobranza').value = originalTotalCobranza;
 
-            // En rectificación no llamamos aplicarCobranza - ya cargamos los valores originales
-            // y calculateTotals se encargará de recalcular si es Principal
-            if (!this.isRectifying) {
-                this.aplicarCobranza(cobranzaTipoId, response.acuenta);
-            }
+            // Preservar exactamente la distribución original, incluso si usa varias cajas.
+            this.recalcularTotalCobranza();
 
             // Acción del formulario
             if (this.elements.methodField.value === 'PUT' && response.id) {
@@ -784,7 +810,8 @@ class CompraManager extends CrudManager {
     bindCobranzaInputs() {
         ['deposito', 'principal', 'consorcio'].forEach(id => {
             const el = document.getElementById(id);
-            if (el) {
+            if (el && el.dataset.boundCobranzaInput !== '1') {
+                el.dataset.boundCobranzaInput = '1';
                 el.addEventListener('input', () => this.recalcularTotalCobranza());
             }
         });
@@ -802,13 +829,49 @@ class CompraManager extends CrudManager {
         const totalCobranzaEl = document.getElementById('total_cobranza');
         totalCobranzaEl.value = totalCobranza.toFixed(2);
 
-        // 🚨 VALIDACIÓN
-        if (totalCobranza > total) {
-            this.showNotification('error', 'El total de la cobranza no puede ser mayor al total del documento');
+        const saldoPendienteEl = document.getElementById('saldo_pendiente');
+        if (saldoPendienteEl) {
+            saldoPendienteEl.value = Math.max(total - totalCobranza, 0).toFixed(2);
+        }
+
+        const importesNegativos = [deposito, principal, consorcio].some(importe => importe < 0);
+        const excedeTotal = totalCobranza - total > 0.009;
+        const esContado = document.getElementById('pago_forma_codigo')?.value === '1';
+        const contadoIncompleto = esContado && total > 0 && Math.abs(totalCobranza - total) > 0.009;
+
+        ['deposito', 'principal', 'consorcio'].forEach(id => {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const valor = parseFloat(input.value) || 0;
+            input.classList.toggle('is-invalid', valor < 0);
+        });
+
+        if (importesNegativos || excedeTotal || contadoIncompleto) {
             totalCobranzaEl.classList.add('is-invalid');
         } else {
             totalCobranzaEl.classList.remove('is-invalid');
         }
+
+        return !(importesNegativos || excedeTotal || contadoIncompleto);
+    }
+
+    validarDistribucionCobranza() {
+        const esValida = this.recalcularTotalCobranza();
+        if (esValida) return true;
+
+        const total = parseFloat(document.getElementById('total')?.value) || 0;
+        const pagoInicial = parseFloat(document.getElementById('total_cobranza')?.value) || 0;
+        const esContado = document.getElementById('pago_forma_codigo')?.value === '1';
+        let mensaje = 'Los importes de caja deben ser mayores o iguales a cero.';
+
+        if (pagoInicial - total > 0.009) {
+            mensaje = 'El pago inicial no puede ser mayor al total del documento.';
+        } else if (esContado && Math.abs(pagoInicial - total) > 0.009) {
+            mensaje = 'Una compra al contado debe quedar pagada completamente.';
+        }
+
+        Swal.fire({ icon: 'error', title: 'Distribución de caja inválida', text: mensaje });
+        return false;
     }
     
     updateDetailsTable(detalles = []) {

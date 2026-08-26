@@ -17,6 +17,7 @@ namespace App\Http\Controllers;
 use App\Models\Compra;
 use App\Models\ComprobanteSerie;
 use App\Services\CompraService;
+use App\Support\PagoInicial;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -289,7 +290,7 @@ class CompraController extends Controller
      */
     protected function validateData(Request $request, $id = null)
     {
-        return $request->validate([
+        $data = $request->validate([
             // Cabecera de la compra
             'proveedor_id' => 'required|exists:proveedores,id',
             'comprobante_tipo_codigo' => 'required|exists:comprobante_tipos,codigo',
@@ -307,7 +308,7 @@ class CompraController extends Controller
             'op_exonerada' => 'required|numeric',
             'op_inafecta' => 'required|numeric',
             'impuesto' => 'required|numeric',
-            'total' => 'required|numeric',
+            'total' => 'required|numeric|min:0',
 
             // Detalles
             'detalles' => 'required|array|min:1',
@@ -319,6 +320,16 @@ class CompraController extends Controller
             'detalles.*.precio_unitario_servicio' => 'nullable|numeric|min:0|max:9',
             'detalles.*.total' => 'required|numeric',
         ]);
+
+        return $this->validatePaymentDistribution($data);
+    }
+
+    /**
+     * Normaliza y valida el pago inicial sin confiar en el total calculado por el navegador.
+     */
+    private function validatePaymentDistribution(array $data): array
+    {
+        return PagoInicial::normalizarYValidar($data, 'compra');
     }
 
     /**

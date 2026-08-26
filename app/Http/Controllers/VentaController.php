@@ -18,6 +18,7 @@ use App\Helpers\NumeroALetras;
 use App\Models\ComprobanteSerie;
 use App\Models\Venta;
 use App\Services\VentaService;
+use App\Support\PagoInicial;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -259,7 +260,7 @@ class VentaController extends Controller
      */
     protected function validateData(Request $request, $id = null)
     {
-        return $request->validate([
+        $data = $request->validate([
             // Cabecera de la venta
             'cliente_id' => 'required|exists:clientes,id',
             'comprobante_tipo_codigo' => 'required|exists:comprobante_tipos,codigo',
@@ -278,7 +279,7 @@ class VentaController extends Controller
             'op_exonerada' => 'required|numeric',
             'op_inafecta' => 'required|numeric',
             'impuesto' => 'required|numeric',
-            'total' => 'required|numeric',
+            'total' => 'required|numeric|min:0',
 
             // Detalles
             'detalles' => 'required|array|min:1',
@@ -290,6 +291,16 @@ class VentaController extends Controller
             'detalles.*.entrega' => 'nullable|numeric',
             'detalles.*.total' => 'required|numeric',
         ]);
+
+        return $this->validatePaymentDistribution($data);
+    }
+
+    /**
+     * Normaliza y valida el pago inicial sin confiar en el total calculado por el navegador.
+     */
+    private function validatePaymentDistribution(array $data): array
+    {
+        return PagoInicial::normalizarYValidar($data, 'venta');
     }
 
     /**

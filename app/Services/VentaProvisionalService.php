@@ -271,42 +271,18 @@ class VentaProvisionalService
      */
     private function aplicarDetallesEnVentas(int $provisionalId): void
     {
-        $detalles = DB::table('venta_provisional_detalles')
-            ->selectRaw('venta_id, SUM(monto) as total')
+        $ventaIds = DB::table('venta_provisional_detalles')
             ->where('venta_provisional_id', $provisionalId)
             ->whereNotNull('venta_id')
             ->where('monto', '>', 0)
-            ->groupBy('venta_id')
-            ->get();
+            ->pluck('venta_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
 
-        $ventaIds = $detalles->pluck('venta_id')->map(fn ($id) => (int) $id)->sort()->values()->all();
-
-        if (empty($ventaIds)) {
-            return;
-        }
-
-        $ventas = Venta::whereIn('id', $ventaIds)
-            ->where('estado', '!=', 'anulada')
-            ->lockForUpdate()
-            ->get()
-            ->keyBy('id');
-
-        foreach ($detalles as $s) {
-            $vId = (int) $s->venta_id;
-            if (! isset($ventas[$vId])) {
-                continue;
-            }
-            $venta = $ventas[$vId];
-            $m = (float) $s->total;
-
-            $venta->abonos = (float) ($venta->abonos ?? 0) + $m;
-            $venta->saldo = (float) ($venta->saldo ?? 0) - $m;
-            if ($venta->saldo < 0) {
-                $venta->saldo = 0;
-            }
-
-            $venta->save();
-        }
+        $this->sincronizarSaldosVentas($ventaIds);
     }
 
     /**
@@ -314,16 +290,25 @@ class VentaProvisionalService
      */
     private function revertirDetallesEnVentas(int $provisionalId): void
     {
-        $detalles = DB::table('venta_provisional_detalles')
-            ->selectRaw('venta_id, SUM(monto) as total')
+        $ventaIds = DB::table('venta_provisional_detalles')
             ->where('venta_provisional_id', $provisionalId)
             ->whereNotNull('venta_id')
             ->where('monto', '>', 0)
-            ->groupBy('venta_id')
-            ->get();
+            ->pluck('venta_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
 
-        $ventaIds = $detalles->pluck('venta_id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+        $this->sincronizarSaldosVentas($ventaIds, $provisionalId);
+    }
 
+    /**
+     * Sincroniza abonos y saldo desde los detalles provisionales, fuente de verdad contable.
+     */
+    private function sincronizarSaldosVentas(array $ventaIds, ?int $excluirProvisionalId = null): void
+    {
         if (empty($ventaIds)) {
             return;
         }
@@ -334,21 +319,15 @@ class VentaProvisionalService
             ->get()
             ->keyBy('id');
 
-        foreach ($detalles as $s) {
-            $vId = (int) $s->venta_id;
-            if (! isset($ventas[$vId])) {
-                continue;
-            }
-            $venta = $ventas[$vId];
-            $m = (float) $s->total;
+        foreach ($ventas as $venta) {
+            $abonos = DB::table('venta_provisional_detalles')
+                ->where('venta_id', $venta->id)
+                ->where('monto', '>', 0)
+                ->when($excluirProvisionalId !== null, fn ($query) => $query->where('venta_provisional_id', '!=', $excluirProvisionalId))
+                ->sum('monto');
 
-            $venta->abonos = (float) ($venta->abonos ?? 0) - $m;
-            if ($venta->abonos < 0) {
-                $venta->abonos = 0;
-            }
-
-            $venta->saldo = (float) ($venta->saldo ?? 0) + $m;
-
+            $venta->abonos = round((float) $abonos, 2);
+            $venta->saldo = max(round((float) $venta->total - (float) $venta->acuenta - $venta->abonos, 2), 0);
             $venta->save();
         }
     }

@@ -271,42 +271,18 @@ class CompraProvisionalService
      */
     private function aplicarDetallesEnCompras(int $provisionalId): void
     {
-        $detalles = DB::table('compra_provisional_detalles')
-            ->selectRaw('compra_id, SUM(monto) as total')
+        $compraIds = DB::table('compra_provisional_detalles')
             ->where('compra_provisional_id', $provisionalId)
             ->whereNotNull('compra_id')
             ->where('monto', '>', 0)
-            ->groupBy('compra_id')
-            ->get();
+            ->pluck('compra_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
 
-        $compraIds = $detalles->pluck('compra_id')->map(fn ($id) => (int) $id)->sort()->values()->all();
-
-        if (empty($compraIds)) {
-            return;
-        }
-
-        $compras = Compra::whereIn('id', $compraIds)
-            ->where('estado', '!=', 'anulada')
-            ->lockForUpdate()
-            ->get()
-            ->keyBy('id');
-
-        foreach ($detalles as $s) {
-            $cId = (int) $s->compra_id;
-            if (! isset($compras[$cId])) {
-                continue;
-            }
-            $compra = $compras[$cId];
-            $m = (float) $s->total;
-
-            $compra->abonos = (float) ($compra->abonos ?? 0) + $m;
-            $compra->saldo = (float) ($compra->saldo ?? 0) - $m;
-            if ($compra->saldo < 0) {
-                $compra->saldo = 0;
-            }
-
-            $compra->save();
-        }
+        $this->sincronizarSaldosCompras($compraIds);
     }
 
     /**
@@ -314,16 +290,25 @@ class CompraProvisionalService
      */
     private function revertirDetallesEnCompras(int $provisionalId): void
     {
-        $detalles = DB::table('compra_provisional_detalles')
-            ->selectRaw('compra_id, SUM(monto) as total')
+        $compraIds = DB::table('compra_provisional_detalles')
             ->where('compra_provisional_id', $provisionalId)
             ->whereNotNull('compra_id')
             ->where('monto', '>', 0)
-            ->groupBy('compra_id')
-            ->get();
+            ->pluck('compra_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
 
-        $compraIds = $detalles->pluck('compra_id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+        $this->sincronizarSaldosCompras($compraIds, $provisionalId);
+    }
 
+    /**
+     * Sincroniza abonos y saldo desde los detalles provisionales, fuente de verdad contable.
+     */
+    private function sincronizarSaldosCompras(array $compraIds, ?int $excluirProvisionalId = null): void
+    {
         if (empty($compraIds)) {
             return;
         }
@@ -334,21 +319,15 @@ class CompraProvisionalService
             ->get()
             ->keyBy('id');
 
-        foreach ($detalles as $s) {
-            $cId = (int) $s->compra_id;
-            if (! isset($compras[$cId])) {
-                continue;
-            }
-            $compra = $compras[$cId];
-            $m = (float) $s->total;
+        foreach ($compras as $compra) {
+            $abonos = DB::table('compra_provisional_detalles')
+                ->where('compra_id', $compra->id)
+                ->where('monto', '>', 0)
+                ->when($excluirProvisionalId !== null, fn ($query) => $query->where('compra_provisional_id', '!=', $excluirProvisionalId))
+                ->sum('monto');
 
-            $compra->abonos = (float) ($compra->abonos ?? 0) - $m;
-            if ($compra->abonos < 0) {
-                $compra->abonos = 0;
-            }
-
-            $compra->saldo = (float) ($compra->saldo ?? 0) + $m;
-
+            $compra->abonos = round((float) $abonos, 2);
+            $compra->saldo = max(round((float) $compra->total - (float) $compra->acuenta - $compra->abonos, 2), 0);
             $compra->save();
         }
     }

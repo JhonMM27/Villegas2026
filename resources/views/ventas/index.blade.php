@@ -198,6 +198,10 @@
             async handleSubmit(e) {
                 e.preventDefault();
 
+                if (!this.validarDistribucionCobranza()) {
+                    return;
+                }
+
                 const alertas = await this.checkStockAlerts();
 
                 if (alertas.length > 0) {
@@ -514,8 +518,18 @@
                         tr.dataset.totalManual = "0";
                         recalcularFilaAuto();
                     });
+
+                    // Configurar limpiador de errores y prevención de wheel scroll en inputs numéricos
                     const allInputs = tr.querySelectorAll('input[type="number"]');
-                    allInputs.forEach(input => this.setupInputErrorClear(input));
+                    allInputs.forEach(input => {
+                        this.setupInputErrorClear(input);
+                        // Evitar que la rueda del mouse altere la cantidad, precios o entregas al enfocar el input
+                        input.addEventListener('wheel', (e) => {
+                            if (document.activeElement === e.target) {
+                                e.target.blur();
+                            }
+                        }, { passive: true });
+                    });
 
                     tbody.appendChild(tr);
                 }
@@ -803,7 +817,11 @@
                 select.dataset.boundCobranza = '1';
 
                 select.addEventListener('change', () => {
-                    this.updateCobranza();
+                    if (select.value === '1') {
+                        this.updateCobranza();
+                    } else {
+                        this.limpiarCobranza();
+                    }
                 });
             }
 
@@ -817,16 +835,13 @@
 
                 const setVal = (el, val) => { if (el) el.value = val; };
 
-                // 🔴 SI NO ES FORMA 1 → TODO EN CERO
+                // En crédito se conserva la distribución manual ingresada por el usuario.
                 if (pagoForma !== '1') {
-                    setVal(depositoEl, '0.00');
-                    setVal(principalEl, '0.00');
-                    setVal(consorcioEl, '0.00');
-                    setVal(totalCobranzaEl, '0.00');
+                    this.recalcularTotalCobranza();
                     return;
                 }
 
-                // 🟢 SI ES 1 → aplicar lógica normal
+                // En contado se distribuye automáticamente el total en la caja elegida.
                 tipo = tipo ?? document.getElementById('cobranza_tipo_id')?.value;
                 if (!tipo) return;
 
@@ -846,6 +861,15 @@
                 }
 
                 setVal(totalCobranzaEl, total.toFixed(2));
+                this.recalcularTotalCobranza();
+            }
+
+            limpiarCobranza() {
+                ['principal', 'deposito', 'consorcio'].forEach(id => {
+                    const input = document.getElementById(id);
+                    if (input) input.value = '0.00';
+                });
+                this.recalcularTotalCobranza();
             }
 
             async showEditModal(id) {
@@ -939,7 +963,8 @@
             bindCobranzaInputs() {
                 ['deposito', 'principal', 'consorcio'].forEach(id => {
                     const el = document.getElementById(id);
-                    if (el) {
+                    if (el && el.dataset.boundCobranzaInput !== '1') {
+                        el.dataset.boundCobranzaInput = '1';
                         el.addEventListener('input', () => this.recalcularTotalCobranza());
                     }
                 });
@@ -957,13 +982,49 @@
                 const totalCobranzaEl = document.getElementById('total_cobranza');
                 totalCobranzaEl.value = totalCobranza.toFixed(2);
 
-                // 🚨 VALIDACIÓN
-                if (totalCobranza > total) {
-                    this.showNotification('error', 'El total de la cobranza no puede ser mayor al total del documento');
+                const saldoPendienteEl = document.getElementById('saldo_pendiente');
+                if (saldoPendienteEl) {
+                    saldoPendienteEl.value = Math.max(total - totalCobranza, 0).toFixed(2);
+                }
+
+                const importesNegativos = [deposito, principal, consorcio].some(importe => importe < 0);
+                const excedeTotal = totalCobranza - total > 0.009;
+                const esContado = document.getElementById('pago_forma_codigo')?.value === '1';
+                const contadoIncompleto = esContado && total > 0 && Math.abs(totalCobranza - total) > 0.009;
+
+                ['deposito', 'principal', 'consorcio'].forEach(id => {
+                    const input = document.getElementById(id);
+                    if (!input) return;
+                    const valor = parseFloat(input.value) || 0;
+                    input.classList.toggle('is-invalid', valor < 0);
+                });
+
+                if (importesNegativos || excedeTotal || contadoIncompleto) {
                     totalCobranzaEl.classList.add('is-invalid');
                 } else {
                     totalCobranzaEl.classList.remove('is-invalid');
                 }
+
+                return !(importesNegativos || excedeTotal || contadoIncompleto);
+            }
+
+            validarDistribucionCobranza() {
+                const esValida = this.recalcularTotalCobranza();
+                if (esValida) return true;
+
+                const total = parseFloat(document.getElementById('total')?.value) || 0;
+                const pagoInicial = parseFloat(document.getElementById('total_cobranza')?.value) || 0;
+                const esContado = document.getElementById('pago_forma_codigo')?.value === '1';
+                let mensaje = 'Los importes de caja deben ser mayores o iguales a cero.';
+
+                if (pagoInicial - total > 0.009) {
+                    mensaje = 'El pago inicial no puede ser mayor al total del documento.';
+                } else if (esContado && Math.abs(pagoInicial - total) > 0.009) {
+                    mensaje = 'Una venta al contado debe quedar pagada completamente.';
+                }
+
+                Swal.fire({ icon: 'error', title: 'Distribución de caja inválida', text: mensaje });
+                return false;
             }
 
 

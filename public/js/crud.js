@@ -559,6 +559,18 @@ class CrudManager {
             input.value = value || '';
         }
     }
-
-
 }
+
+/**
+ * Prevención global para evitar la modificación de valores en inputs numéricos al usar la rueda del mouse.
+ * 
+ * Funcionalidad:
+ * - Detecta el evento 'wheel' cuando el cursor se mueve sobre un elemento de tipo <input type="number">.
+ * - Si el input numérico se encuentra enfocado (document.activeElement), remueve el foco (blur()).
+ * - Esto evita que el navegador altere la cantidad, precio o cualquier valor numérico al desplazarse por el modal o la página.
+ */
+document.addEventListener('wheel', function (e) {
+    if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'number') {
+        document.activeElement.blur();
+    }
+}, { passive: true });

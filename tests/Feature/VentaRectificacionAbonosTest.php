@@ -99,8 +99,9 @@ class VentaRectificacionAbonosTest extends TestCase
             'id' => 1,
             'estado' => 'rectificada',
             'total' => 12531,
+            'acuenta' => 12531,
             'abonos' => 0,
-            'saldo' => 12531,
+            'saldo' => 0,
             'rectificacion_count' => 1,
         ]);
     }
@@ -114,8 +115,9 @@ class VentaRectificacionAbonosTest extends TestCase
         $this->assertDatabaseHas('ventas', [
             'id' => 1,
             'estado' => 'rectificada',
+            'acuenta' => 12531,
             'abonos' => 0,
-            'saldo' => 12531,
+            'saldo' => 0,
         ]);
     }
 

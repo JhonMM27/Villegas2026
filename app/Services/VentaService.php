@@ -23,6 +23,7 @@ use App\Models\Movimiento;
 use App\Models\PagoForma;
 use App\Models\Producto;
 use App\Models\Venta;
+use App\Support\PagoInicial;
 use Illuminate\Support\Facades\DB;
 
 class VentaService
@@ -502,7 +503,11 @@ class VentaService
         }
         $totalItems = count($data['detalles']);
 
-        $acuenta = round((float) ($data['total_cobranza'] ?? 0), 2);
+        $pagoInicial = PagoInicial::calcular($data);
+        $importePrincipal = $pagoInicial['principal'];
+        $importeDeposito = $pagoInicial['deposito'];
+        $importeConsorcio = $pagoInicial['consorcio'];
+        $acuenta = $pagoInicial['total'];
 
         // Construir array de la cabecera
         $ventaData = [
@@ -524,11 +529,11 @@ class VentaService
             'op_inafecta' => round($totales['op_inafecta'], 2),
             'impuesto' => round($totales['impuesto'], 2),
             'total' => round($totales['total'], 2),
-            'importe_p' => $data['principal'] ?? 0,
-            'importe_d' => $data['deposito'] ?? 0,
-            'importe_c' => $data['consorcio'] ?? 0,
+            'importe_p' => $importePrincipal,
+            'importe_d' => $importeDeposito,
+            'importe_c' => $importeConsorcio,
             'acuenta' => $acuenta,
-            'saldo' => round(round($totales['total'], 2) - $acuenta, 2),
+            'saldo' => max(round(round($totales['total'], 2) - $acuenta, 2), 0),
             'abonos' => 0.00,
             'rentabilidad' => round($totales['rentabilidad'], 4),
         ];

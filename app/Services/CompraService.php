@@ -24,6 +24,7 @@ use App\Models\PagoForma;
 use App\Models\Producto;
 use App\Models\Proveedor;
 use App\Models\Unidad;
+use App\Support\PagoInicial;
 use Illuminate\Support\Facades\DB;
 
 class CompraService
@@ -464,6 +465,13 @@ class CompraService
             );
         }
 
+        $pagoInicial = PagoInicial::calcular($data);
+        $importePrincipal = $pagoInicial['principal'];
+        $importeDeposito = $pagoInicial['deposito'];
+        $importeConsorcio = $pagoInicial['consorcio'];
+        $acuenta = $pagoInicial['total'];
+        $saldo = max(round(round((float) $totales['total'], 2) - $acuenta - $abonos, 2), 0);
+
         // Construir array de la cabecera
         $compraData = [
             'proveedor_id' => $data['proveedor_id'],
@@ -480,12 +488,12 @@ class CompraService
             'op_inafecta' => round($totales['op_inafecta'], 2),
             'impuesto' => round($totales['impuesto'], 2),
             'total' => round($totales['total'], 2),
-            'importe_p' => $data['principal'] ?? 0,
-            'importe_d' => $data['deposito'] ?? 0,
-            'importe_c' => $data['consorcio'] ?? 0,
-            'acuenta' => (float) ($data['total_cobranza'] ?? 0),
+            'importe_p' => $importePrincipal,
+            'importe_d' => $importeDeposito,
+            'importe_c' => $importeConsorcio,
+            'acuenta' => $acuenta,
             'abonos' => $abonos,
-            'saldo' => round($totales['total'], 2) - (float) ($data['total_cobranza'] ?? 0) - $abonos,
+            'saldo' => $saldo,
             'fecha_compra' => $data['fecha_compra'] ?? now(),
             'fecha_vencimiento' => $data['fecha_vencimiento'] ?? null,
         ];
