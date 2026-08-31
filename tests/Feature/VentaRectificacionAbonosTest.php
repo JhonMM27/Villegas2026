@@ -132,6 +132,22 @@ class VentaRectificacionAbonosTest extends TestCase
         ]);
     }
 
+    public function test_rectificar_sin_motivo_guarda_auditoria_con_motivo_nulo(): void
+    {
+        $this->insertarVenta(abonos: 0, saldo: 12531, estado: 'anulada');
+        $data = $this->datosRectificacion();
+        $data['rectificacion_motivo'] = null;
+
+        app(VentaService::class)->rectificarVenta(1, $data);
+
+        $this->assertDatabaseHas('auditoria_eventos', [
+            'tipo_evento' => 'rectificacion',
+            'modulo' => 'ventas',
+            'registro_id' => 1,
+            'motivo' => null,
+        ]);
+    }
+
     public function test_abonos_migrados_sin_detalle_bloquean_operacion_con_mensaje_auditoria(): void
     {
         $this->insertarVenta(abonos: 3762, saldo: 8769, estado: 'anulada');
@@ -356,7 +372,7 @@ class VentaRectificacionAbonosTest extends TestCase
             $table->string('registro_referencia', 150);
             $table->unsignedSmallInteger('user_id')->nullable();
             $table->string('user_nombre', 100);
-            $table->string('motivo', 500);
+            $table->string('motivo', 500)->nullable();
             $table->json('datos_anteriores');
             $table->json('datos_nuevos');
             $table->json('cambios');

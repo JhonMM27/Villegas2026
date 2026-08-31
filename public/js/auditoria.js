@@ -36,6 +36,8 @@
     };
 
     $(function () {
+        let eventoActivoId = null;
+        const printButton = document.getElementById('auditoriaImprimirPdf');
         const table = $('#auditoriaTable').DataTable({
             processing: true,
             serverSide: true,
@@ -90,6 +92,8 @@
             const title = document.getElementById('auditoriaDetalleTitulo');
             const icon = document.getElementById('auditoriaDetalleIcono');
             const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+            eventoActivoId = null;
+            printButton.disabled = true;
             modalElement.classList.remove('audit-event-cancel');
             title.textContent = 'Detalle de auditoría';
             icon.className = 'bi bi-shield-check';
@@ -107,9 +111,21 @@
                 icon.className = isCancellation ? 'bi bi-x-octagon' : 'bi bi-pencil-square';
                 subtitle.textContent = `${data.modulo_nombre} · ${data.registro_referencia}`;
                 content.innerHTML = renderEvent(data);
+                eventoActivoId = data.id;
+                printButton.disabled = false;
             } catch (error) {
                 content.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(error.message)}</div>`;
             }
+        });
+
+        printButton.addEventListener('click', () => {
+            if (!eventoActivoId) return;
+            window.open(`${config.pdfUrl}/${eventoActivoId}/pdf`, '_blank', 'noopener');
+        });
+
+        document.getElementById('rectificacionHistorialModal').addEventListener('hidden.bs.modal', () => {
+            eventoActivoId = null;
+            printButton.disabled = true;
         });
     });
 }());

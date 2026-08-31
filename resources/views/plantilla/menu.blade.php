@@ -327,14 +327,14 @@
                     </li>
                 @endcanany
 
-                @role('admin')
+                @can('auditoria_list')
                     <li class="nav-item">
                         <a href="{{ route('auditoria.index') }}" class="nav-link" id="itemAuditoria">
                             <i class="bi bi-shield-check nav-icon"></i>
                             <p>Auditoría del sistema</p>
                         </a>
                     </li>
-                @endrole
+                @endcan
 
                 {{-- OPERACIONES --}}
                 <li class="nav-header">OPERACIONES</li>

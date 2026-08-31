@@ -587,7 +587,7 @@ class PreparadaManager extends CrudManager {
     async handleSubmit(e) {
         if (this.isRectifying) {
             e.preventDefault();
-            const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Este motivo quedará registrado permanentemente en Auditoría.');
+            const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Puede registrar un motivo o continuar dejando el campo vacío.');
             if (motivo === null) return;
             asignarMotivoAuditoria(this.form, motivo);
         }

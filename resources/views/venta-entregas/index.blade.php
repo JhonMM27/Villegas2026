@@ -123,7 +123,7 @@ class VentaEntregaManager extends CrudManager {
             const btnAnular = e.target.closest('.btn-anular-entrega');
             if (btnAnular) {
                 e.preventDefault();
-                const motivo = await solicitarMotivoAuditoria('Anular entrega', 'Se revertirá el impacto de esta entrega. El motivo quedará registrado en Auditoría.');
+                const motivo = await solicitarMotivoAuditoria('Anular entrega', 'Se revertirá el impacto de esta entrega. El motivo es opcional.');
                 if (motivo === null) return;
 
                 try {
@@ -412,7 +412,7 @@ class VentaEntregaManager extends CrudManager {
     async handleSubmit(e) {
         if (this.isRectifying) {
             e.preventDefault();
-            const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Este motivo quedará registrado permanentemente en Auditoría.');
+            const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Puede registrar un motivo o continuar dejando el campo vacío.');
             if (motivo === null) return;
             asignarMotivoAuditoria(this.form, motivo);
         }

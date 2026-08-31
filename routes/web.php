@@ -74,9 +74,10 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::middleware('role:admin')->prefix('auditoria')->name('auditoria.')->group(function () {
+    Route::prefix('auditoria')->name('auditoria.')->group(function () {
         Route::get('/', [AuditoriaController::class, 'index'])->name('index');
         Route::get('/data', [AuditoriaController::class, 'data'])->name('data');
+        Route::get('/{evento}/pdf', [AuditoriaController::class, 'pdf'])->whereNumber('evento')->name('pdf');
         Route::get('/{evento}', [AuditoriaController::class, 'show'])->whereNumber('evento')->name('show');
     });
     Route::get('/afectacion-tipos/select', [AfectacionTipoController::class, 'select'])->name('afectacion-tipos.select');

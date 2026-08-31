@@ -10,6 +10,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -44,7 +45,7 @@ class AuditoriaControllerTest extends TestCase
             $table->string('registro_referencia', 150);
             $table->unsignedSmallInteger('user_id')->nullable();
             $table->string('user_nombre', 100);
-            $table->string('motivo', 500);
+            $table->string('motivo', 500)->nullable();
             $table->json('datos_anteriores');
             $table->json('datos_nuevos');
             $table->json('cambios');
@@ -85,13 +86,12 @@ class AuditoriaControllerTest extends TestCase
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
-    public function test_solo_el_rol_admin_puede_consultar_un_evento(): void
+    public function test_solo_el_usuario_con_permiso_puede_consultar_un_evento(): void
     {
         $evento = $this->crearEvento();
         $admin = User::query()->create($this->datosUsuario('admin@example.test'));
         $operador = User::query()->create($this->datosUsuario('operador@example.test'));
-        Role::query()->create(['name' => 'admin', 'guard_name' => 'web']);
-        $admin->assignRole('admin');
+        $this->asignarPermisoAuditoria($admin);
 
         $this->actingAs($operador)->getJson(route('auditoria.show', $evento))->assertForbidden();
 
@@ -102,13 +102,87 @@ class AuditoriaControllerTest extends TestCase
             ->assertJsonPath('motivo', 'Corrección del costo registrado');
     }
 
-    public function test_las_tres_rutas_estan_protegidas_por_el_rol_admin(): void
+    public function test_el_admin_puede_generar_el_pdf_del_evento(): void
     {
-        foreach (['auditoria.index', 'auditoria.data', 'auditoria.show'] as $nombre) {
+        $evento = $this->crearEvento();
+        $admin = User::query()->create($this->datosUsuario('admin-pdf@example.test'));
+        $this->asignarPermisoAuditoria($admin);
+
+        $response = $this->actingAs($admin)->get(route('auditoria.pdf', $evento));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    public function test_un_usuario_sin_permiso_no_puede_generar_el_pdf(): void
+    {
+        $evento = $this->crearEvento();
+        $operador = User::query()->create($this->datosUsuario('operador-pdf@example.test'));
+
+        $this->actingAs($operador)
+            ->get(route('auditoria.pdf', $evento))
+            ->assertForbidden();
+    }
+
+    public function test_el_pdf_se_genera_cuando_el_motivo_es_nulo(): void
+    {
+        $evento = $this->crearEvento();
+        $evento->update(['motivo' => null]);
+        $admin = User::query()->create($this->datosUsuario('admin-sin-motivo@example.test'));
+        $this->asignarPermisoAuditoria($admin);
+
+        $this->actingAs($admin)
+            ->get(route('auditoria.pdf', $evento))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_la_vista_pdf_incluye_fecha_usuario_motivo_y_cambios(): void
+    {
+        $evento = $this->crearEvento();
+        $evento->created_at = '2026-08-28 14:35:22';
+
+        $html = view('auditoria.evento_pdf', [
+            'evento' => $evento,
+            'accion' => 'Rectificación',
+            'moduloNombre' => 'Compras',
+            'empresa' => (object) [
+                'razon_social' => 'CONSORCIOS VILLEGAS E.I.R.L.',
+                'direccion' => 'Carretera Pomalca KM 3',
+                'ruc' => '20538937321',
+            ],
+        ])->render();
+
+        $this->assertStringContainsString('28/08/2026', $html);
+        $this->assertStringContainsString('14:35:22', $html);
+        $this->assertStringContainsString('Administrador', $html);
+        $this->assertStringContainsString('Corrección del costo registrado', $html);
+        $this->assertStringContainsString('S/ 100.00', $html);
+        $this->assertStringContainsString('S/ 120.00', $html);
+    }
+
+    public function test_las_cuatro_rutas_estan_protegidas_por_el_permiso_de_auditoria(): void
+    {
+        foreach (['auditoria.index', 'auditoria.data', 'auditoria.show', 'auditoria.pdf'] as $nombre) {
             $middleware = Route::getRoutes()->getByName($nombre)?->gatherMiddleware() ?? [];
             $this->assertContains('auth', $middleware);
-            $this->assertContains('role:admin', $middleware);
+            $this->assertContains('can:auditoria_list', $middleware);
         }
+    }
+
+    private function asignarPermisoAuditoria(User $usuario): void
+    {
+        $permiso = Permission::query()->firstOrCreate([
+            'name' => 'auditoria_list',
+            'guard_name' => 'web',
+        ]);
+        $rol = Role::query()->firstOrCreate([
+            'name' => 'admin',
+            'guard_name' => 'web',
+        ]);
+        $rol->givePermissionTo($permiso);
+        $usuario->assignRole($rol);
     }
 
     private function crearEvento(): AuditoriaEvento
@@ -123,7 +197,18 @@ class AuditoriaControllerTest extends TestCase
             'motivo' => 'Corrección del costo registrado',
             'datos_anteriores' => ['cabecera' => [], 'detalles' => []],
             'datos_nuevos' => ['cabecera' => [], 'detalles' => []],
-            'cambios' => ['cabecera' => [], 'detalles' => []],
+            'cambios' => [
+                'cabecera' => [
+                    [
+                        'campo' => 'Costo total',
+                        'anterior' => 100,
+                        'nuevo' => 120,
+                        'tipo' => 'modificado',
+                        'formato' => 'moneda',
+                    ],
+                ],
+                'detalles' => [],
+            ],
         ]);
     }
 

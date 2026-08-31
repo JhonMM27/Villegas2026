@@ -30,6 +30,7 @@ yarn-error.log
 !database/sql/2026_08_26_rectificacion_historiales.sql
 !database/sql/2026_08_27_auditoria_eventos.sql
 !database/sql/2026_08_27_auditoria_motivo_nullable.sql
+!database/sql/2026_08_29_auditoria_permiso.sql
 
 
 # === OPENCODE ===

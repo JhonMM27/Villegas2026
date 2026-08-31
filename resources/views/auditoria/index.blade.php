@@ -107,7 +107,7 @@
 @endsection
 
 @push('scripts')
-<script>window.auditoriaConfig = @json(['dataUrl' => route('auditoria.data'), 'showUrl' => url('/auditoria')]);</script>
+<script>window.auditoriaConfig = @json(['dataUrl' => route('auditoria.data'), 'showUrl' => url('/auditoria'), 'pdfUrl' => url('/auditoria')]);</script>
 <script src="{{ asset('js/auditoria.js') }}"></script>
 <script>document.getElementById('itemAuditoria')?.classList.add('active');</script>
 @endpush

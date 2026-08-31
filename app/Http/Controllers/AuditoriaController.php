@@ -6,8 +6,11 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditoriaEvento;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Yajra\DataTables\DataTables;
 
@@ -19,12 +22,13 @@ class AuditoriaController extends Controller
         'prestamos' => 'Préstamos',
         'preparadas' => 'Preparadas',
         'nucleo_preparadas' => 'Preparadas de núcleo',
+        'cuadre_stocks' => 'Cuadres de stock',
         'venta_entregas' => 'Entregas de venta',
     ];
 
     public function __construct()
     {
-        $this->middleware('role:admin');
+        $this->middleware('can:auditoria_list');
     }
 
     public function index(): View
@@ -119,5 +123,34 @@ class AuditoriaController extends Controller
             'fecha' => $evento->created_at?->format('d/m/Y H:i:s'),
             'cambios' => $evento->cambios,
         ]);
+    }
+
+    public function pdf(AuditoriaEvento $evento): Response
+    {
+        $accion = $evento->tipo_evento === AuditoriaEvento::TIPO_ANULACION
+            ? 'Anulación'
+            : 'Rectificación';
+        $moduloNombre = self::MODULOS[$evento->modulo]
+            ?? str_replace('_', ' ', ucfirst($evento->modulo));
+        $nombreArchivo = implode('_', array_filter([
+            'auditoria',
+            Str::slug($accion, '_'),
+            Str::slug($evento->registro_referencia, '_'),
+        ])).'.pdf';
+
+        return Pdf::loadView('auditoria.evento_pdf', [
+            'evento' => $evento,
+            'accion' => $accion,
+            'moduloNombre' => $moduloNombre,
+            'empresa' => (object) [
+                'razon_social' => 'CONSORCIOS VILLEGAS E.I.R.L.',
+                'direccion' => 'Carretera Pomalca KM 3',
+                'ruc' => '20538937321',
+            ],
+        ])->setPaper('a4', 'landscape')->addInfo([
+            'Title' => 'Auditoría - '.$accion.' - '.$evento->registro_referencia,
+            'Subject' => 'Detalle de evento protegido de auditoría',
+            'Author' => 'CONSORCIOS VILLEGAS E.I.R.L.',
+        ])->stream($nombreArchivo);
     }
 }

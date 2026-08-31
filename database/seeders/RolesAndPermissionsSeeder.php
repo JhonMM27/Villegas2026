@@ -84,6 +84,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'costos_report',
             'rentabilidad_report',
             'super_admin',
+            'auditoria_list',
             'planilla_report',
             'ration_datos_list',
             'ration_datos_create',

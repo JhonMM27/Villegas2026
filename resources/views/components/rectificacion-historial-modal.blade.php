@@ -167,6 +167,9 @@
                 <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
             </div>
             <div class="modal-footer py-2">
+                <button type="button" class="btn btn-primary btn-sm" id="auditoriaImprimirPdf" disabled>
+                    <i class="bi bi-file-earmark-pdf me-1"></i>Imprimir PDF
+                </button>
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Cerrar</button>
             </div>
         </div>

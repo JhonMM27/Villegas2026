@@ -577,7 +577,7 @@ class CuadreStockManager extends CrudManager {
             return;
         }
 
-        const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Este motivo quedará registrado permanentemente en Auditoría.');
+        const motivo = await solicitarMotivoAuditoria('Motivo de la rectificación', 'Puede registrar un motivo o continuar dejando el campo vacío.');
         if (motivo === null) return;
 
         const formData = {
