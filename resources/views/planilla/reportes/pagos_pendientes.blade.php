@@ -151,13 +151,13 @@
             @endphp
             @foreach ($pagos as $p)
                 @php
-                    $sueldoReal = (float) ($p->sueldo_real_mostrar ?? $p->empleado->sueldo_real ?? 0);
-                    $sueldoPlanilla = (float) ($p->sueldo_planilla_mostrar ?? $p->empleado->sueldo_planilla ?? 0);
-                    $disponible = $sueldoReal - $sueldoPlanilla;
-                    $adelantos = (float) ($p->adelantos_calculado ?? 0);
+                    $desglose = $p->desglose_planilla ?? [];
+                    $sueldoReal = (float) ($desglose['sueldo_real_periodo'] ?? 0);
+                    $sueldoPlanilla = (float) ($desglose['sueldo_planilla_periodo'] ?? 0);
+                    $adelantos = (float) $p->adelantos;
                     $horasExtras = (float) $p->horas_extras;
                     $descuentoFaltas = (float) ($p->descuento_faltas ?? 0);
-                    $totalPagar = $disponible - $adelantos + $horasExtras - $descuentoFaltas;
+                    $totalPagar = (float) $p->total_pagar;
 
                     $totalSueldo += $sueldoReal;
                     $totalPlanilla += $sueldoPlanilla;
@@ -169,13 +169,8 @@
                 <tr>
                     <td class="text-left">
                         {{ $p->empleado->nombre ?? 'N/A' }}
-                        @if ($p->prorrateo_ingreso ?? false)
-                            <span class="badge bg-info ms-1"
-                                title="Prorrateo por fecha de ingreso ({{ $p->dias_trabajados ?? 0 }} días)">   </span>
-                        @endif
-                        @if ($p->prorrateo_salida ?? false)
-                            <span class="badge bg-warning ms-1"
-                                title="Prorrateo por fecha de salida ({{ $p->dias_trabajados ?? 0 }} días)"></span>
+                        @if (($desglose['dias_trabajados'] ?? 30) < 30)
+                            <small>({{ $desglose['dias_trabajados'] }} días)</small>
                         @endif
                     </td>
                     <td>{{ $p->empleado->dni ?? 'N/A' }}</td>

@@ -261,7 +261,7 @@
                                     <td class="text-right fw-bold">{{ $pagos->count() }}</td>
                                 </tr>
                                 <tr>
-                                    <td>Total Sueldo Base (Disponible):</td>
+                                    <td>Total disponible no planilla:</td>
                                     <td class="text-right fw-bold">S/
                                         {{ number_format($resumen['total_sueldo_base'] ?? 0, 2) }}</td>
                                 </tr>
@@ -323,7 +323,7 @@
                             <th>Período</th>
                             <th class="text-right">Sueldo Planilla</th>
                             <th class="text-right">Sueldo Real</th>
-                            <th class="text-right">Sueldo Base</th>
+                            <th class="text-right">No planilla</th>
                             <th class="text-right">H. Extras</th>
                             <th class="text-right">Días Faltas</th>
                             <th class="text-right">Desc. Faltas</th>
@@ -407,7 +407,7 @@
                             <tr>
                                 <th class="text-center">ID</th>
                                 <th>Período</th>
-                                <th class="text-right">Sueldo Base</th>
+                                <th class="text-right">Disponible no planilla</th>
                                 <th class="text-right">H. Extras</th>
                                 <th class="text-right">Días Faltas</th>
                                 <th class="text-right">Desc. Faltas</th>

@@ -8,7 +8,6 @@ use App\Models\Empleado;
 use App\Models\Gasto;
 use App\Models\GastoCategoria;
 use App\Models\GastoTipo;
-use App\Models\PlanillaAdelanto;
 use App\Models\PlanillaPago;
 use App\Models\PlanillaPagoDetalle;
 use Illuminate\Database\Eloquent\Collection;
@@ -18,7 +17,8 @@ class PlanillaPagoService
 {
     public function __construct(
         protected EmpleadoService $empleadoService,
-        protected PlanillaAsistenciaService $asistenciaService
+        protected PlanillaAsistenciaService $asistenciaService,
+        protected PlanillaCalculoService $calculoService
     ) {}
 
     public function getAll(): Collection
@@ -47,7 +47,7 @@ class PlanillaPagoService
 
     public function findById(int $id): ?PlanillaPago
     {
-        return PlanillaPago::with(['empleado', 'detalles', 'adelantosRecords'])->find($id);
+        return PlanillaPago::with(['empleado', 'sueldoAplicado', 'detalles', 'adelantosRecords'])->find($id);
     }
 
     public function existePagoMes(int $empleadoId, int $mes, int $anio): bool
@@ -74,13 +74,6 @@ class PlanillaPagoService
                 throw new \Exception('El empleado no tiene un sueldo vigente para el período seleccionado');
             }
 
-            $sueldoReal = (float) $sueldo->sueldo_real;
-            $disponible = $this->empleadoService->calcularDisponible(
-                (int) $data['empleado_id'],
-                (int) $data['mes'],
-                (int) $data['anio']
-            );
-
             $horasExtras = (float) ($data['horas_extras'] ?? 0);
             $this->asistenciaService->syncDiasFaltadosFromInasistencias(
                 (int) $data['empleado_id'],
@@ -93,23 +86,30 @@ class PlanillaPagoService
                 (int) $data['anio']
             );
             $diasFaltados = $asistencia ? (float) $asistencia->dias_faltados : 0.0;
-            $descuentoFaltas = $this->calcularDescuentoFaltas($sueldoReal, $diasFaltados);
             $ctsSueldoReal = (float) ($data['cts_sueldo_real'] ?? 0);
-            $totalPagar = $disponible + $horasExtras - $descuentoFaltas + $ctsSueldoReal;
+            $desglose = $this->calculoService->calcular(
+                $empleado,
+                $sueldo,
+                (int) $data['mes'],
+                (int) $data['anio'],
+                $horasExtras,
+                $diasFaltados,
+                $ctsSueldoReal
+            );
 
             $pago = PlanillaPago::create([
                 'empleado_id' => (int) $data['empleado_id'],
                 'empleado_sueldo_id' => $sueldo->id,
                 'mes' => (int) $data['mes'],
                 'anio' => (int) $data['anio'],
-                'sueldo_base' => $disponible,
+                'sueldo_base' => $desglose['disponible'],
                 'horas_extras' => $horasExtras,
                 'dias_faltados' => $diasFaltados,
-                'descuento_faltas' => $descuentoFaltas,
+                'descuento_faltas' => $desglose['descuento_faltas'],
                 'cts_planilla' => (float) ($data['cts_planilla'] ?? 0) ?: null,
                 'cts_sueldo_real' => $ctsSueldoReal ?: null,
-                'adelantos' => 0,
-                'total_pagar' => $totalPagar,
+                'adelantos' => $desglose['adelantos'],
+                'total_pagar' => $desglose['total_pagar'],
                 'estado' => 'pendiente',
                 'observaciones' => $data['observaciones'] ?? null,
                 'importe_p' => $data['principal'] ?? 0,
@@ -129,15 +129,15 @@ class PlanillaPagoService
             PlanillaPagoDetalle::create([
                 'planilla_pago_id' => $pago->id,
                 'concepto' => 'Sueldo base disponible',
-                'monto' => $disponible,
+                'monto' => $desglose['disponible'],
                 'tipo' => 'ingreso',
             ]);
 
-            if ($descuentoFaltas > 0) {
+            if ($desglose['descuento_faltas'] > 0) {
                 PlanillaPagoDetalle::create([
                     'planilla_pago_id' => $pago->id,
                     'concepto' => 'Descuento por Faltas',
-                    'monto' => $descuentoFaltas,
+                    'monto' => $desglose['descuento_faltas'],
                     'tipo' => 'descuento',
                 ]);
             }
@@ -167,7 +167,7 @@ class PlanillaPagoService
             $horasExtras = (float) ($data['horas_extras'] ?? 0);
             $diasFaltados = (float) ($data['dias_faltados'] ?? 0);
             $ctsSueldoReal = (float) ($data['cts_sueldo_real'] ?? 0);
-            $descuentoFaltas = $this->calcularDescuentoFaltas($sueldoReal, $diasFaltados);
+            $descuentoFaltas = $this->calculoService->descuentoFaltas($sueldoReal, $diasFaltados);
             $newTotal = (float) $pago->sueldo_base + $horasExtras - $descuentoFaltas + $ctsSueldoReal;
 
             $oldTotal = (float) $pago->total_pagar;
@@ -209,50 +209,44 @@ class PlanillaPagoService
             return false;
         }
 
-        $empleado = $this->empleadoService->findById($pago->empleado_id);
-        if (! $empleado) {
-            return false;
-        }
+        return DB::transaction(function () use ($pago): bool {
+            $pago = PlanillaPago::query()->lockForUpdate()->find($pago->id);
+            if (! $pago || $pago->estado === 'pagado') {
+                return false;
+            }
+            $empleado = $this->empleadoService->findById($pago->empleado_id);
+            if (! $empleado) {
+                return false;
+            }
 
-        $sueldo = $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, $pago->mes, $pago->anio);
-        if (! $sueldo) {
-            return false;
-        }
+            $sueldo = $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, $pago->mes, $pago->anio);
+            if (! $sueldo) {
+                return false;
+            }
 
-        $sueldoReal = (float) $sueldo->sueldo_real;
-        $disponible = $this->empleadoService->calcularDisponible(
-            $pago->empleado_id,
-            $pago->mes,
-            $pago->anio
-        );
+            $asistencia = $this->asistenciaService->getByEmpleadoMes($pago->empleado_id, $pago->mes, $pago->anio);
+            $diasFaltados = $asistencia ? (float) $asistencia->dias_faltados : 0.0;
+            $desglose = $this->calculoService->calcular(
+                $empleado,
+                $sueldo,
+                (int) $pago->mes,
+                (int) $pago->anio,
+                (float) $pago->horas_extras,
+                $diasFaltados,
+                (float) ($pago->cts_sueldo_real ?? 0)
+            );
+            $oldTotal = (float) $pago->total_pagar;
 
-        $totalAdelantos = (float) PlanillaAdelanto::where('empleado_id', $pago->empleado_id)
-            ->delMes($pago->mes, $pago->anio)
-            ->sum('monto');
+            $pago->sueldo_base = $desglose['disponible'];
+            $pago->empleado_sueldo_id = $sueldo->id;
+            $pago->adelantos = $desglose['adelantos'];
+            $pago->dias_faltados = $diasFaltados;
+            $pago->descuento_faltas = $desglose['descuento_faltas'];
+            $pago->total_pagar = $desglose['total_pagar'];
+            $this->ajustarDistribucionCaja($pago, $oldTotal, $desglose['total_pagar']);
 
-        $asistencia = $this->asistenciaService->getByEmpleadoMes($pago->empleado_id, $pago->mes, $pago->anio);
-        $diasFaltados = $asistencia ? (float) $asistencia->dias_faltados : 0.0;
-
-        $descuentoFaltas = $this->calcularDescuentoFaltas($sueldoReal, $diasFaltados);
-
-        $oldTotal = (float) $pago->total_pagar;
-        $newTotal = $disponible + (float) $pago->horas_extras - $descuentoFaltas;
-
-        $pago->sueldo_base = $disponible;
-        $pago->empleado_sueldo_id = $sueldo->id;
-        $pago->adelantos = $totalAdelantos;
-        $pago->dias_faltados = $diasFaltados;
-        $pago->descuento_faltas = $descuentoFaltas;
-        $pago->total_pagar = $newTotal;
-
-        if ($oldTotal > 0 && abs($newTotal - $oldTotal) > 0.01) {
-            $ratio = $newTotal / $oldTotal;
-            $pago->importe_p = round((float) $pago->importe_p * $ratio, 2);
-            $pago->importe_d = round((float) $pago->importe_d * $ratio, 2);
-            $pago->importe_c = round((float) $pago->importe_c * $ratio, 2);
-        }
-
-        return $pago->save();
+            return $pago->save();
+        });
     }
 
     public function getResumenMensual(int $mes, int $anio): array
@@ -272,11 +266,7 @@ class PlanillaPagoService
 
     private function calcularDescuentoFaltas(float $sueldoReal, float $diasFaltados): float
     {
-        if ($diasFaltados <= 0) {
-            return 0.0;
-        }
-
-        return round($diasFaltados * ($sueldoReal / PlanillaAsistenciaService::DIAS_LABORABLES_MES), 2);
+        return $this->calculoService->descuentoFaltas($sueldoReal, $diasFaltados);
     }
 
     public function generarPagosDelMes(int $mes, int $anio): int
@@ -307,7 +297,6 @@ class PlanillaPagoService
                 continue;
             }
 
-            $disponible = $this->empleadoService->calcularDisponible($empleado->id, $mes, $anio);
             $sueldo = $this->empleadoService->sueldoParaPeriodo($empleado->id, $mes, $anio);
             if (! $sueldo) {
                 continue;
@@ -316,21 +305,21 @@ class PlanillaPagoService
             $this->asistenciaService->syncDiasFaltadosFromInasistencias($empleado->id, $mes, $anio);
             $asistencia = $this->asistenciaService->getByEmpleadoMes($empleado->id, $mes, $anio);
             $diasFaltados = $asistencia ? (float) $asistencia->dias_faltados : 0.0;
-            $descuentoFaltas = $this->calcularDescuentoFaltas((float) $sueldo->sueldo_real, $diasFaltados);
+            $desglose = $this->calculoService->calcular($empleado, $sueldo, $mes, $anio, 0, $diasFaltados);
 
             PlanillaPago::create([
                 'empleado_id' => $empleado->id,
                 'empleado_sueldo_id' => $sueldo->id,
                 'mes' => $mes,
                 'anio' => $anio,
-                'sueldo_base' => $disponible,
+                'sueldo_base' => $desglose['disponible'],
                 'horas_extras' => 0,
-                'adelantos' => 0,
+                'adelantos' => $desglose['adelantos'],
                 'dias_faltados' => $diasFaltados,
-                'descuento_faltas' => $descuentoFaltas,
-                'total_pagar' => $disponible - $descuentoFaltas,
+                'descuento_faltas' => $desglose['descuento_faltas'],
+                'total_pagar' => $desglose['total_pagar'],
                 'estado' => 'pendiente',
-                'importe_p' => $disponible - $descuentoFaltas,
+                'importe_p' => $desglose['total_pagar'],
                 'importe_d' => 0,
                 'importe_c' => 0,
             ]);
@@ -524,6 +513,25 @@ class PlanillaPagoService
         }
 
         return $contador;
+    }
+
+    private function ajustarDistribucionCaja(PlanillaPago $pago, float $oldTotal, float $newTotal): void
+    {
+        $sumaCaja = (float) $pago->importe_p + (float) $pago->importe_d + (float) $pago->importe_c;
+        if ($oldTotal > 0 && $sumaCaja > 0) {
+            $ratio = $newTotal / $oldTotal;
+            $pago->importe_p = round((float) $pago->importe_p * $ratio, 2);
+            $pago->importe_d = round((float) $pago->importe_d * $ratio, 2);
+            $pago->importe_c = round((float) $pago->importe_c * $ratio, 2);
+            $diferencia = round($newTotal - ((float) $pago->importe_p + (float) $pago->importe_d + (float) $pago->importe_c), 2);
+            $pago->importe_p = round((float) $pago->importe_p + $diferencia, 2);
+
+            return;
+        }
+
+        $pago->importe_p = $newTotal;
+        $pago->importe_d = 0;
+        $pago->importe_c = 0;
     }
 
     private function getUltimoDiaDelMes(int $mes, int $anio): int

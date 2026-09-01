@@ -40,4 +40,9 @@ class EmpleadoSueldo extends Model
     {
         return $this->belongsTo(User::class, 'registrado_por');
     }
+
+    public function getEmpleadoNombreAttribute(): string
+    {
+        return (string) ($this->empleado?->nombre ?? 'Empleado '.$this->empleado_id);
+    }
 }

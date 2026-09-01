@@ -534,6 +534,7 @@ Route::middleware(['auth'])->group(function () {
     // Planilla - Empleados
     Route::get('/empleados/buscar', [EmpleadoController::class, 'buscar'])->name('empleados.buscar');
     Route::get('/empleados/{id}/edit', [EmpleadoController::class, 'edit'])->name('empleados.edit');
+    Route::post('/empleados/{id}/rectificar-sueldo', [EmpleadoController::class, 'rectificarSueldo'])->name('empleados.rectificar_sueldo');
     Route::resource('empleados', EmpleadoController::class)->except(['create', 'edit']);
 
     // Planilla - Adelantos

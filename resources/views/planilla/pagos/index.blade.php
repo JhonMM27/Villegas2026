@@ -581,8 +581,8 @@ class PagoPlanillaManager extends CrudManager {
 
             document.getElementById('empleado_id').value = response.empleado_id;
             document.getElementById('empleado_nombre').value = response.empleado.nombre + ' (DNI: ' + response.empleado.dni + ')';
-            document.getElementById('sueldo_planilla').value = parseFloat(response.empleado.sueldo_planilla || 0).toFixed(2);
-            document.getElementById('sueldo_real').value = parseFloat(response.empleado.sueldo_real || 0).toFixed(2);
+            document.getElementById('sueldo_planilla').value = parseFloat(response.sueldo_aplicado?.sueldo_planilla || 0).toFixed(2);
+            document.getElementById('sueldo_real').value = parseFloat(response.sueldo_aplicado?.sueldo_real || 0).toFixed(2);
             document.getElementById('disponible_label').textContent = parseFloat(response.sueldo_base || 0).toFixed(2);
             document.getElementById('horas_extras').value = parseFloat(response.horas_extras || 0);
             document.getElementById('dias_faltados').value = parseFloat(response.dias_faltados || 0).toFixed(2);
@@ -607,7 +607,7 @@ class PagoPlanillaManager extends CrudManager {
             document.getElementById('cts_sueldo_real').value = ctsSueldoReal;
 
             const ctsSection = document.getElementById('cts_section');
-            if (parseFloat(response.empleado.sueldo_planilla) > 0) {
+            if (parseFloat(response.sueldo_aplicado?.sueldo_planilla || 0) > 0) {
                 ctsSection.classList.remove('d-none');
             } else {
                 ctsSection.classList.add('d-none');

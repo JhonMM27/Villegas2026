@@ -18,7 +18,7 @@ class EmpleadoController extends Controller
         $this->middleware('can:empleados_list')->only(['index']);
         $this->middleware('can:empleados_edit')->only(['edit']);
         $this->middleware('can:empleados_create')->only(['store']);
-        $this->middleware('can:empleados_edit')->only(['update']);
+        $this->middleware('can:empleados_edit')->only(['update', 'rectificarSueldo']);
         $this->middleware('can:empleados_delete')->only(['destroy']);
     }
 
@@ -38,6 +38,7 @@ class EmpleadoController extends Controller
 
                     if (auth()->user()->can('empleados_edit')) {
                         $buttons .= '<button class="btn btn-sm btn-warning me-1" onclick="empleadoManager.showEditModal('.$row->id.')"><i class="bi bi-pencil"></i></button>';
+                        $buttons .= '<button class="btn btn-sm btn-outline-warning me-1" onclick="empleadoManager.rectificarSueldo('.$row->id.')" title="Rectificar sueldo"><i class="bi bi-cash-coin"></i></button>';
                     }
 
                     if (auth()->user()->can('empleados_delete')) {
@@ -96,6 +97,40 @@ class EmpleadoController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Empleado actualizado correctamente',
+        ]);
+    }
+
+    public function rectificarSueldo(Request $request, $id)
+    {
+        $empleado = $this->empleadoService->findById((int) $id);
+        if (! $empleado) {
+            return response()->json(['success' => false, 'message' => 'Empleado no encontrado'], 404);
+        }
+
+        $data = $request->validate([
+            'mes' => 'required|integer|min:1|max:12',
+            'anio' => 'required|integer|min:2020|max:2100',
+            'sueldo_planilla' => 'required|numeric|min:0|lte:sueldo_real',
+            'sueldo_real' => 'required|numeric|min:0',
+            'motivo' => 'required|string|max:255',
+            'observaciones_sueldo' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            $sueldo = app(\App\Services\EmpleadoSueldoService::class)->rectificarMes(
+                $empleado,
+                (int) $data['mes'],
+                (int) $data['anio'],
+                $data
+            );
+        } catch (InvalidArgumentException $exception) {
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sueldo rectificado y pagos pendientes recalculados correctamente',
+            'sueldo' => $sueldo,
         ]);
     }
 
@@ -171,8 +206,7 @@ class EmpleadoController extends Controller
             'dni' => 'required|string|max:8|unique:empleados,dni,'.$id,
             'telefono' => 'nullable|string|max:20',
             'correo' => 'nullable|email|max:255',
-            'sueldo_base' => 'required|numeric|min:0',
-            'sueldo_planilla' => 'required|numeric|min:0',
+            'sueldo_planilla' => 'required|numeric|min:0|lte:sueldo_real',
             'sueldo_real' => 'required|numeric|min:0',
             'vigente_desde' => 'required|date',
             'motivo' => 'nullable|string|max:255',

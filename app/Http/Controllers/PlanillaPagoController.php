@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Services\EmpleadoService;
 use App\Services\PlanillaAsistenciaService;
+use App\Services\PlanillaCalculoService;
 use App\Services\PlanillaPagoService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
@@ -15,7 +16,8 @@ class PlanillaPagoController extends Controller
     public function __construct(
         protected PlanillaPagoService $pagoService,
         protected EmpleadoService $empleadoService,
-        protected PlanillaAsistenciaService $asistenciaService
+        protected PlanillaAsistenciaService $asistenciaService,
+        protected PlanillaCalculoService $calculoService
     ) {
         $this->middleware('can:planilla_pagos_list')->only(['index']);
         $this->middleware('can:planilla_pagos_create')->only(['store', 'procesarStore']);
@@ -85,7 +87,7 @@ class PlanillaPagoController extends Controller
             return response()->json(['error' => 'Pago no encontrado'], 404);
         }
 
-        $pago->load('empleado');
+        $pago->load(['empleado', 'sueldoAplicado']);
 
         return response()->json($pago);
     }
@@ -220,7 +222,7 @@ class PlanillaPagoController extends Controller
         $mes = (int) $request->get('mes', date('m'));
         $anio = (int) $request->get('anio', date('Y'));
 
-        $disponible = $this->empleadoService->calcularDisponible($empleadoId, $mes, $anio);
+        $disponible = 0;
         $sueldoPlanilla = 0;
         $sueldoReal = 0;
         $diasFaltados = 0;
@@ -235,7 +237,18 @@ class PlanillaPagoController extends Controller
             $asistencia = $this->asistenciaService->getByEmpleadoMes($empleadoId, $mes, $anio);
             if ($asistencia) {
                 $diasFaltados = (float) $asistencia->dias_faltados;
-                $descuentoFaltas = $this->asistenciaService->calcularDescuentoFaltas($sueldoReal, $diasFaltados);
+            }
+            if ($sueldo) {
+                $desglose = $this->calculoService->calcular(
+                    $empleado,
+                    $sueldo,
+                    $mes,
+                    $anio,
+                    0,
+                    $diasFaltados
+                );
+                $disponible = $desglose['disponible'];
+                $descuentoFaltas = $desglose['descuento_faltas'];
             }
         }
 
@@ -243,6 +256,10 @@ class PlanillaPagoController extends Controller
             'disponible' => $disponible,
             'sueldo_planilla' => $sueldoPlanilla,
             'sueldo_real' => $sueldoReal,
+            'sueldo_no_planilla' => isset($desglose) ? $desglose['sueldo_no_planilla'] : 0,
+            'sueldo_no_planilla_periodo' => isset($desglose) ? $desglose['sueldo_no_planilla_periodo'] : 0,
+            'dias_trabajados' => isset($desglose) ? $desglose['dias_trabajados'] : 0,
+            'adelantos' => isset($desglose) ? $desglose['adelantos'] : 0,
             'dias_faltados' => $diasFaltados,
             'descuento_faltas' => $descuentoFaltas,
         ]);

@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\DB;
 class EmpleadoService
 {
     public function __construct(
-        protected EmpleadoSueldoService $sueldoService
+        protected EmpleadoSueldoService $sueldoService,
+        protected PlanillaCalculoService $calculoService
     ) {}
 
     public function getAll(): Collection
@@ -105,42 +106,10 @@ class EmpleadoService
             return 0.0;
         }
 
-        $baseDisponible = (float) $sueldo->sueldo_base;
+        $mes ??= (int) now()->month;
+        $anio ??= (int) now()->year;
 
-        if ($mes && $anio) {
-            $fechaIngreso = $empleado->fecha_ingreso;
-            $fechaSalida = $empleado->fecha_salida;
-
-            $ingresoEnMes = $fechaIngreso && $fechaIngreso->year === $anio && $fechaIngreso->month === $mes;
-            $salidaEnMes = $fechaSalida && $fechaSalida->year === $anio && $fechaSalida->month === $mes;
-
-            if ($salidaEnMes) {
-                if ($ingresoEnMes) {
-                    $diasTrabajados = $fechaSalida->day - $fechaIngreso->day + 1;
-                } else {
-                    $diasTrabajados = $fechaSalida->day;
-                }
-                $factor = $diasTrabajados / 30;
-                $baseDisponible = (float) $sueldo->sueldo_base * $factor;
-            } elseif ($ingresoEnMes && $fechaIngreso->day > 1) {
-                $diasTrabajados = 30 - $fechaIngreso->day + 1;
-                $factor = $diasTrabajados / 30;
-                $baseDisponible = (float) $sueldo->sueldo_base * $factor;
-            }
-        }
-
-        $query = $empleado->adelantos();
-
-        if ($mes && $anio) {
-            $query->delMes($mes, $anio);
-        } else {
-            $query->whereYear('fecha', now()->year)
-                ->whereMonth('fecha', now()->month);
-        }
-
-        $totalAdelantos = (float) $query->sum('monto');
-
-        return max(0, $baseDisponible - $totalAdelantos);
+        return (float) $this->calculoService->calcular($empleado, $sueldo, $mes, $anio)['disponible'];
     }
 
     public function sueldoParaPeriodo(int $empleadoId, int $mes, int $anio): ?EmpleadoSueldo
@@ -154,7 +123,6 @@ class EmpleadoService
     private function datosSueldo(array $data): array
     {
         return Arr::only($data, [
-            'sueldo_base',
             'sueldo_real',
             'sueldo_planilla',
             'vigente_desde',
@@ -166,7 +134,6 @@ class EmpleadoService
     private function camposSueldo(): array
     {
         return [
-            'sueldo_base',
             'sueldo_real',
             'sueldo_planilla',
             'vigente_desde',

@@ -42,12 +42,16 @@ class Empleado extends Model
     public function sueldoActual(): HasOne
     {
         return $this->hasOne(EmpleadoSueldo::class)
-            ->whereDate('vigente_desde', '<=', now()->toDateString())
-            ->where(function ($query): void {
-                $query->whereNull('vigente_hasta')
-                    ->orWhereDate('vigente_hasta', '>=', now()->toDateString());
-            })
-            ->ofMany('vigente_desde', 'max');
+            ->ofMany(
+                ['vigente_desde' => 'max', 'id' => 'max'],
+                function ($query): void {
+                    $query->whereDate('vigente_desde', '<=', now()->toDateString())
+                        ->where(function ($vigencia): void {
+                            $vigencia->whereNull('vigente_hasta')
+                                ->orWhereDate('vigente_hasta', '>=', now()->toDateString());
+                        });
+                }
+            );
     }
 
     public function getSueldoBaseAttribute(): string

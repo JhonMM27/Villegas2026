@@ -22,7 +22,7 @@
                                     <th>Nombre</th>
                                     <th>DNI</th>
                                     <th>Teléfono</th>
-                                    <th>Sueldo Base</th>
+                                    <th>No Planilla</th>
                                     <th>Sueldo Planilla</th>
                                     <th>Sueldo Real</th>
                                     <th>Estado</th>
@@ -40,12 +40,141 @@
     @include('planilla.empleados.action')
 @endcanany
 @endsection
+@push('estilos')
+<style>
+    .payroll-correction-modal {
+        border: 0;
+        border-radius: 1rem;
+        overflow: hidden;
+        box-shadow: 0 1.5rem 4rem rgba(15, 23, 42, .2);
+    }
+
+    .payroll-correction-header {
+        padding: 1.1rem 1.5rem;
+        border-bottom: 1px solid var(--bs-border-color);
+        background: linear-gradient(135deg, rgba(255, 193, 7, .14), rgba(255, 255, 255, 0));
+    }
+
+    .payroll-correction-icon {
+        width: 2.75rem;
+        height: 2.75rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        border-radius: .8rem;
+        color: #8a5a00;
+        background: rgba(255, 193, 7, .24);
+        font-size: 1.3rem;
+    }
+
+    .employee-summary {
+        display: flex;
+        align-items: center;
+        gap: .85rem;
+        padding: .9rem 1rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: .85rem;
+        background: var(--bs-tertiary-bg);
+    }
+
+    .employee-avatar {
+        width: 2.6rem;
+        height: 2.6rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        color: var(--bs-primary);
+        background: rgba(var(--bs-primary-rgb), .12);
+        font-size: 1.15rem;
+    }
+
+    .correction-notice {
+        display: flex;
+        align-items: center;
+        gap: .7rem;
+        padding: .8rem 1rem;
+        border: 1px solid rgba(var(--bs-info-rgb), .22);
+        border-radius: .75rem;
+        color: var(--bs-info-text-emphasis);
+        background: rgba(var(--bs-info-rgb), .08);
+        font-size: .87rem;
+        line-height: 1.35;
+    }
+
+    .correction-notice i {
+        flex: 0 0 auto;
+        font-size: 1.25rem;
+    }
+
+    .formula-pill {
+        padding: .35rem .65rem;
+        border-radius: 999px;
+        color: var(--bs-success-text-emphasis);
+        background: rgba(var(--bs-success-rgb), .1);
+        font-size: .78rem;
+        font-weight: 600;
+    }
+
+    .salary-input .form-control,
+    .salary-result .form-control {
+        min-width: 0;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .salary-result .input-group-text,
+    .salary-result .form-control {
+        color: var(--bs-success-text-emphasis);
+        background: rgba(var(--bs-success-rgb), .09);
+        border-color: rgba(var(--bs-success-rgb), .28);
+    }
+
+    @media (max-width: 575.98px) {
+        .payroll-correction-header,
+        .payroll-correction-modal .modal-body,
+        .payroll-correction-modal .modal-footer {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
+
+        .employee-summary {
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .employee-summary .badge {
+            margin-left: 3.45rem;
+        }
+    }
+</style>
+@endpush
 @push('scripts')
 <script>
 class EmpleadoManager extends CrudManager {
     constructor() {
         super("{{ url('empleados') }}");
         this.initializeDataTable();
+        ['sueldo_real', 'sueldo_planilla'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', () => this.calcularNoPlanilla());
+        });
+        document.getElementById('vigente_mes')?.addEventListener('change', event => {
+            document.getElementById('vigente_desde').value = `${event.target.value}-01`;
+        });
+        this.rectificacionElement = document.getElementById('modalRectificarSueldo');
+        this.rectificacionModal = this.rectificacionElement
+            ? new bootstrap.Modal(this.rectificacionElement)
+            : null;
+        this.rectificacionForm = document.getElementById('formRectificarSueldo');
+        this.rectificacionForm?.addEventListener('submit', event => this.guardarRectificacion(event));
+        ['rect_real', 'rect_planilla'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', () => this.calcularRectificacion());
+        });
+        document.getElementById('rect_motivo')?.addEventListener('input', event => {
+            document.getElementById('rect_motivo_contador').textContent = event.target.value.length;
+            event.target.classList.remove('is-invalid');
+        });
     }
 
     initializeDataTable() {
@@ -70,7 +199,9 @@ class EmpleadoManager extends CrudManager {
     showCreateModal() {
         super.showCreateModal();
         this.elements.modalTitle.textContent = 'Nuevo Empleado';
-        this.setFieldValue('vigente_desde', '{{ now()->toDateString() }}');
+        document.getElementById('vigente_mes').value = '{{ now()->format('Y-m') }}';
+        document.getElementById('vigente_desde').value = '{{ now()->startOfMonth()->toDateString() }}';
+        this.calcularNoPlanilla();
     }
 
     showEditModal(id) {
@@ -82,7 +213,9 @@ class EmpleadoManager extends CrudManager {
             document.getElementById('sueldo_base').value = data.empleado.sueldo_base;
             document.getElementById('sueldo_planilla').value = data.empleado.sueldo_planilla;
             document.getElementById('sueldo_real').value = data.empleado.sueldo_real;
-            this.setFieldValue('vigente_desde', '{{ now()->toDateString() }}');
+            document.getElementById('vigente_mes').value = '{{ now()->format('Y-m') }}';
+            document.getElementById('vigente_desde').value = '{{ now()->startOfMonth()->toDateString() }}';
+            this.calcularNoPlanilla();
             document.getElementById('estado').value = data.empleado.estado;
             if (data.empleado.fecha_ingreso) {
                 this.setFieldValue('fecha_ingreso', data.empleado.fecha_ingreso);
@@ -100,6 +233,123 @@ class EmpleadoManager extends CrudManager {
 
     focusFirstField() {
         document.getElementById('nombre').focus();
+    }
+
+    calcularNoPlanilla() {
+        const real = parseFloat(document.getElementById('sueldo_real')?.value) || 0;
+        const planilla = parseFloat(document.getElementById('sueldo_planilla')?.value) || 0;
+        document.getElementById('sueldo_base').value = Math.max(real - planilla, 0).toFixed(2);
+    }
+
+    async rectificarSueldo(id) {
+        if (!this.rectificacionModal) return;
+
+        try {
+            const { empleado } = await this.fetchData(`${this.baseUrl}/${id}/edit`);
+            this.limpiarRectificacion();
+            document.getElementById('rect_empleado_id').value = empleado.id;
+            document.getElementById('rect_empleado_nombre').textContent = empleado.nombre;
+            document.getElementById('rect_empleado_dni').textContent = `DNI: ${empleado.dni}`;
+            document.getElementById('rect_periodo').value = '{{ now()->format('Y-m') }}';
+            document.getElementById('rect_real').value = parseFloat(empleado.sueldo_real || 0).toFixed(2);
+            document.getElementById('rect_planilla').value = parseFloat(empleado.sueldo_planilla || 0).toFixed(2);
+            this.calcularRectificacion();
+            this.rectificacionModal.show();
+        } catch (error) {
+            this.showNotification('error', 'No se pudo cargar la información salarial del empleado');
+            console.error(error);
+        }
+    }
+
+    calcularRectificacion() {
+        const realInput = document.getElementById('rect_real');
+        const planillaInput = document.getElementById('rect_planilla');
+        if (!realInput || !planillaInput) return;
+
+        const real = parseFloat(realInput.value) || 0;
+        const planilla = parseFloat(planillaInput.value) || 0;
+        const esValido = planilla <= real;
+        planillaInput.classList.toggle('is-invalid', !esValido);
+        realInput.classList.remove('is-invalid');
+        document.getElementById('rect_no_planilla').value = Math.max(real - planilla, 0).toFixed(2);
+    }
+
+    limpiarRectificacion() {
+        this.rectificacionForm?.reset();
+        this.rectificacionForm?.querySelectorAll('.is-invalid').forEach(element => element.classList.remove('is-invalid'));
+        const alerta = document.getElementById('rect_alerta');
+        alerta.classList.add('d-none');
+        alerta.textContent = '';
+        document.getElementById('rect_motivo_contador').textContent = '0';
+        document.getElementById('rect_no_planilla').value = '0.00';
+    }
+
+    validarRectificacion() {
+        const periodo = document.getElementById('rect_periodo');
+        const real = document.getElementById('rect_real');
+        const planilla = document.getElementById('rect_planilla');
+        const motivo = document.getElementById('rect_motivo');
+        const sueldoReal = parseFloat(real.value);
+        const sueldoPlanilla = parseFloat(planilla.value);
+
+        periodo.classList.toggle('is-invalid', !periodo.value);
+        real.classList.toggle('is-invalid', !Number.isFinite(sueldoReal) || sueldoReal < 0);
+        planilla.classList.toggle('is-invalid', !Number.isFinite(sueldoPlanilla) || sueldoPlanilla < 0 || sueldoPlanilla > sueldoReal);
+        motivo.classList.toggle('is-invalid', motivo.value.trim().length === 0);
+
+        return Boolean(periodo.value)
+            && Number.isFinite(sueldoReal)
+            && sueldoReal >= 0
+            && Number.isFinite(sueldoPlanilla)
+            && sueldoPlanilla >= 0
+            && sueldoPlanilla <= sueldoReal
+            && motivo.value.trim().length > 0;
+    }
+
+    async guardarRectificacion(event) {
+        event.preventDefault();
+        if (!this.validarRectificacion()) return;
+
+        const empleadoId = document.getElementById('rect_empleado_id').value;
+        const [anio, mes] = document.getElementById('rect_periodo').value.split('-').map(Number);
+        const boton = document.getElementById('btnRectificarSueldo');
+        const contenidoOriginal = boton.innerHTML;
+        const alerta = document.getElementById('rect_alerta');
+        boton.disabled = true;
+        boton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Procesando...';
+        alerta.classList.add('d-none');
+
+        try {
+            const response = await fetch(`${this.baseUrl}/${empleadoId}/rectificar-sueldo`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({
+                    anio,
+                    mes,
+                    sueldo_real: parseFloat(document.getElementById('rect_real').value),
+                    sueldo_planilla: parseFloat(document.getElementById('rect_planilla').value),
+                    motivo: document.getElementById('rect_motivo').value.trim()
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'No se pudo rectificar el sueldo');
+            }
+
+            this.rectificacionModal.hide();
+            this.showNotification('success', data.message);
+            this.tabla.ajax.reload(null, false);
+        } catch (error) {
+            alerta.textContent = error.message || 'Ocurrió un error al procesar la rectificación.';
+            alerta.classList.remove('d-none');
+        } finally {
+            boton.disabled = false;
+            boton.innerHTML = contenidoOriginal;
+        }
     }
 
     async verDetalle(id) {
@@ -157,7 +407,7 @@ class EmpleadoManager extends CrudManager {
                                         <h6 class="text-success mb-3"><i class="bi bi-currency-dollar me-2"></i>Información Salarial</h6>
                                         <div class="row mb-2">
                                             <div class="col-md-6">
-                                                <label class="form-label text-muted small mb-1">Sueldo Base</label>
+                                                 <label class="form-label text-muted small mb-1">Sueldo no planilla</label>
                                                 <p class="fw-bold mb-0">S/ ${parseFloat(data.empleado.sueldo_base).toFixed(2)}</p>
                                             </div>
                                             <div class="col-md-6">

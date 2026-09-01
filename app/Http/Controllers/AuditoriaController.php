@@ -24,6 +24,7 @@ class AuditoriaController extends Controller
         'nucleo_preparadas' => 'Preparadas de núcleo',
         'cuadre_stocks' => 'Cuadres de stock',
         'venta_entregas' => 'Entregas de venta',
+        'empleado_sueldos' => 'Sueldos de empleados',
     ];
 
     public function __construct()

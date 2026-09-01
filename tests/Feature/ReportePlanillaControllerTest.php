@@ -320,6 +320,64 @@ class ReportePlanillaControllerTest extends TestCase
         $this->assertSame(1130.0, $pago->sueldo_planilla_historico_reporte);
     }
 
+    public function test_pagos_pendientes_usa_el_total_guardado_y_base_treinta_para_ercli(): void
+    {
+        DB::table('empleados')->insert([
+            'id' => 26,
+            'nombre' => 'ERCLI RENAN CUSMA IRIGOIN',
+            'dni' => '60155210',
+            'fecha_ingreso' => '2026-08-03',
+            'fecha_salida' => '2026-08-30',
+            'estado' => 'activo',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('empleado_sueldos')->insert([
+            'id' => 26,
+            'empleado_id' => 26,
+            'sueldo_base' => 1800,
+            'sueldo_real' => 1800,
+            'sueldo_planilla' => 0,
+            'vigente_desde' => '2026-01-01',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('planilla_pagos')->insert([
+            'id' => 119,
+            'empleado_id' => 26,
+            'empleado_sueldo_id' => 26,
+            'mes' => 8,
+            'anio' => 2026,
+            'sueldo_base' => 1680,
+            'total_pagar' => 1680,
+            'estado' => 'pendiente',
+            'importe_p' => 1680,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $pdf = Mockery::mock(\Barryvdh\DomPDF\PDF::class);
+        $pdf->shouldReceive('stream')->once()->with('reporte_pagos_pendientes.pdf')->andReturn(response('pdf'));
+        Pdf::shouldReceive('loadView')
+            ->once()
+            ->with('planilla.reportes.pagos_pendientes', Mockery::on(function (array $datos): bool {
+                $ercli = $datos['pagos']->firstWhere('id', 119);
+                $this->assertSame(1680.0, (float) $ercli->total_pagar);
+                $this->assertSame(28, $ercli->desglose_planilla['dias_trabajados']);
+                $this->assertSame(1680.0, $ercli->desglose_planilla['sueldo_real_periodo']);
+
+                return true;
+            }))
+            ->andReturn($pdf);
+
+        $request = Request::create('/reporte', 'GET', [
+            'fecha_inicio' => '2026-08-01',
+            'fecha_fin' => '2026-08-31',
+        ]);
+
+        $this->assertSame(200, app(ReportePlanillaController::class)->pagosPendientesPdf($request)->getStatusCode());
+    }
+
     private function prepararReporte(string $inicio, string $fin): array
     {
         $controller = app(ReportePlanillaController::class);

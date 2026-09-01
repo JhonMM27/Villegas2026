@@ -11,6 +11,7 @@ use App\Models\PlanillaPago;
 use App\Models\PlanillaPrestamo;
 use App\Services\EmpleadoService;
 use App\Services\EmpleadoSueldoService;
+use App\Services\PlanillaCalculoService;
 use App\Services\PlanillaPagoService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -22,7 +23,8 @@ class ReportePlanillaController extends Controller
     public function __construct(
         protected PlanillaPagoService $pagoService,
         protected EmpleadoService $empleadoService,
-        protected EmpleadoSueldoService $sueldoService
+        protected EmpleadoSueldoService $sueldoService,
+        protected PlanillaCalculoService $calculoService
     ) {
         $this->middleware('can:planilla_report')->only(['index', 'mensual', 'porEmpleado', 'adelantosPdf', 'prestamosPdf', 'pagosPendientesPdf', 'empleadoPdf', 'inasistenciasPdf', 'trabajadoresPdf', 'historialSueldosPdf']);
     }
@@ -148,36 +150,10 @@ class ReportePlanillaController extends Controller
             ->orderBy('fecha', 'asc')
             ->get();
 
-        $pagos->each(function ($pago) use ($empleado) {
-            $sueldoBase = (float) $pago->sueldo_base_contractual;
-            $pago->prorrateo_ingreso = false;
-            $pago->prorrateo_salida = false;
+        $pagos->each(function ($pago): void {
+            $pago->desglose_planilla = $this->calculoService->presentarPago($pago);
             $pago->sueldo_base_mostrar = (float) $pago->sueldo_base;
             $pago->total_pagar_mostrar = (float) $pago->total_pagar;
-
-            if ($empleado->fecha_salida) {
-                $fs = $empleado->fecha_salida;
-                if ($fs->year === $pago->anio && $fs->month === $pago->mes && $fs->day < 30) {
-                    $diasTrabajados = $fs->day;
-                    $factor = $diasTrabajados / 30;
-                    $baseDisponible = $sueldoBase * $factor;
-                    $pago->prorrateo_salida = true;
-                    $pago->sueldo_base_mostrar = $baseDisponible;
-                    $pago->total_pagar_mostrar = $baseDisponible + (float) $pago->horas_extras - (float) $pago->descuento_faltas;
-                }
-            }
-
-            if ($empleado->fecha_ingreso) {
-                $fi = $empleado->fecha_ingreso;
-                if ($fi->year === $pago->anio && $fi->month === $pago->mes && $fi->day > 1) {
-                    $diasTrabajados = 30 - $fi->day + 1;
-                    $factor = $diasTrabajados / 30;
-                    $baseDisponible = $sueldoBase * $factor;
-                    $pago->prorrateo_ingreso = true;
-                    $pago->sueldo_base_mostrar = $baseDisponible;
-                    $pago->total_pagar_mostrar = $baseDisponible + (float) $pago->horas_extras - (float) $pago->descuento_faltas;
-                }
-            }
         });
 
         $totalSueldoBaseMostrar = $pagos->sum('sueldo_base_mostrar');
@@ -282,46 +258,8 @@ class ReportePlanillaController extends Controller
 
         $totalRegistros = $pagos->count();
 
-        $pagos->each(function ($pago) {
-            $adelantos = PlanillaAdelanto::where('empleado_id', $pago->empleado_id)
-                ->whereMonth('fecha', $pago->mes)
-                ->whereYear('fecha', $pago->anio)
-                ->sum('monto');
-            $pago->adelantos_calculado = $adelantos;
-
-            $sueldoReal = (float) $pago->sueldo_real_historico;
-            $sueldoPlanilla = (float) $pago->sueldo_planilla_historico;
-            $diasEnMes = (int) cal_days_in_month(CAL_GREGORIAN, (int) $pago->mes, (int) $pago->anio);
-
-            $pago->prorrateo_ingreso = false;
-            $pago->prorrateo_salida = false;
-            $pago->dias_trabajados = $diasEnMes;
-            $pago->sueldo_real_mostrar = $sueldoReal;
-            $pago->sueldo_planilla_mostrar = $sueldoPlanilla;
-
-            if ($pago->empleado->fecha_ingreso) {
-                $fi = $pago->empleado->fecha_ingreso;
-                if ($fi->year === $pago->anio && $fi->month === $pago->mes && $fi->day > 1) {
-                    $diasTrabajados = $diasEnMes - $fi->day + 1;
-                    $factor = $diasTrabajados / $diasEnMes;
-                    $pago->sueldo_real_mostrar = round($sueldoReal * $factor, 2);
-                    $pago->sueldo_planilla_mostrar = round($sueldoPlanilla * $factor, 2);
-                    $pago->prorrateo_ingreso = true;
-                    $pago->dias_trabajados = $diasTrabajados;
-                }
-            }
-
-            if ($pago->empleado->fecha_salida) {
-                $fs = $pago->empleado->fecha_salida;
-                if ($fs->year === $pago->anio && $fs->month === $pago->mes && $fs->day < 30) {
-                    $diasTrabajados = $fs->day;
-                    $factor = $diasTrabajados / $diasEnMes;
-                    $pago->sueldo_real_mostrar = round($pago->sueldo_real_mostrar * $factor, 2);
-                    $pago->sueldo_planilla_mostrar = round($pago->sueldo_planilla_mostrar * $factor, 2);
-                    $pago->prorrateo_salida = true;
-                    $pago->dias_trabajados = $diasTrabajados;
-                }
-            }
+        $pagos->each(function ($pago): void {
+            $pago->desglose_planilla = $this->calculoService->presentarPago($pago);
         });
 
         $pdf = PDF::loadView('planilla.reportes.pagos_pendientes', compact('pagos', 'empresa', 'totalRegistros'));
@@ -787,6 +725,7 @@ class ReportePlanillaController extends Controller
             $pago->monto_proporcional = (float) $pago->total_pagar;
             $pago->sueldo_planilla_proporcional = (float) $pago->sueldo_planilla_historico;
             $pago->dias_trabajados_reporte = $diasTrabajados;
+            $pago->desglose_planilla = $this->calculoService->presentarPago($pago);
         }
 
         $totalPagado = (float) $pagos

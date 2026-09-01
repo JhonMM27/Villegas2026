@@ -12,7 +12,7 @@ class RectificacionAuditoriaService
 {
     public const MODULOS = [
         'compras', 'ventas', 'prestamos', 'preparadas',
-        'nucleo_preparadas', 'venta_entregas',
+        'nucleo_preparadas', 'venta_entregas', 'empleado_sueldos',
     ];
 
     private const CONFIG = [
@@ -101,6 +101,20 @@ class RectificacionAuditoriaService
                 'salida_kg' => ['Kilos entregados', 'cantidad'],
             ],
         ],
+        'empleado_sueldos' => [
+            'referencia' => ['empleado_nombre', 'vigente_desde'],
+            'cabecera' => [
+                'empleado_nombre' => ['Empleado', 'texto'],
+                'vigente_desde' => ['Vigente desde', 'fecha'],
+                'vigente_hasta' => ['Vigente hasta', 'fecha'],
+                'sueldo_real' => ['Sueldo real', 'moneda'],
+                'sueldo_planilla' => ['Sueldo planilla', 'moneda'],
+                'sueldo_base' => ['Sueldo no planilla', 'moneda'],
+                'motivo' => ['Motivo', 'texto'],
+                'observaciones' => ['Observaciones', 'texto'],
+            ],
+            'detalle' => [],
+        ],
     ];
 
     public function capturar(string $modulo, Model $registro): array
@@ -109,6 +123,7 @@ class RectificacionAuditoriaService
         $relaciones = match ($modulo) {
             'cuadre_stocks' => ['detalles.producto'],
             'prestamos' => ['detalles', 'clienteOrigen', 'clienteDestino'],
+            'empleado_sueldos' => ['empleado'],
             default => ['detalles'],
         };
         $registro->loadMissing($relaciones);
@@ -128,7 +143,10 @@ class RectificacionAuditoriaService
         ];
 
         $ocurrencias = [];
-        $detalles = $registro->getRelation('detalles')->map(function (Model $detalle) use ($config, &$ocurrencias): array {
+        $detallesRelacion = $registro->relationLoaded('detalles')
+            ? $registro->getRelation('detalles')
+            : collect();
+        $detalles = $detallesRelacion->map(function (Model $detalle) use ($config, &$ocurrencias): array {
             $productoId = (string) ($detalle->getAttribute('producto_id') ?? 'sin-producto');
             $unidad = (string) ($detalle->getAttribute('unidad_codigo') ?? $detalle->getAttribute('unidad_nombre') ?? '');
             $base = $productoId.'|'.$unidad;
@@ -241,6 +259,7 @@ class RectificacionAuditoriaService
     private function valorCabecera(Model $registro, string $campo): mixed
     {
         return match ($campo) {
+            'empleado_nombre' => $this->valor($registro->empleado?->nombre),
             'cliente_origen_nombre' => $this->valor($registro->clienteOrigen?->razon_social ?? $registro->clienteOrigen?->nombre),
             'cliente_destino_nombre' => $this->valor($registro->clienteDestino?->razon_social ?? $registro->clienteDestino?->nombre),
             default => $this->valor($registro->getAttribute($campo)),
