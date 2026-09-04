@@ -148,7 +148,7 @@ class AuditoriaController extends Controller
                 'direccion' => 'Carretera Pomalca KM 3',
                 'ruc' => '20538937321',
             ],
-        ])->setPaper('a4', 'landscape')->addInfo([
+        ])->setPaper('a4', 'portrait')->addInfo([
             'Title' => 'Auditoría - '.$accion.' - '.$evento->registro_referencia,
             'Subject' => 'Detalle de evento protegido de auditoría',
             'Author' => 'CONSORCIOS VILLEGAS E.I.R.L.',

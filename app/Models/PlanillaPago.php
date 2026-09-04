@@ -26,7 +26,11 @@ class PlanillaPago extends Model
         'cts_sueldo_real',
         'total_pagar',
         'fecha_pago',
+        'fecha_pago_original',
         'estado',
+        'anulado_at',
+        'anulado_por',
+        'motivo_anulacion',
         'observaciones',
         'importe_p',
         'importe_d',
@@ -41,6 +45,9 @@ class PlanillaPago extends Model
         'descuento_faltas' => 'decimal:2',
         'total_pagar' => 'decimal:2',
         'fecha_pago' => 'date',
+        'fecha_pago_original' => 'date',
+        'anulado_at' => 'datetime',
+        'anulado_por' => 'integer',
     ];
 
     public function getSueldoBaseContractualAttribute(): string
@@ -93,10 +100,13 @@ class PlanillaPago extends Model
         return $query->where('estado', 'pagado');
     }
 
-    public function marcarComoPagado(): void
+    public function scopeNoAnulados($query)
     {
-        $this->estado = 'pagado';
-        $this->fecha_pago = now()->toDateString();
-        $this->save();
+        return $query->where('estado', '!=', 'anulado');
+    }
+
+    public function movimientos(): HasMany
+    {
+        return $this->hasMany(PlanillaPagoMovimiento::class);
     }
 }

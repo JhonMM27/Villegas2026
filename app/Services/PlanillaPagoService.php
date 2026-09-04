@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Empleado;
 use App\Models\Gasto;
 use App\Models\GastoCategoria;
 use App\Models\GastoTipo;
@@ -18,13 +17,15 @@ class PlanillaPagoService
     public function __construct(
         protected EmpleadoService $empleadoService,
         protected PlanillaAsistenciaService $asistenciaService,
-        protected PlanillaCalculoService $calculoService
+        protected PlanillaCalculoService $calculoService,
+        protected PlanillaElegibilidadService $elegibilidadService
     ) {}
 
     public function getAll(): Collection
     {
         return PlanillaPago::with(['empleado.sueldoActual', 'sueldoAplicado'])
             ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
+            ->noAnulados()
             ->orderByDesc('id')
             ->get();
     }
@@ -32,7 +33,8 @@ class PlanillaPagoService
     public function getByMes(int $mes, int $anio): Collection
     {
         return PlanillaPago::with(['empleado.sueldoActual', 'sueldoAplicado'])
-            ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
+            ->whereIn('empleado_id', $this->elegibilidadService->idsEmpleadosElegibles($mes, $anio))
+            ->noAnulados()
             ->delMes($mes, $anio)
             ->get();
     }
@@ -63,6 +65,9 @@ class PlanillaPagoService
             $empleado = $this->empleadoService->findById((int) $data['empleado_id']);
             if (! $empleado) {
                 throw new \Exception('Empleado no encontrado');
+            }
+            if (! $this->elegibilidadService->esElegible($empleado, (int) $data['mes'], (int) $data['anio'])) {
+                throw new \Exception('El empleado no es elegible para el período seleccionado');
             }
 
             $sueldo = $this->empleadoService->sueldoParaPeriodo(
@@ -146,12 +151,19 @@ class PlanillaPagoService
         });
     }
 
-    public function marcarPagado(PlanillaPago $pago): bool
+    public function marcarPagado(PlanillaPago $pago, ?string $fechaPago = null): bool
     {
-        return DB::transaction(function () use ($pago) {
-            $pago->marcarComoPagado();
+        return DB::transaction(function () use ($pago, $fechaPago) {
+            $pago = PlanillaPago::query()->lockForUpdate()->findOrFail($pago->id);
+            if ($pago->estado === 'anulado') {
+                throw new \RuntimeException('No se puede confirmar un pago anulado.');
+            }
+            if (! $this->elegibilidadService->esElegible($pago->empleado, (int) $pago->mes, (int) $pago->anio)) {
+                throw new \RuntimeException('El empleado no es elegible para este período.');
+            }
 
-            $this->registrarGastoIndividualPago($pago);
+            $this->aplicarConfirmacion($pago, $fechaPago);
+            $this->sincronizarGastoPlanilla((int) $pago->mes, (int) $pago->anio);
 
             return true;
         });
@@ -205,13 +217,13 @@ class PlanillaPagoService
 
     public function recalcularPago(PlanillaPago $pago): bool
     {
-        if ($pago->estado === 'pagado') {
+        if ($pago->estado !== 'pendiente') {
             return false;
         }
 
         return DB::transaction(function () use ($pago): bool {
             $pago = PlanillaPago::query()->lockForUpdate()->find($pago->id);
-            if (! $pago || $pago->estado === 'pagado') {
+            if (! $pago || $pago->estado !== 'pendiente') {
                 return false;
             }
             $empleado = $this->empleadoService->findById($pago->empleado_id);
@@ -264,129 +276,135 @@ class PlanillaPagoService
         ];
     }
 
-    private function calcularDescuentoFaltas(float $sueldoReal, float $diasFaltados): float
+    public function generarPagosDelMes(int $mes, int $anio): array
     {
-        return $this->calculoService->descuentoFaltas($sueldoReal, $diasFaltados);
-    }
+        return DB::transaction(function () use ($mes, $anio): array {
+            $empleados = $this->elegibilidadService->empleadosElegibles($mes, $anio);
+            $resultado = [
+                'elegibles' => $empleados->count(),
+                'creados' => 0,
+                'existentes' => 0,
+                'anulados' => 0,
+                'sin_sueldo' => [],
+            ];
 
-    public function generarPagosDelMes(int $mes, int $anio): int
-    {
-        $diaLimite = $this->getUltimoDiaDelMes($mes, $anio);
-        $fechaLimite = "{$anio}-{$mes}-{$diaLimite} 23:59:59";
+            foreach ($empleados as $empleado) {
+                $existente = PlanillaPago::query()
+                    ->where('empleado_id', $empleado->id)
+                    ->delMes($mes, $anio)
+                    ->lockForUpdate()
+                    ->first();
 
-        $empleados = Empleado::where('estado', 'activo')
-            ->where('fecha_ingreso', '<=', $fechaLimite)
-            ->where(function ($q) use ($mes, $anio) {
-                $q->whereNull('fecha_salida')
-                    ->orWhere(function ($q2) use ($mes, $anio) {
-                        $q2->whereYear('fecha_salida', $anio)
-                            ->whereMonth('fecha_salida', $mes);
-                    });
-            })
-            ->get();
+                if ($existente) {
+                    $resultado[$existente->estado === 'anulado' ? 'anulados' : 'existentes']++;
 
-        $contador = 0;
+                    continue;
+                }
 
-        foreach ($empleados as $empleado) {
-            $existe = PlanillaPago::where('empleado_id', $empleado->id)
-                ->where('mes', $mes)
-                ->where('anio', $anio)
-                ->exists();
+                $sueldo = $this->empleadoService->sueldoParaPeriodo($empleado->id, $mes, $anio);
+                if (! $sueldo) {
+                    $resultado['sin_sueldo'][] = $empleado->nombre;
 
-            if ($existe) {
-                continue;
+                    continue;
+                }
+
+                $this->asistenciaService->syncDiasFaltadosFromInasistencias($empleado->id, $mes, $anio);
+                $asistencia = $this->asistenciaService->getByEmpleadoMes($empleado->id, $mes, $anio);
+                $diasFaltados = $asistencia ? (float) $asistencia->dias_faltados : 0.0;
+                $desglose = $this->calculoService->calcular($empleado, $sueldo, $mes, $anio, 0, $diasFaltados);
+
+                PlanillaPago::create([
+                    'empleado_id' => $empleado->id,
+                    'empleado_sueldo_id' => $sueldo->id,
+                    'mes' => $mes,
+                    'anio' => $anio,
+                    'sueldo_base' => $desglose['disponible'],
+                    'horas_extras' => 0,
+                    'adelantos' => $desglose['adelantos'],
+                    'dias_faltados' => $diasFaltados,
+                    'descuento_faltas' => $desglose['descuento_faltas'],
+                    'total_pagar' => $desglose['total_pagar'],
+                    'estado' => 'pendiente',
+                    'importe_p' => $desglose['total_pagar'],
+                    'importe_d' => 0,
+                    'importe_c' => 0,
+                ]);
+
+                $resultado['creados']++;
             }
 
-            $sueldo = $this->empleadoService->sueldoParaPeriodo($empleado->id, $mes, $anio);
-            if (! $sueldo) {
-                continue;
-            }
-
-            $this->asistenciaService->syncDiasFaltadosFromInasistencias($empleado->id, $mes, $anio);
-            $asistencia = $this->asistenciaService->getByEmpleadoMes($empleado->id, $mes, $anio);
-            $diasFaltados = $asistencia ? (float) $asistencia->dias_faltados : 0.0;
-            $desglose = $this->calculoService->calcular($empleado, $sueldo, $mes, $anio, 0, $diasFaltados);
-
-            PlanillaPago::create([
-                'empleado_id' => $empleado->id,
-                'empleado_sueldo_id' => $sueldo->id,
-                'mes' => $mes,
-                'anio' => $anio,
-                'sueldo_base' => $desglose['disponible'],
-                'horas_extras' => 0,
-                'adelantos' => $desglose['adelantos'],
-                'dias_faltados' => $diasFaltados,
-                'descuento_faltas' => $desglose['descuento_faltas'],
-                'total_pagar' => $desglose['total_pagar'],
-                'estado' => 'pendiente',
-                'importe_p' => $desglose['total_pagar'],
-                'importe_d' => 0,
-                'importe_c' => 0,
-            ]);
-
-            $contador++;
-        }
-
-        return $contador;
+            return $resultado;
+        });
     }
 
     public function confirmarPagosDelMes(int $mes, int $anio): int
     {
-        $result = PlanillaPago::where('mes', $mes)
-            ->where('anio', $anio)
-            ->where('estado', 'pendiente')
-            ->update([
-                'estado' => 'pagado',
-                'fecha_pago' => now()->toDateString(),
-            ]);
+        return DB::transaction(function () use ($mes, $anio): int {
+            $pagos = PlanillaPago::query()
+                ->whereIn('empleado_id', $this->elegibilidadService->idsEmpleadosElegibles($mes, $anio))
+                ->delMes($mes, $anio)
+                ->pendientes()
+                ->lockForUpdate()
+                ->get();
 
-        $this->sincronizarGastoPlanilla($mes, $anio);
+            foreach ($pagos as $pago) {
+                $this->aplicarConfirmacion($pago);
+            }
 
-        return $result;
+            $this->sincronizarGastoPlanilla($mes, $anio);
+
+            return $pagos->count();
+        });
     }
 
     public function revertirPagosDelMes(int $mes, int $anio): int
     {
-        $result = PlanillaPago::where('mes', $mes)
-            ->where('anio', $anio)
-            ->where('estado', 'pagado')
-            ->update([
-                'estado' => 'pendiente',
-                'fecha_pago' => null,
-            ]);
+        return DB::transaction(function () use ($mes, $anio): int {
+            $pagos = PlanillaPago::query()
+                ->whereIn('empleado_id', $this->elegibilidadService->idsEmpleadosElegibles($mes, $anio))
+                ->delMes($mes, $anio)
+                ->pagados()
+                ->lockForUpdate()
+                ->get();
 
-        $this->sincronizarGastoPlanilla($mes, $anio);
+            foreach ($pagos as $pago) {
+                $this->aplicarReversion($pago, 'Reversión masiva del período');
+            }
 
-        return $result;
+            $this->sincronizarGastoPlanilla($mes, $anio);
+
+            return $pagos->count();
+        });
     }
 
     public function existenPagosDelMes(int $mes, int $anio): bool
     {
-        return PlanillaPago::where('mes', $mes)
-            ->where('anio', $anio)
+        return PlanillaPago::whereIn('empleado_id', $this->elegibilidadService->idsEmpleadosElegibles($mes, $anio))
+            ->delMes($mes, $anio)
+            ->noAnulados()
             ->exists();
     }
 
     public function getCantidadPagosDelMes(int $mes, int $anio): array
     {
-        $total = PlanillaPago::where('mes', $mes)
-            ->where('anio', $anio)
-            ->count();
-
-        $pendientes = PlanillaPago::where('mes', $mes)
-            ->where('anio', $anio)
-            ->where('estado', 'pendiente')
-            ->count();
-
-        $pagados = PlanillaPago::where('mes', $mes)
-            ->where('anio', $anio)
-            ->where('estado', 'pagado')
+        $idsElegibles = $this->elegibilidadService->idsEmpleadosElegibles($mes, $anio);
+        $base = PlanillaPago::query()->whereIn('empleado_id', $idsElegibles)->delMes($mes, $anio)->noAnulados();
+        $total = (clone $base)->count();
+        $pendientes = (clone $base)->pendientes()->count();
+        $pagados = (clone $base)->pagados()->count();
+        $excluidos = PlanillaPago::query()
+            ->whereNotIn('empleado_id', $idsElegibles ?: [0])
+            ->delMes($mes, $anio)
+            ->noAnulados()
             ->count();
 
         return [
             'total' => $total,
             'pendientes' => $pendientes,
             'pagados' => $pagados,
+            'elegibles' => count($idsElegibles),
+            'faltantes' => max(count($idsElegibles) - $total, 0),
+            'excluidos' => $excluidos,
         ];
     }
 
@@ -396,13 +414,64 @@ class PlanillaPagoService
             return false;
         }
 
-        $pago->estado = 'pendiente';
-        $pago->fecha_pago = null;
-        $pago->save();
+        return DB::transaction(function () use ($pago): bool {
+            $pago = PlanillaPago::query()->lockForUpdate()->findOrFail($pago->id);
+            $this->aplicarReversion($pago, 'Reversión individual');
+            $this->sincronizarGastoPlanilla((int) $pago->mes, (int) $pago->anio);
 
-        $this->eliminarGastoIndividualPago($pago);
+            return true;
+        });
+    }
 
-        return true;
+    public function anularPago(PlanillaPago $pago, string $motivo): bool
+    {
+        return DB::transaction(function () use ($pago, $motivo): bool {
+            $pago = PlanillaPago::query()->lockForUpdate()->findOrFail($pago->id);
+            if ($pago->estado === 'anulado') {
+                return false;
+            }
+
+            $estadoAnterior = (string) $pago->estado;
+            $fechaAnterior = $pago->fecha_pago?->toDateString();
+            $pago->fecha_pago_original ??= $pago->fecha_pago;
+            $pago->estado = 'anulado';
+            $pago->fecha_pago = null;
+            $pago->anulado_at = now();
+            $pago->anulado_por = auth()->id();
+            $pago->motivo_anulacion = trim($motivo);
+            $pago->save();
+            $this->registrarMovimiento($pago, 'anulacion', $estadoAnterior, 'anulado', $fechaAnterior, null, $motivo);
+            $this->sincronizarGastoPlanilla((int) $pago->mes, (int) $pago->anio);
+
+            return true;
+        });
+    }
+
+    public function rectificarFechaPago(PlanillaPago $pago, string $fechaPago, string $motivo): bool
+    {
+        return DB::transaction(function () use ($pago, $fechaPago, $motivo): bool {
+            $pago = PlanillaPago::query()->lockForUpdate()->findOrFail($pago->id);
+            if ($pago->estado !== 'pagado') {
+                throw new \RuntimeException('Solo se puede rectificar la fecha de un pago confirmado.');
+            }
+
+            $fechaAnterior = $pago->fecha_pago?->toDateString();
+            $pago->fecha_pago = $fechaPago;
+            $pago->fecha_pago_original = $fechaPago;
+            $pago->save();
+            $this->registrarMovimiento(
+                $pago,
+                'rectificacion_fecha',
+                'pagado',
+                'pagado',
+                $fechaAnterior,
+                $fechaPago,
+                $motivo
+            );
+            $this->sincronizarGastoPlanilla((int) $pago->mes, (int) $pago->anio);
+
+            return true;
+        });
     }
 
     public function registrarGastoIndividualPago(PlanillaPago $pago): void
@@ -446,16 +515,8 @@ class PlanillaPagoService
         $userNombre = auth()->user()->name ?? 'Sistema';
         $nombreMes = $this->getNombreMes($pago->mes);
 
-        $ultimoRecibo = Gasto::whereRaw("numero_recibo REGEXP '^[0-9]+$'")
-            ->selectRaw('MAX(CAST(numero_recibo AS UNSIGNED)) as max_recibo')
-            ->value('max_recibo');
-        $siguienteRecibo = $ultimoRecibo ? ((int) $ultimoRecibo + 1) : 1;
-
-        $ultimoInterno = Gasto::whereNotNull('numero_interno')
-            ->where('numero_interno', '!=', '')
-            ->selectRaw('MAX(CAST(numero_interno AS UNSIGNED)) as max_interno')
-            ->value('max_interno');
-        $siguienteInterno = $ultimoInterno ? ((int) $ultimoInterno + 1) : 1;
+        $siguienteRecibo = $this->siguienteNumeroGasto('numero_recibo');
+        $siguienteInterno = $this->siguienteNumeroGasto('numero_interno');
 
         if (! $gastoExistente) {
             Gasto::create([
@@ -534,9 +595,63 @@ class PlanillaPagoService
         $pago->importe_c = 0;
     }
 
-    private function getUltimoDiaDelMes(int $mes, int $anio): int
+    private function aplicarConfirmacion(PlanillaPago $pago, ?string $fechaPago = null): void
     {
-        return (int) date('t', strtotime("{$anio}-{$mes}-01"));
+        $estadoAnterior = (string) $pago->estado;
+        $fechaAnterior = $pago->fecha_pago?->toDateString();
+        $restauraFechaOriginal = $pago->fecha_pago_original !== null;
+        $fechaEfectiva = $pago->fecha_pago_original?->toDateString()
+            ?? $fechaPago
+            ?? now()->toDateString();
+
+        $pago->estado = 'pagado';
+        $pago->fecha_pago = $fechaEfectiva;
+        $pago->fecha_pago_original ??= $fechaEfectiva;
+        $pago->save();
+
+        $this->registrarMovimiento(
+            $pago,
+            'confirmacion',
+            $estadoAnterior,
+            'pagado',
+            $fechaAnterior,
+            $fechaEfectiva,
+            $restauraFechaOriginal
+                ? 'Confirmación conservando la fecha original'
+                : 'Confirmación de pago'
+        );
+    }
+
+    private function aplicarReversion(PlanillaPago $pago, string $motivo): void
+    {
+        $fechaAnterior = $pago->fecha_pago?->toDateString();
+        $pago->fecha_pago_original ??= $pago->fecha_pago;
+        $pago->estado = 'pendiente';
+        $pago->fecha_pago = null;
+        $pago->save();
+
+        $this->registrarMovimiento($pago, 'reversion', 'pagado', 'pendiente', $fechaAnterior, null, $motivo);
+    }
+
+    private function registrarMovimiento(
+        PlanillaPago $pago,
+        string $accion,
+        string $estadoAnterior,
+        string $estadoNuevo,
+        ?string $fechaAnterior,
+        ?string $fechaNueva,
+        ?string $motivo = null
+    ): void {
+        $pago->movimientos()->create([
+            'accion' => $accion,
+            'estado_anterior' => $estadoAnterior,
+            'estado_nuevo' => $estadoNuevo,
+            'fecha_pago_anterior' => $fechaAnterior,
+            'fecha_pago_nueva' => $fechaNueva,
+            'motivo' => $motivo,
+            'user_id' => auth()->id(),
+            'user_nombre' => (string) (auth()->user()?->name ?? 'Sistema'),
+        ]);
     }
 
     public function sincronizarGastoPlanilla(int $mes, int $anio): void
@@ -549,10 +664,12 @@ class PlanillaPagoService
         $totalSueldos = (float) $pagos->sum(
             fn (PlanillaPago $pago): float => (float) ($pago->sueldoAplicado?->sueldo_real ?? 0)
         );
+        $fechaUltimoPago = $pagos->max('fecha_pago') ?? now();
 
         if ($totalSueldos <= 0) {
             Gasto::where('planilla_mes', $mes)
                 ->where('planilla_anio', $anio)
+                ->whereNull('empleado_id')
                 ->delete();
 
             return;
@@ -579,21 +696,14 @@ class PlanillaPagoService
 
         $gasto = Gasto::where('planilla_mes', $mes)
             ->where('planilla_anio', $anio)
+            ->whereNull('empleado_id')
             ->first();
 
         $userId = auth()->id() ?? 1;
         $userNombre = auth()->user()->name ?? 'Sistema';
 
-        $ultimoRecibo = Gasto::whereRaw("numero_recibo REGEXP '^[0-9]+$'")
-            ->selectRaw('MAX(CAST(numero_recibo AS UNSIGNED)) as max_recibo')
-            ->value('max_recibo');
-        $siguienteRecibo = $ultimoRecibo ? ((int) $ultimoRecibo + 1) : 1;
-
-        $ultimoInterno = Gasto::whereNotNull('numero_interno')
-            ->where('numero_interno', '!=', '')
-            ->selectRaw('MAX(CAST(numero_interno AS UNSIGNED)) as max_interno')
-            ->value('max_interno');
-        $siguienteInterno = $ultimoInterno ? ((int) $ultimoInterno + 1) : 1;
+        $siguienteRecibo = $this->siguienteNumeroGasto('numero_recibo');
+        $siguienteInterno = $this->siguienteNumeroGasto('numero_interno');
 
         $nombreMes = $this->getNombreMes($mes);
 
@@ -601,7 +711,7 @@ class PlanillaPagoService
             Gasto::create([
                 'user_id' => $userId,
                 'user_nombre' => $userNombre,
-                'fecha_gasto' => now(),
+                'fecha_gasto' => $fechaUltimoPago,
                 'descripcion' => "Pago Empleados mes {$nombreMes}/{$anio}",
                 'responsable' => 'Consorcios Villegas',
                 'responsable_dni' => null,
@@ -618,6 +728,7 @@ class PlanillaPagoService
             ]);
         } else {
             $gasto->update([
+                'fecha_gasto' => $fechaUltimoPago,
                 'importe_p' => $totalSueldos,
                 'importe_d' => 0,
                 'importe_c' => 0,
@@ -637,5 +748,23 @@ class PlanillaPagoService
         ];
 
         return $meses[$mes] ?? $mes;
+    }
+
+    private function siguienteNumeroGasto(string $columna): int
+    {
+        if (! in_array($columna, ['numero_recibo', 'numero_interno'], true)) {
+            throw new \InvalidArgumentException('Columna de correlativo no permitida.');
+        }
+
+        $query = Gasto::query()->whereNotNull($columna)->where($columna, '!=', '');
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            $query->whereRaw("{$columna} GLOB '[0-9]*' AND {$columna} NOT GLOB '*[^0-9]*'");
+            $ultimo = $query->selectRaw("MAX(CAST({$columna} AS INTEGER)) AS maximo")->value('maximo');
+        } else {
+            $query->whereRaw("{$columna} REGEXP '^[0-9]+$'");
+            $ultimo = $query->selectRaw("MAX(CAST({$columna} AS UNSIGNED)) AS maximo")->value('maximo');
+        }
+
+        return $ultimo ? (int) $ultimo + 1 : 1;
     }
 }

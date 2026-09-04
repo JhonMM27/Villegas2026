@@ -29,19 +29,55 @@ class PlanillaAdelantoController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $data = PlanillaAdelanto::with('empleado')
-                ->whereHas('empleado', fn ($q) => $q->where('estado', 'activo'))
-                ->select(['id', 'numero_interno', 'empleado_id', 'monto', 'fecha', 'observaciones']);
+            $data = PlanillaAdelanto::query()
+                ->join('empleados', 'empleados.id', '=', 'planilla_adelantos.empleado_id')
+                ->where('empleados.estado', 'activo')
+                ->select([
+                    'planilla_adelantos.id',
+                    'planilla_adelantos.numero_interno',
+                    'planilla_adelantos.empleado_id',
+                    'planilla_adelantos.monto',
+                    'planilla_adelantos.fecha',
+                    'planilla_adelantos.observaciones',
+                    'empleados.nombre as empleado_nombre',
+                    'empleados.dni as empleado_dni',
+                ]);
 
             $mes = $request->get('mes');
             if ($mes && preg_match('/^(\d{4})-(\d{2})$/', $mes, $m)) {
-                $data->whereYear('fecha', (int) $m[1])
-                    ->whereMonth('fecha', (int) $m[2]);
+                $data->whereYear('planilla_adelantos.fecha', (int) $m[1])
+                    ->whereMonth('planilla_adelantos.fecha', (int) $m[2]);
             }
 
-            $data->orderByDesc('id');
+            $data->orderByDesc('planilla_adelantos.id');
 
             return DataTables::of($data)
+                ->filter(function ($query) use ($request): void {
+                    $search = trim((string) data_get($request->input('search', []), 'value', ''));
+                    if ($search === '') {
+                        return;
+                    }
+
+                    $term = "%{$search}%";
+                    $fecha = null;
+                    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $search, $partes)) {
+                        $fecha = "{$partes[3]}-{$partes[2]}-{$partes[1]}";
+                    }
+                    $numero = str_replace(['S/', 's/', ',', ' '], '', $search);
+
+                    $query->where(function ($filtro) use ($term, $fecha, $numero): void {
+                        $filtro
+                            ->where('planilla_adelantos.numero_interno', 'like', $term)
+                            ->orWhere('empleados.nombre', 'like', $term)
+                            ->orWhere('empleados.dni', 'like', $term)
+                            ->orWhere('planilla_adelantos.fecha', 'like', '%'.($fecha ?? trim($term, '%')).'%')
+                            ->orWhere('planilla_adelantos.observaciones', 'like', $term);
+
+                        if (is_numeric($numero)) {
+                            $filtro->orWhere('planilla_adelantos.monto', 'like', "%{$numero}%");
+                        }
+                    });
+                })
                 ->addColumn('action', function ($row) {
                     $buttons = '';
 
@@ -65,7 +101,7 @@ class PlanillaAdelantoController extends Controller
 
                     return '<div class="btn-group">'.$buttons.'</div>';
                 })
-                ->editColumn('empleado_id', fn ($row) => $row->empleado->nombre)
+                ->editColumn('empleado_nombre', fn ($row) => $row->empleado_nombre)
                 ->editColumn('monto', fn ($row) => 'S/'.number_format((float) $row->monto, 2))
                 ->editColumn('fecha', fn ($row) => $row->fecha->format('d/m/Y'))
                 ->rawColumns(['action'])

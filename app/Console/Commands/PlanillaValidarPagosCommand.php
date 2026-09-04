@@ -17,7 +17,7 @@ class PlanillaValidarPagosCommand extends Command
 
     public function handle(PlanillaCalculoService $calculoService, EmpleadoService $empleadoService): int
     {
-        $query = PlanillaPago::query()->with(['empleado', 'sueldoAplicado']);
+        $query = PlanillaPago::query()->with(['empleado', 'sueldoAplicado'])->noAnulados();
         if (! $this->option('todos')) {
             $query->where('estado', 'pendiente');
         }

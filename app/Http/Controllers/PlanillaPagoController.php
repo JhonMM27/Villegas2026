@@ -111,8 +111,8 @@ class PlanillaPagoController extends Controller
                 return response()->json(['success' => false, 'message' => 'Pago no encontrado'], 404);
             }
 
-            if ($pago->estado === 'pagado') {
-                return response()->json(['success' => false, 'message' => 'No se puede editar un pago ya pagado'], 422);
+            if ($pago->estado !== 'pendiente') {
+                return response()->json(['success' => false, 'message' => 'Solo se puede editar un pago pendiente'], 422);
             }
 
             $this->pagoService->update($pago, $data);
@@ -313,11 +313,12 @@ class PlanillaPagoController extends Controller
     public function generarPagosMes(Request $request)
     {
         try {
-            $mes = (int) $request->get('mes');
-            $anio = (int) $request->get('anio');
-
-            $anioActual = (int) date('Y');
-            $mesActual = (int) date('n');
+            $data = $request->validate([
+                'mes' => ['required', 'integer', 'between:1,12'],
+                'anio' => ['required', 'integer', 'min:2026'],
+            ]);
+            $mes = (int) $data['mes'];
+            $anio = (int) $data['anio'];
 
             if ($anio < 2026 || ($anio === 2026 && $mes < 4)) {
                 return response()->json([
@@ -326,19 +327,19 @@ class PlanillaPagoController extends Controller
                 ], 422);
             }
 
-            if ($this->pagoService->existenPagosDelMes($mes, $anio)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Ya existen pagos generados para este mes',
-                ], 422);
+            $resultado = $this->pagoService->generarPagosDelMes($mes, $anio);
+            $mensaje = "Se crearon {$resultado['creados']} pagos de {$resultado['elegibles']} empleados elegibles";
+            if ($resultado['existentes'] > 0) {
+                $mensaje .= "; {$resultado['existentes']} ya existían";
             }
-
-            $cantidad = $this->pagoService->generarPagosDelMes($mes, $anio);
+            if (count($resultado['sin_sueldo']) > 0) {
+                $mensaje .= '; sin sueldo vigente: '.implode(', ', $resultado['sin_sueldo']);
+            }
 
             return response()->json([
                 'success' => true,
-                'message' => "Se generaron {$cantidad} pagos para {$this->getNombreMes($mes)} {$anio}",
-                'cantidad' => $cantidad,
+                'message' => $mensaje.'.',
+                'resultado' => $resultado,
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -351,8 +352,12 @@ class PlanillaPagoController extends Controller
     public function confirmarPagosMes(Request $request)
     {
         try {
-            $mes = (int) $request->get('mes');
-            $anio = (int) $request->get('anio');
+            $data = $request->validate([
+                'mes' => ['required', 'integer', 'between:1,12'],
+                'anio' => ['required', 'integer', 'min:2026'],
+            ]);
+            $mes = (int) $data['mes'];
+            $anio = (int) $data['anio'];
 
             $cantidad = $this->pagoService->confirmarPagosDelMes($mes, $anio);
 
@@ -372,8 +377,12 @@ class PlanillaPagoController extends Controller
     public function revertirPagosMes(Request $request)
     {
         try {
-            $mes = (int) $request->get('mes');
-            $anio = (int) $request->get('anio');
+            $data = $request->validate([
+                'mes' => ['required', 'integer', 'between:1,12'],
+                'anio' => ['required', 'integer', 'min:2026'],
+            ]);
+            $mes = (int) $data['mes'];
+            $anio = (int) $data['anio'];
 
             $cantidad = $this->pagoService->revertirPagosDelMes($mes, $anio);
 
@@ -395,25 +404,30 @@ class PlanillaPagoController extends Controller
         $mes = (int) $request->get('mes');
         $anio = (int) $request->get('anio');
 
-        $existe = $this->pagoService->existenPagosDelMes($mes, $anio);
+        $cantidades = $this->pagoService->getCantidadPagosDelMes($mes, $anio);
+        $existe = $cantidades['total'] > 0;
 
         if (! $existe) {
             return response()->json([
                 'existe' => false,
                 'mensaje' => 'Pagos no generados',
+                'elegibles' => $cantidades['elegibles'],
+                'faltantes' => $cantidades['faltantes'],
+                'excluidos' => $cantidades['excluidos'],
             ]);
         }
-
-        $cantidades = $this->pagoService->getCantidadPagosDelMes($mes, $anio);
 
         return response()->json([
             'existe' => true,
             'total' => $cantidades['total'],
             'pendientes' => $cantidades['pendientes'],
             'pagados' => $cantidades['pagados'],
+            'elegibles' => $cantidades['elegibles'],
+            'faltantes' => $cantidades['faltantes'],
+            'excluidos' => $cantidades['excluidos'],
             'mensaje' => $cantidades['pendientes'] > 0
                 ? "{$cantidades['pendientes']} pagos pendientes de {$cantidades['total']}"
-                : 'Todos los pagos confirmados',
+                : 'Todos los pagos generados están confirmados',
         ]);
     }
 

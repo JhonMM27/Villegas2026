@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\PlanillaAdelantoController;
 use App\Http\Controllers\ReportePlanillaController;
+use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
@@ -376,6 +378,38 @@ class ReportePlanillaControllerTest extends TestCase
         ]);
 
         $this->assertSame(200, app(ReportePlanillaController::class)->pagosPendientesPdf($request)->getStatusCode());
+    }
+
+    public function test_buscador_de_adelantos_encuentra_nombre_dni_fecha_numero_y_monto(): void
+    {
+        $usuario = Mockery::mock(User::class)->makePartial();
+        $usuario->id = 1;
+        $usuario->shouldReceive('can')->andReturn(false);
+        $this->actingAs($usuario);
+
+        foreach (['RODRIGUEZ', '63390350', '18/07/2026', '1780', 'S/ 150'] as $termino) {
+            $request = Request::create('/planilla-adelantos', 'GET', [
+                'draw' => 1,
+                'start' => 0,
+                'length' => 10,
+                'mes' => '2026-07',
+                'search' => ['value' => $termino, 'regex' => false],
+                'columns' => [
+                    ['data' => 'action', 'name' => 'action', 'searchable' => false, 'orderable' => false, 'search' => ['value' => '', 'regex' => false]],
+                    ['data' => 'numero_interno', 'name' => 'numero_interno', 'searchable' => true, 'orderable' => true, 'search' => ['value' => '', 'regex' => false]],
+                    ['data' => 'empleado_nombre', 'name' => 'empleados.nombre', 'searchable' => true, 'orderable' => true, 'search' => ['value' => '', 'regex' => false]],
+                    ['data' => 'monto', 'name' => 'monto', 'searchable' => true, 'orderable' => true, 'search' => ['value' => '', 'regex' => false]],
+                    ['data' => 'fecha', 'name' => 'fecha', 'searchable' => true, 'orderable' => true, 'search' => ['value' => '', 'regex' => false]],
+                    ['data' => 'observaciones', 'name' => 'observaciones', 'searchable' => true, 'orderable' => true, 'search' => ['value' => '', 'regex' => false]],
+                ],
+            ], [], [], ['HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest']);
+
+            $response = app(PlanillaAdelantoController::class)->index($request);
+            $contenido = $response->getData(true);
+
+            $this->assertSame(1, $contenido['recordsFiltered'], "No se encontró el término {$termino}");
+            $this->assertSame('JHONATAN ELIACER RODRIGUEZ VASQUEZ', $contenido['data'][0]['empleado_nombre']);
+        }
     }
 
     private function prepararReporte(string $inicio, string $fin): array

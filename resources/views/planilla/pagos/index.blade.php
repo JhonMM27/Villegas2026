@@ -167,25 +167,34 @@ class PagoPlanillaManager extends CrudManager {
         try {
             const response = await fetch(`{{ route('planilla-pagos.estado-mes') }}?mes=${mes}&anio=${anio}`);
             const data = await response.json();
+            this.estadoMes = data;
+            const avisos = [];
+            if ((data.faltantes ?? 0) > 0) {
+                avisos.push(`<span class="text-warning">${data.faltantes} pago(s) elegible(s) por generar</span>`);
+            }
+            if ((data.excluidos ?? 0) > 0) {
+                avisos.push(`<span class="text-danger">${data.excluidos} registro(s) fuera de la nómina activa; no se procesarán</span>`);
+            }
+            const estadoConAvisos = (mensaje) => [mensaje, ...avisos].filter(Boolean).join('<br>');
 
             if (!data.existe) {
-                estadoDiv.innerHTML = '<span class="text-warning">Pagos no generados para este mes</span>';
+                estadoDiv.innerHTML = estadoConAvisos(`<span class="text-warning">Pagos no generados para ${data.elegibles ?? 0} empleado(s) elegible(s)</span>`);
                 btnGenerar.classList.remove('d-none');
                 btnConfirmar.classList.add('d-none');
                 btnRevertir.classList.add('d-none');
             } else if (data.pendientes > 0) {
-                estadoDiv.innerHTML = data.mensaje;
-                btnGenerar.classList.add('d-none');
+                estadoDiv.innerHTML = estadoConAvisos(data.mensaje);
+                btnGenerar.classList.toggle('d-none', (data.faltantes ?? 0) === 0);
                 btnConfirmar.classList.remove('d-none');
                 btnRevertir.classList.add('d-none');
             } else if (data.pagados > 0) {
-                estadoDiv.innerHTML = data.mensaje;
-                btnGenerar.classList.add('d-none');
+                estadoDiv.innerHTML = estadoConAvisos(data.mensaje);
+                btnGenerar.classList.toggle('d-none', (data.faltantes ?? 0) === 0);
                 btnConfirmar.classList.add('d-none');
                 btnRevertir.classList.remove('d-none');
             } else {
-                estadoDiv.innerHTML = data.mensaje;
-                btnGenerar.classList.add('d-none');
+                estadoDiv.innerHTML = estadoConAvisos(data.mensaje);
+                btnGenerar.classList.toggle('d-none', (data.faltantes ?? 0) === 0);
                 btnConfirmar.classList.add('d-none');
                 btnRevertir.classList.add('d-none');
             }
@@ -260,7 +269,7 @@ class PagoPlanillaManager extends CrudManager {
 
         Swal.fire({
             title: '¿Confirmar todos los pagos?',
-            text: `Se marcarán como pagados todos los pagos pendientes de ${nombreMes} ${anio}`,
+            text: `Se confirmarán ${this.estadoMes?.pendientes ?? 0} pago(s) elegible(s) de ${nombreMes} ${anio}. Los registros fuera de la nómina activa no serán procesados.`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Sí, confirmar todos',
@@ -320,7 +329,7 @@ class PagoPlanillaManager extends CrudManager {
 
         Swal.fire({
             title: '¿Revertir todos los pagos?',
-            text: `Se marcarán como pendientes todos los pagos confirmados de ${nombreMes} ${anio}`,
+            text: `Se revertirán ${this.estadoMes?.pagados ?? 0} pago(s) elegible(s) de ${nombreMes} ${anio} conservando sus fechas originales.`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Sí, revertir todos',

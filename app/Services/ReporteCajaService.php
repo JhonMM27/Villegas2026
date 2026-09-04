@@ -132,6 +132,7 @@ class ReporteCajaService
 
         // 10. PLANILLA - PAGOS PLANILLA (Incluye históricos sin filtrar por estado del empleado)
         $pagosPlanilla = PlanillaPago::whereBetween('fecha_pago', [$ini, $fin])
+            ->pagados()
             ->selectRaw('
                 COALESCE(SUM(total_pagar),0) as total,
                 COALESCE(SUM(importe_p),0) as importe_p,
@@ -245,6 +246,7 @@ class ReporteCajaService
                 ->get();
 
             $data['pagosPlanillaList'] = PlanillaPago::whereBetween('fecha_pago', [$ini, $fin])
+                ->pagados()
                 ->with('empleado')
                 ->select(['id', 'fecha_pago', 'empleado_id', 'total_pagar', 'importe_p', 'importe_d', 'importe_c'])
                 ->orderBy('fecha_pago')

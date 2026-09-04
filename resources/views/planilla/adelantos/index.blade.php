@@ -86,7 +86,7 @@ class AdelantoManager extends CrudManager {
             columns: [
                 { data: 'action', name: 'action', orderable: false, searchable: false },
                 { data: 'numero_interno', name: 'numero_interno' },
-                { data: 'empleado_id', name: 'empleado_id' },
+                { data: 'empleado_nombre', name: 'empleados.nombre' },
                 { data: 'monto', name: 'monto' },
                 { data: 'fecha', name: 'fecha' },
                 { data: 'observaciones', name: 'observaciones' }
