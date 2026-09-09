@@ -172,6 +172,32 @@ class PlanillaPagoCierreServiceTest extends TestCase
         $this->assertDatabaseMissing('planilla_pagos', ['empleado_id' => $rene->id, 'mes' => 8, 'anio' => 2026]);
     }
 
+    public function test_gasto_planilla_usa_total_pagado_y_distribucion_de_caja(): void
+    {
+        [$empleado, $sueldo] = $this->crearEmpleado('Parcial', '33333333', 'activo');
+        $pago = $this->crearPago($empleado, $sueldo, 'pagado', '2026-08-08');
+        $pago->update([
+            'total_pagar' => 400,
+            'importe_p' => 250,
+            'importe_d' => 100,
+            'importe_c' => 50,
+        ]);
+
+        $service = app(PlanillaPagoService::class);
+        $service->sincronizarGastoPlanilla(8, 2026);
+        $service->sincronizarGastoPlanilla(8, 2026);
+
+        $this->assertDatabaseCount('gastos', 1);
+        $this->assertDatabaseHas('gastos', [
+            'planilla_mes' => 8,
+            'planilla_anio' => 2026,
+            'monto' => 400,
+            'importe_p' => 250,
+            'importe_d' => 100,
+            'importe_c' => 50,
+        ]);
+    }
+
     private function crearEmpleado(string $nombre, string $dni, string $estado, ?string $salida = null): array
     {
         $empleado = Empleado::create([

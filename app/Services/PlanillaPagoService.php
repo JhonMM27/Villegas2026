@@ -172,6 +172,7 @@ class PlanillaPagoService
     public function update(PlanillaPago $pago, array $data): bool
     {
         return DB::transaction(function () use ($pago, $data) {
+            $periodoAnterior = [(int) $pago->mes, (int) $pago->anio];
             $sueldo = $pago->sueldoAplicado
                 ?? $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, (int) $pago->mes, (int) $pago->anio);
             $sueldoReal = $sueldo ? (float) $sueldo->sueldo_real : 0;
@@ -209,6 +210,9 @@ class PlanillaPagoService
 
             if ($pago->estado === 'pagado') {
                 $this->sincronizarGastoPlanilla((int) $pago->mes, (int) $pago->anio);
+                if ($periodoAnterior !== [(int) $pago->mes, (int) $pago->anio]) {
+                    $this->sincronizarGastoPlanilla(...$periodoAnterior);
+                }
             }
 
             return $result;
@@ -481,11 +485,11 @@ class PlanillaPagoService
             return;
         }
 
-        $sueldo = $pago->sueldoAplicado
-            ?? $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, (int) $pago->mes, (int) $pago->anio);
-        $sueldoPlanilla = (float) ($sueldo?->sueldo_planilla ?? 0);
         $totalPagar = (float) $pago->total_pagar;
-        $montoGasto = $sueldoPlanilla + $totalPagar;
+        $importeP = (float) $pago->importe_p;
+        $importeD = (float) $pago->importe_d;
+        $importeC = (float) $pago->importe_c;
+        $montoGasto = $totalPagar;
 
         $categoria = GastoCategoria::where('nombre', 'Gastos_Personal')->first();
         if (! $categoria) {
@@ -532,9 +536,9 @@ class PlanillaPagoService
                 'numero_recibo' => $siguienteRecibo,
                 'numero_interno' => (string) $siguienteInterno,
                 'monto' => $montoGasto,
-                'importe_p' => $montoGasto,
-                'importe_d' => 0,
-                'importe_c' => 0,
+                'importe_p' => $importeP,
+                'importe_d' => $importeD,
+                'importe_c' => $importeC,
                 'planilla_mes' => $pago->mes,
                 'planilla_anio' => $pago->anio,
             ]);
@@ -545,9 +549,9 @@ class PlanillaPagoService
                 'responsable' => $empleado->nombre,
                 'responsable_dni' => $empleado->dni,
                 'monto' => $montoGasto,
-                'importe_p' => $montoGasto,
-                'importe_d' => 0,
-                'importe_c' => 0,
+                'importe_p' => $importeP,
+                'importe_d' => $importeD,
+                'importe_c' => $importeC,
             ]);
         }
     }
@@ -661,9 +665,10 @@ class PlanillaPagoService
             ->where('planilla_pagos.anio', $anio)
             ->where('planilla_pagos.estado', 'pagado')
             ->get();
-        $totalSueldos = (float) $pagos->sum(
-            fn (PlanillaPago $pago): float => (float) ($pago->sueldoAplicado?->sueldo_real ?? 0)
-        );
+        $totalSueldos = (float) $pagos->sum(fn (PlanillaPago $pago): float => (float) $pago->total_pagar);
+        $importeP = (float) $pagos->sum(fn (PlanillaPago $pago): float => (float) $pago->importe_p);
+        $importeD = (float) $pagos->sum(fn (PlanillaPago $pago): float => (float) $pago->importe_d);
+        $importeC = (float) $pagos->sum(fn (PlanillaPago $pago): float => (float) $pago->importe_c);
         $fechaUltimoPago = $pagos->max('fecha_pago') ?? now();
 
         if ($totalSueldos <= 0) {
@@ -720,18 +725,18 @@ class PlanillaPagoService
                 'numero_recibo' => $siguienteRecibo,
                 'numero_interno' => (string) $siguienteInterno,
                 'monto' => $totalSueldos,
-                'importe_p' => $totalSueldos,
-                'importe_d' => 0,
-                'importe_c' => 0,
+                'importe_p' => $importeP,
+                'importe_d' => $importeD,
+                'importe_c' => $importeC,
                 'planilla_mes' => $mes,
                 'planilla_anio' => $anio,
             ]);
         } else {
             $gasto->update([
                 'fecha_gasto' => $fechaUltimoPago,
-                'importe_p' => $totalSueldos,
-                'importe_d' => 0,
-                'importe_c' => 0,
+                'importe_p' => $importeP,
+                'importe_d' => $importeD,
+                'importe_c' => $importeC,
                 'monto' => $totalSueldos,
                 'descripcion' => "Pago Empleados mes {$nombreMes}/{$anio}",
             ]);
