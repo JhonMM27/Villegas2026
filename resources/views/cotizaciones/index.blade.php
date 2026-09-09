@@ -241,7 +241,7 @@ class CotizacionManager extends CrudManager {
                     <input type="number" name="detalles[${rowCount}][cantidad_kgm]" value="${cantidad*item.empaque}" step="any" class="form-control form-control-sm inputCantidadKgm">
                 </td>
                 <td class="text-end">
-                    <input type="number" name="detalles[${rowCount}][precio_unitario]" value="${precioConImpuesto.toFixed(4)}" step="0.0001" class="form-control form-control-sm inputPrecioUnitario">
+                    <input type="number" name="detalles[${rowCount}][precio_unitario]" value="${precioConImpuesto.toFixed(4)}" step="0.0001" min="0" class="form-control form-control-sm inputPrecioUnitario">
                 </td>
                 <td class="text-end">
                     <input type="number" name="detalles[${rowCount}][total]" value="${sub.toFixed(2)}" step="0.01" class="form-control form-control-sm inputSubtotal">

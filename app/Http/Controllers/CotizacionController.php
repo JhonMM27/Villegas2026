@@ -394,7 +394,7 @@ class CotizacionController extends Controller
             'detalles.*.unidad_codigo' => 'required|exists:unidades,codigo',
             'detalles.*.empaque' => 'required|numeric',
             'detalles.*.cantidad' => 'required|numeric|min:0.01',
-            'detalles.*.precio_unitario' => 'required|numeric|min:0.0001',
+            'detalles.*.precio_unitario' => 'required|numeric|min:0',
             'detalles.*.total' => 'nullable|numeric|min:0',
         ]);
     }

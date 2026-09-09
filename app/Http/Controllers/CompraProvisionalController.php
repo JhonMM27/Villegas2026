@@ -21,6 +21,7 @@ use App\Models\CompraProvisional;
 use App\Models\Proveedor;
 use App\Services\CompraProvisionalService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\DataTables;
@@ -286,7 +287,7 @@ class CompraProvisionalController extends Controller
      * Consulta compras con saldo pendiente para un proveedor, soportando provisional_id opcional.
      *
      * @param  Request  $request  Requiere 'proveedor_id', 'provisional_id' (opcional)
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function comprasConSaldo(Request $request)
     {
@@ -386,7 +387,7 @@ class CompraProvisionalController extends Controller
      * Devuelve la vista parcial con el detalle de un pago provisional de compra.
      *
      * @param  int  $id  ID del provisional
-     * @return \Illuminate\Contracts\View\View|JsonResponse
+     * @return string|JsonResponse
      */
     public function view($id)
     {

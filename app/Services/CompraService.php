@@ -453,6 +453,7 @@ class CompraService
         $pagoForma = PagoForma::where('codigo', $data['pago_forma_codigo'])->first();
 
         // Cargar productos involucrados con sus relaciones
+        /** @var \Illuminate\Support\Collection<int, Producto> $productos */
         $productos = Producto::with('afectacionTipo', 'unidad')
             ->whereIn('id', collect($data['detalles'])->pluck('producto_id'))
             ->get()
@@ -539,7 +540,7 @@ class CompraService
      * @param  array  $detalle  Datos del detalle desde el request
      * @return array Detalle listo para createMany()
      */
-    private function calculateDetail($producto, $cantidad, $precio_unitario_input, $precio_servicio_input, array &$totales, $detalle): array
+    private function calculateDetail(Producto $producto, $cantidad, $precio_unitario_input, $precio_servicio_input, array &$totales, $detalle): array
     {
         $precio_unitario = $precio_unitario_input;
         $precio_unitario_servicio = $precio_servicio_input;

@@ -173,7 +173,7 @@ class PlanillaPagoService
     {
         return DB::transaction(function () use ($pago, $data) {
             $sueldo = $pago->sueldoAplicado
-                ?? $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, $pago->mes, $pago->anio);
+                ?? $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, (int) $pago->mes, (int) $pago->anio);
             $sueldoReal = $sueldo ? (float) $sueldo->sueldo_real : 0;
 
             $horasExtras = (float) ($data['horas_extras'] ?? 0);
@@ -208,7 +208,7 @@ class PlanillaPagoService
             $result = $pago->save();
 
             if ($pago->estado === 'pagado') {
-                $this->sincronizarGastoPlanilla($pago->mes, $pago->anio);
+                $this->sincronizarGastoPlanilla((int) $pago->mes, (int) $pago->anio);
             }
 
             return $result;
@@ -482,7 +482,7 @@ class PlanillaPagoService
         }
 
         $sueldo = $pago->sueldoAplicado
-            ?? $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, $pago->mes, $pago->anio);
+            ?? $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, (int) $pago->mes, (int) $pago->anio);
         $sueldoPlanilla = (float) ($sueldo?->sueldo_planilla ?? 0);
         $totalPagar = (float) $pago->total_pagar;
         $montoGasto = $sueldoPlanilla + $totalPagar;
@@ -513,7 +513,7 @@ class PlanillaPagoService
 
         $userId = auth()->id() ?? 1;
         $userNombre = auth()->user()->name ?? 'Sistema';
-        $nombreMes = $this->getNombreMes($pago->mes);
+        $nombreMes = $this->getNombreMes((int) $pago->mes);
 
         $siguienteRecibo = $this->siguienteNumeroGasto('numero_recibo');
         $siguienteInterno = $this->siguienteNumeroGasto('numero_interno');

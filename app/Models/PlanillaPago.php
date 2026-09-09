@@ -38,6 +38,8 @@ class PlanillaPago extends Model
     ];
 
     protected $casts = [
+        'mes' => 'integer',
+        'anio' => 'integer',
         'sueldo_base' => 'decimal:2',
         'horas_extras' => 'decimal:2',
         'adelantos' => 'decimal:2',
