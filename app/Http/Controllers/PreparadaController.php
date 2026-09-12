@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Controlador de Preparadas (Producción).
  *
@@ -16,7 +18,7 @@ namespace App\Http\Controllers;
 use App\Models\Preparada;
 use App\Models\Producto;
 use App\Services\PreparadaService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\TicketPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
@@ -306,10 +308,7 @@ class PreparadaController extends Controller
             'ruc' => '20538937321',
         ];
 
-        $pdf = Pdf::loadView('preparadas.ticket', compact('preparada', 'empresa'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('preparadas.ticket', compact('preparada', 'empresa'));
 
         return $pdf->stream("preparada_{$preparada->id}.pdf");
     }

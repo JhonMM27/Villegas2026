@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Controlador de Préstamos.
  *
@@ -18,7 +20,7 @@ use App\Models\ComprobanteTipo;
 use App\Models\Prestamo;
 use App\Models\Producto;
 use App\Services\PrestamoService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\TicketPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
@@ -482,10 +484,7 @@ class PrestamoController extends Controller
             'ruc' => '20538937321',
         ];
 
-        $pdf = Pdf::loadView('prestamos.ticket', compact('prestamo', 'empresa'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('prestamos.ticket', compact('prestamo', 'empresa'));
 
         return $pdf->stream("ticket_{$prestamo->id}.pdf");
     }

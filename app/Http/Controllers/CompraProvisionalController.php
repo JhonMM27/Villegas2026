@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Controlador de Compras Provisionales (Pagos Anticipados a Proveedores).
  *
@@ -20,7 +22,7 @@ use App\Models\Compra;
 use App\Models\CompraProvisional;
 use App\Models\Proveedor;
 use App\Services\CompraProvisionalService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\TicketPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -375,10 +377,7 @@ class CompraProvisionalController extends Controller
         $formatter = new NumeroALetras;
         $total_letras = $formatter->convertir($provisional->monto);
 
-        $pdf = Pdf::loadView('compra-provisionales.ticket', compact('provisional', 'totalDeuda', 'empresa', 'total_letras'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('compra-provisionales.ticket', compact('provisional', 'totalDeuda', 'empresa', 'total_letras'));
 
         return $pdf->stream("ticket_{$provisional->id}.pdf");
     }

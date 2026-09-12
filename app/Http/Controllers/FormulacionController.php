@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\Cliente;
 use App\Models\Formulacion;
 use App\Models\Producto;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\TicketPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\DataTables;
@@ -312,10 +314,7 @@ class FormulacionController extends Controller
             'ruc' => '20538937321',
         ];
 
-        $pdf = Pdf::loadView('formulaciones.ticket', compact('formulacion', 'empresa'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('formulaciones.ticket', compact('formulacion', 'empresa'));
 
         return $pdf->stream("formulacion_{$formulacion->id}.pdf");
     }

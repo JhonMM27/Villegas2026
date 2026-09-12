@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Controlador de Ventas.
  *
@@ -17,9 +19,9 @@ namespace App\Http\Controllers;
 use App\Helpers\NumeroALetras;
 use App\Models\ComprobanteSerie;
 use App\Models\Venta;
+use App\Services\TicketPdfService;
 use App\Services\VentaService;
 use App\Support\PagoInicial;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -347,7 +349,7 @@ class VentaController extends Controller
     {
         $venta = Venta::with(['cliente'])->findOrFail($id);
 
-        $correlativoFormateado = str_pad($venta->correlativo, 8, '0', STR_PAD_LEFT);
+        $correlativoFormateado = str_pad((string) $venta->correlativo, 8, '0', STR_PAD_LEFT);
 
         $empresa = (object) [
             'razon_social' => 'CONSORCIOS VILLEGAS E.I.R.L.',
@@ -364,10 +366,7 @@ class VentaController extends Controller
         $formatter = new NumeroALetras;
         $total_letras = $formatter->convertir($venta->total);
 
-        $pdf = Pdf::loadView('ventas.ticket', compact('venta', 'empresa', 'total_letras', 'saldoAnterior'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('ventas.ticket', compact('venta', 'empresa', 'total_letras', 'saldoAnterior'));
 
         return $pdf->stream("NP - venta {$venta->serie}-{$correlativoFormateado}.pdf");
     }

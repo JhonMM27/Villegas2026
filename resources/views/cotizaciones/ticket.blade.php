@@ -5,175 +5,18 @@
     <meta charset="UTF-8">
 
     <title>
-        COTIZACION {{ $cotizacion->serie }}-{{ str_pad($cotizacion->correlativo, 8, '0', STR_PAD_LEFT) }}
+        COTIZACION {{ $cotizacion->serie }}-{{ str_pad((string) $cotizacion->correlativo, 8, '0', STR_PAD_LEFT) }}
     </title>
 
-    <style>
-        @page {
-            margin: 0;
-            size: 302px auto;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        html,
-        body {
-            width: 302px;
-            margin: 0;
-            padding: 0;
-            color: #000;
-        }
-
-        body {
-            font-family: FontA11, Font11, Arial, Helvetica, sans-serif;
-            font-size: 13px;
-            line-height: 1.22;
-            font-weight: normal;
-        }
-
-        .ticket {
-            width: 302px;
-            margin: 0;
-            padding-left: 26px;
-            padding-right: 29px;
-            text-align: left;
-        }
-
-        .center {
-            text-align: center;
-        }
-
-        .right {
-            text-align: right;
-        }
-
-        .bold,
-        strong,
-        .data-label {
-            font-weight: bold;
-        }
-
-        h3 {
-            width: 247px;
-            margin: 0;
-            padding: 0;
-            font-size: 15px;
-            line-height: 1.15;
-            font-weight: bold;
-            text-align: center;
-        }
-
-        p {
-            width: 247px;
-            margin: 0;
-            padding: 0;
-            font-size: 13px;
-            line-height: 1.22;
-            font-weight: normal;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-        }
-
-        table {
-            width: 247px;
-            border-collapse: collapse;
-            table-layout: fixed;
-            margin: 0;
-            padding: 0;
-        }
-
-        td,
-        th {
-            padding: 0;
-            margin: 0;
-            font-size: 13px;
-            line-height: 1.22;
-            font-weight: normal;
-            vertical-align: top;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-        }
-
-        th {
-            font-weight: bold;
-        }
-
-        .line {
-            width: 247px;
-            border-top: 1px dashed #000;
-            height: 0;
-            margin: 4px 0;
-        }
-
-        .spacer {
-            height: 5px;
-        }
-
-        .fecha-col {
-            width: 123px;
-            text-align: left;
-        }
-
-        .hora-col {
-            width: 124px;
-            text-align: right;
-        }
-
-        .detail-table {
-            width: 247px;
-        }
-
-        .col-cant {
-            width: 78px;
-            text-align: left;
-        }
-
-        .col-price {
-            width: 75px;
-            text-align: right;
-        }
-
-        .col-total {
-            width: 94px;
-            text-align: right;
-        }
-
-        .product-name {
-            width: 247px;
-            font-size: 14px;
-            line-height: 1.20;
-            font-weight: bold;
-            text-transform: uppercase;
-            padding-top: 5px;
-        }
-
-        .total {
-            width: 247px;
-            text-align: right;
-            font-size: 19px;
-            line-height: 1.20;
-            font-weight: bold;
-        }
-
-        .small {
-            width: 247px;
-            font-size: 12px;
-            line-height: 1.20;
-        }
-
-        .footer-space {
-            height: 25px;
-        }
-    </style>
+    @include('tickets.styles')
+    @include('tickets.compact-styles')
 </head>
 
 <body>
     <div class="ticket">
 
         @php
-            $numeroCotizacion = $cotizacion->serie . '-' . str_pad($cotizacion->correlativo, 8, '0', STR_PAD_LEFT);
+            $numeroCotizacion = $cotizacion->serie . '-' . str_pad((string) $cotizacion->correlativo, 8, '0', STR_PAD_LEFT);
             $fechaCotizacion = \Carbon\Carbon::parse($cotizacion->fecha_cotizacion);
         @endphp
 
@@ -187,18 +30,8 @@
         <div class="line"></div>
 
         {{-- FECHA Y HORA --}}
-        <table>
-            <tr>
-                <td class="fecha-col">
-                    FECHA: {{ $fechaCotizacion->format('d/m/Y') }}
-                </td>
-                <td class="hora-col">
-                    HORA: {{ $fechaCotizacion->format('H:i:s') }}
-                </td>
-            </tr>
-        </table>
 
-        <div class="spacer"></div>
+            @include('tickets.date-time', ['date' => $fechaCotizacion])
 
         {{-- DATOS CLIENTE --}}
         <p>
@@ -221,8 +54,6 @@
             {{ $cotizacion->cliente->telefono ?? '-' }}
         </p>
 
-        <div class="spacer"></div>
-
         <p>
             <span class="data-label">FORMA DE PAGO:</span>
             {{ $cotizacion->pago_forma_nombre ?? '-' }}
@@ -230,20 +61,8 @@
 
         <div class="line"></div>
 
-        {{-- CABECERA DETALLE --}}
-        <table class="detail-table">
-            <thead>
-                <tr>
-                    <th class="col-cant">Cant</th>
-                    <th class="col-price">P.Unit</th>
-                    <th class="col-total">Importe</th>
-                </tr>
-            </thead>
-        </table>
-
-        <div class="line"></div>
-
         {{-- DETALLE PRODUCTOS --}}
+        @include('tickets.detail-header')
         @foreach ($cotizacion->detalles as $detalle)
             @php
                 $unidadCodigo = $detalle->unidad_codigo ?? 'NIU';
@@ -268,39 +87,19 @@
                 $importe = number_format((float) ($detalle->total ?? 0), 2, '.', ',');
             @endphp
 
-            <p class="product-name">
-                {{ $detalle->producto_nombre ?? 'PRODUCTO SIN NOMBRE' }}
-            </p>
-
-            <table class="detail-table">
-                <tr>
-                    <td class="col-cant">
-                        {{ $cantidad }} {{ $unidadTexto }}
-                    </td>
-                    <td class="col-price">
-                        S/ {{ $precio }}
-                    </td>
-                    <td class="col-total">
-                        S/ {{ $importe }}
-                    </td>
-                </tr>
-            </table>
+            @include('tickets.item', ['name' => $detalle->producto_nombre ?? 'PRODUCTO SIN NOMBRE', 'quantity' => $cantidad, 'unit' => $unidadTexto, 'price' => $precio, 'amount' => $importe])
         @endforeach
 
         <div class="line"></div>
-        <div class="spacer"></div>
 
         {{-- TOTAL --}}
-        <p class="total">
-            TOTAL: S/ {{ number_format((float) ($cotizacion->total ?? 0), 2, '.', ',') }}
-        </p>
+        @include('tickets.summary-row', ['label' => 'TOTAL:', 'value' => 'S/ ' . number_format((float) ($cotizacion->total ?? 0), 2, '.', ','), 'isTotal' => true])
 
         <p class="center small">
             Son: {{ $total_letras ?? '' }}
         </p>
 
         <div class="line"></div>
-        <div class="spacer"></div>
 
         {{-- USUARIO --}}
         <p>
@@ -318,6 +117,7 @@
         <div class="footer-space"></div>
 
     </div>
+<div id="ticket-end"></div>
 </body>
 
 </html>

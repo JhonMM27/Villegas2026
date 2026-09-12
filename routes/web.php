@@ -62,6 +62,7 @@ use App\Http\Controllers\VentaController;
 use App\Http\Controllers\VentaEntregaController;
 use App\Http\Controllers\VentaProvisionalController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\TicketCalibrationController;
 
 Route::middleware('guest')->group(function () {
     Route::get('/', function () {
@@ -74,6 +75,7 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/tickets/calibracion', TicketCalibrationController::class)->name('tickets.calibracion');
     Route::prefix('auditoria')->name('auditoria.')->group(function () {
         Route::get('/', [AuditoriaController::class, 'index'])->name('index');
         Route::get('/data', [AuditoriaController::class, 'data'])->name('data');

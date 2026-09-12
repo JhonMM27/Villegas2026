@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\Nucleo;
 use App\Models\Producto;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\TicketPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -307,10 +309,7 @@ class NucleoController extends Controller
             'ruc' => '20538937321',
         ];
 
-        $pdf = Pdf::loadView('nucleos.ticket', compact('nucleo', 'empresa'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('nucleos.ticket', compact('nucleo', 'empresa'));
 
         return $pdf->stream("nucleo_{$nucleo->id}.pdf");
     }

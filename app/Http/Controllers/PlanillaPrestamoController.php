@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PlanillaPrestamo;
 use App\Services\PlanillaPrestamoService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\TicketPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -310,10 +310,7 @@ class PlanillaPrestamoController extends Controller
             'celular' => '967984895 - 978431737 - 915177079',
         ];
 
-        $pdf = Pdf::loadView('planilla.prestamos.pago_ticket', compact('pago', 'empresa'))
-            ->setPaper([0, 0, 226.77, 400], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('planilla.prestamos.pago_ticket', compact('pago', 'empresa'));
 
         return $pdf->stream("pago_prestamo_{$pago->numero_interno}.pdf");
     }
@@ -419,10 +416,7 @@ class PlanillaPrestamoController extends Controller
             'celular' => '967984895 - 978431737 - 915177079',
         ];
 
-        $pdf = Pdf::loadView('planilla.prestamos.ticket', compact('prestamo', 'empresa'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('planilla.prestamos.ticket', compact('prestamo', 'empresa'));
 
         return $pdf->stream("prestamo_{$prestamo->numero_interno}.pdf");
     }

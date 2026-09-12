@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Controlador de Compras.
  *
@@ -17,8 +19,8 @@ namespace App\Http\Controllers;
 use App\Models\Compra;
 use App\Models\ComprobanteSerie;
 use App\Services\CompraService;
+use App\Services\TicketPdfService;
 use App\Support\PagoInicial;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -360,10 +362,7 @@ class CompraController extends Controller
             'celular' => '967984895 - 978431737 - 915177079',
         ];
 
-        $pdf = Pdf::loadView('compras.ticket', compact('compra', 'empresa'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('compras.ticket', compact('compra', 'empresa'));
 
         return $pdf->stream("ticket_{$compra->id}.pdf");
     }

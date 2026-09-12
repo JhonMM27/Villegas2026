@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\Venta;
 use App\Models\VentaDetalle;
+use App\Services\TicketPdfService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -1002,7 +1005,7 @@ class CuentaCorrienteClienteController extends Controller
             'celular' => '967984895 - 978431737 - 915177079',
         ];
 
-        $pdf = Pdf::loadView('cuenta-cliente.reportes.saldos', compact(
+        $pdf = app(TicketPdfService::class)->render('cuenta-cliente.reportes.saldos', compact(
             'reportes',
             'clienteNombre',
             'totTotal',
@@ -1010,9 +1013,7 @@ class CuentaCorrienteClienteController extends Controller
             'totAbonos',
             'totSaldo',
             'totItems', 'empresa'
-        ))->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        ));
 
         $nombreSanitizado = preg_replace('/[^a-zA-Z0-9\s\-]/', '', $clienteNombre ?? '');
         $nombreSanitizado = preg_replace('/\s+/', '_', trim($nombreSanitizado));

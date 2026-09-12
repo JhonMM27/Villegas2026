@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Helpers\NumeroALetras;
 use App\Models\Costo;
+use App\Services\TicketPdfService;
 use App\Support\NumericStringOrder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -250,10 +253,7 @@ class CostoController extends Controller
         $formatter = new NumeroALetras;
         $total_letras = $formatter->convertir($costo->monto);
 
-        $pdf = Pdf::loadView('costos.ticket', compact('costo', 'empresa', 'total_letras'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('costos.ticket', compact('costo', 'empresa', 'total_letras'));
 
         return $pdf->stream("costo_{$costo->id}.pdf");
     }

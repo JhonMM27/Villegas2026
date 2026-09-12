@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Saldos Cliente: {{ $clienteNombre }}</title>
+    <title>Saldos Proveedor: {{ $proveedorNombre }}</title>
     @include('tickets.styles')
     @include('tickets.compact-styles')
 </head>
@@ -19,7 +19,7 @@
     </div>
     <div class="line"></div>
     {{-- DATOS PROVEEDOR --}}
-    <p><strong>Cliente:</strong> {{ $clienteNombre }}</p>
+    <p><strong>Proveedor:</strong> {{ $proveedorNombre }}</p>
     <div class="line"></div>
 
     {{-- DETALLE PRODUCTOS --}}
@@ -35,7 +35,7 @@
             @endphp
         <div class="ticket-row">
 <div class="ticket-field"><span class="field-label">Doc.:</span> {{ $r->documento }}</div>
-<div class="ticket-field"><span class="field-label">Fecha:</span> {{ \Carbon\Carbon::parse($r->fecha_venta)->format('d/m/Y') }}</div>
+<div class="ticket-field"><span class="field-label">Fecha:</span> {{ \Carbon\Carbon::parse($r->fecha_compra)->format('d/m/Y') }}</div>
 @include('tickets.summary-row', ['label' => 'Saldo:', 'value' => number_format((float)$r->saldo, 2), 'isTotal' => false])
 </div>
         @endforeach

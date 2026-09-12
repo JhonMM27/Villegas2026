@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Helpers\NumeroALetras;
@@ -9,7 +11,7 @@ use App\Models\ComprobanteTipo;
 use App\Models\Cotizacion;
 use App\Models\PagoForma;
 use App\Models\Producto;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\TicketPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\DataTables;
@@ -316,11 +318,13 @@ class CotizacionController extends Controller
             'pago_forma_nombre' => $data['pago_forma_nombre'] ?? '',
 
             'moneda' => $data['moneda'],
-            'op_gravada' => round($data['op_gravada'] ?? 0, 2),
-            'op_exonerada' => round($data['op_exonerada'] ?? 0, 2),
-            'op_inafecta' => round($data['op_inafecta'] ?? 0, 2),
-            'impuesto' => round($data['impuesto'] ?? 0, 2),
-            'total' => round($data['total'] ?? 0, 2),
+            // Los formularios llegan como texto aunque la validación `numeric` sea correcta.
+            // Normalizamos antes de usar funciones aritméticas bajo strict_types.
+            'op_gravada' => round((float) ($data['op_gravada'] ?? 0), 2),
+            'op_exonerada' => round((float) ($data['op_exonerada'] ?? 0), 2),
+            'op_inafecta' => round((float) ($data['op_inafecta'] ?? 0), 2),
+            'impuesto' => round((float) ($data['impuesto'] ?? 0), 2),
+            'total' => round((float) ($data['total'] ?? 0), 2),
         ];
 
         if ($isNew) {
@@ -339,15 +343,15 @@ class CotizacionController extends Controller
     private function calculateDetail($producto, $detalle, array &$totales)
     {
         $unidad_codigo = $detalle['unidad_codigo'];
-        $precio_unitario = $detalle['precio_unitario'];
-        $cantidad = $detalle['cantidad'];
-        $porcentajeImpuesto = optional($producto->afectacionTipo)->porcentaje ?? 0;
+        $precio_unitario = (float) $detalle['precio_unitario'];
+        $cantidad = (float) $detalle['cantidad'];
+        $porcentajeImpuesto = (float) (optional($producto->afectacionTipo)->porcentaje ?? 0);
         $valor_unitario = $porcentajeImpuesto > 0 ? $precio_unitario / (1 + $porcentajeImpuesto) : $precio_unitario;
         // Usar el total enviado desde la vista si está disponible
         $detalleTotal = isset($detalle['total']) ? (float) $detalle['total'] : round($precio_unitario * $cantidad, 2);
         $subtotal = $porcentajeImpuesto > 0 ? $detalleTotal / (1 + $porcentajeImpuesto) : $detalleTotal;
         $detalleImpuesto = $detalleTotal - $subtotal;
-        $empaque = $detalle['empaque'];
+        $empaque = (float) $detalle['empaque'];
 
         $salidaKg = $cantidad * $empaque;
 
@@ -429,7 +433,7 @@ class CotizacionController extends Controller
     {
         $cotizacion = Cotizacion::with(['cliente', 'detalles'])->findOrFail($id);
 
-        $correlativoFormateado = str_pad($cotizacion->correlativo, 8, '0', STR_PAD_LEFT);
+        $correlativoFormateado = str_pad((string) $cotizacion->correlativo, 8, '0', STR_PAD_LEFT);
 
         $empresa = (object) [
             'razon_social' => 'CONSORCIOS VILLEGAS E.I.R.L.',
@@ -441,10 +445,7 @@ class CotizacionController extends Controller
         $formatter = new NumeroALetras;
         $total_letras = $formatter->convertir($cotizacion->total);
 
-        $pdf = Pdf::loadView('cotizaciones.ticket', compact('cotizacion', 'empresa', 'total_letras'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('cotizaciones.ticket', compact('cotizacion', 'empresa', 'total_letras'));
 
         return $pdf->stream("COT - {$cotizacion->serie}-{$correlativoFormateado}.pdf");
     }

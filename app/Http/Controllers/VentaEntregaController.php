@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Controlador de Entregas de Venta (Entregas Parciales).
  *
@@ -19,9 +21,9 @@ use App\Models\Cliente;
 use App\Models\Venta;
 use App\Models\VentaDetalle;
 use App\Models\VentaEntrega;
+use App\Services\TicketPdfService;
 use App\Services\VentaEntregaService;
 use App\Support\NumericStringOrder;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -388,10 +390,7 @@ class VentaEntregaController extends Controller
             'celular' => '967984895 - 978431737 - 915177079',
         ];
 
-        $pdf = Pdf::loadView('venta-entregas.ticket', compact('entrega', 'empresa'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('venta-entregas.ticket', compact('entrega', 'empresa'));
 
         return $pdf->stream("ticket_entrega_{$entrega->id}.pdf");
     }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\CajaPago;
@@ -8,7 +10,7 @@ use App\Models\Gasto;
 use App\Models\PagoForma;
 use App\Models\Producto;
 use App\Models\Proveedor;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\TicketPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\DataTables;
@@ -381,10 +383,7 @@ class CajaPagoController extends Controller
             'ruc' => '20538937321',
         ];
 
-        $pdf = Pdf::loadView('compras.ticket', compact('compra', 'empresa'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('compras.ticket', compact('compra', 'empresa'));
 
         return $pdf->stream("ticket_{$compra->id}.pdf");
     }

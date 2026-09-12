@@ -4,40 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <title>NUCLEO PREPARADA {{ $nucleoPreparada->id }}</title>
-    <style>
-        @page {
-            margin: 2mm 0mm 2mm 0mm;
-            size: 76mm auto;
-        }
-
-        body {
-            font-family: DejaVu Sans, sans-serif;
-            font-size: 10px;
-            margin: 0;
-            padding: 0;
-            line-height: 1.2;
-        }
-
-        .ticket {
-            width: 72mm;
-            margin: 0 auto;
-            text-align: left;
-        }
-
-        .center { text-align: center; }
-        .bold { font-weight: bold; }
-        .right { text-align: right; }
-
-        h3 { margin: 0; padding: 0; font-size: 12px; }
-        p { margin: 0; padding: 0; font-size: 9px; }
-
-        .line {
-            border-top: 1px dashed #000;
-            margin: 2px 0;
-        }
-
-        .spacer { height: 3px; }
-    </style>
+    @include('tickets.styles')
+    @include('tickets.compact-styles')
 </head>
 
 <body>
@@ -56,38 +24,20 @@
         <div class="line"></div>
 
         {{-- FECHA Y HORA --}}
-        <table style="width: 100%;">
-            <tr>
-                <td></td>
-                <td class="right">FECHA: {{ \Carbon\Carbon::parse($nucleoPreparada->fecha)->format('d/m/Y') }}</td>
-                <td class="right">HORA: {{ \Carbon\Carbon::parse($nucleoPreparada->fecha)->format('H:i:s') }}</td>
-            </tr>
-        </table>
 
-        <div class="spacer"></div>
+            @include('tickets.date-time', ['date' => $nucleoPreparada->fecha])
 
         {{-- DATOS CLIENTE --}}
         <p><strong>CLIENTE:</strong> {{ $nucleoPreparada->cliente_nombre }}</p>
         <p><strong>DIRECCION:</strong> {{ $nucleoPreparada->cliente_direccion ?? '-' }}</p>
 
-        <div class="spacer"></div>
-
         <p><strong>NUCLEO:</strong> {{ $nucleoPreparada->nucleo_nombre }} ({{ $nucleoPreparada->producto_empaque }}KG)</p>
 
         <div class="line"></div>
-        <div class="spacer"></div>
-
-        {{-- ENCABEZADO TABLA --}}
-        <div class="bold">
-            <span style="display: inline-block; width: 30%;">Cant</span>
-            <span style="display: inline-block; width: 25%; text-align: right;">P.Unit</span>
-            <span style="display: inline-block; width: 35%; text-align: right;">Importe</span>
-        </div>
-        <div class="line"></div>
 
         {{-- DETALLE INSUMOS --}}
+        @include('tickets.detail-header')
         @foreach ($nucleoPreparada->detalles as $detalle)
-            <p class="bold">{{ $detalle->producto_nombre }}</p>
 
             @php
                 $cantidad = number_format((float) $detalle->salida_kg, 2);
@@ -95,32 +45,18 @@
                 $importe = number_format((float) ($detalle->salida_kg * $detalle->costo_unitario), 2);
             @endphp
 
-            <p>
-                <span style="display: inline-block; width: 30%;">{{ $cantidad }} KG</span>
-                <span style="display: inline-block; width: 25%; text-align: right;">S/ {{ $precio }}</span>
-                <span style="display: inline-block; width: 35%; text-align: right;">S/ {{ $importe }}</span>
-            </p>
+            @include('tickets.item', ['name' => $detalle->producto_nombre, 'quantity' => $cantidad, 'unit' => 'KG', 'price' => $precio, 'amount' => $importe])
         @endforeach
 
         <div class="line"></div>
-        <div class="spacer"></div>
 
         {{-- TOTALES --}}
-        <p style="text-align: right;">
-            SACOS: {{ number_format($nucleoPreparada->ingreso_saco, 2) }}
-        </p>
-        <p style="text-align: right;">
-            KG TOTALES: {{ number_format($nucleoPreparada->ingreso_kg, 2) }}
-        </p>
+        @include('tickets.summary-row', ['label' => 'SACOS:', 'value' => number_format($nucleoPreparada->ingreso_saco, 2), 'isTotal' => false])
+        @include('tickets.summary-row', ['label' => 'KG TOTALES:', 'value' => number_format($nucleoPreparada->ingreso_kg, 2), 'isTotal' => false])
 
-        <div class="spacer"></div>
-
-        <p class="bold" style="text-align: right; font-size: 11px;">
-            TOTAL: S/ {{ number_format($nucleoPreparada->ingreso_soles, 2) }}
-        </p>
+        @include('tickets.summary-row', ['label' => 'TOTAL:', 'value' => 'S/ ' . number_format($nucleoPreparada->ingreso_soles, 2), 'isTotal' => true])
 
         <div class="line"></div>
-        <div class="spacer"></div>
 
         {{-- USUARIO --}}
         <p><strong>USUARIO:</strong> {{ $nucleoPreparada->user_nombre }}</p>
@@ -131,9 +67,8 @@
             <p class="bold">GRACIAS POR SU PREFERENCIA</p>
         </div>
 
-        <div style="height: 4mm;"></div>
-
     </div>
+<div id="ticket-end"></div>
 </body>
 
 </html>

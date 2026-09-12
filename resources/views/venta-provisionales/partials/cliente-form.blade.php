@@ -1,5 +1,5 @@
 <div class="border border-primary rounded p-3">
-    <label class="form-label mb-1 fw-bold">Cliente</label>
+    <label for="cliente_nombre" class="form-label mb-1 fw-bold">Cliente</label>
     <div class="input-group input-group-sm">
         <input type="text" id="cliente_nombre" name="cliente_nombre" class="form-control form-control-sm"
             autocomplete="off" placeholder="Buscar cliente..." data-error-field="cliente_id">

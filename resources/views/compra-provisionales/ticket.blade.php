@@ -3,33 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Provisional Compra {{ $provisional->numero_recibo }}</title>
-    <style>
-        @page {
-            margin: 2mm 0mm 2mm 0mm;
-            size: 76mm auto;
-        }
-        body {
-            font-family: DejaVu Sans, sans-serif;
-            font-size: 10px;
-            margin: 0;
-            padding: 0;
-            line-height: 1.2;
-        }
-        .ticket {
-            width: 72mm;
-            margin: 0 auto;
-            text-align: left;
-        }
-        .center { text-align: center; }
-        .bold { font-weight: bold; }
-        .right { text-align: right; }
-        h3 { margin: 0; padding: 0; font-size: 12px; }
-        p { margin: 0; padding: 0; font-size: 9px; }
-        table { width: 100%; border-collapse: collapse; margin: 0; }
-        td { padding: 1px 0; vertical-align: top; }
-        .line { border-top: 1px dashed #000; margin: 2px 0; }
-        .spacer { height: 3px; }
-    </style>
+    @include('tickets.styles')
+    @include('tickets.compact-styles')
 </head>
 <body>
 <div class="ticket">
@@ -41,8 +16,6 @@
         <p>CEL: {{ $empresa->celular }}</p>
     </div>
 
-    <div class="spacer"></div>
-
     <div class="center">
         <h3 class="bold">RECIBO {{ $provisional->numero_recibo }}</h3>
     </div>
@@ -53,55 +26,38 @@
     <p><strong>Proveedor:</strong> {{ $provisional->proveedor_nombre }}</p>
     <p><strong>Documento:</strong> {{ $provisional->proveedor->documentoTipo->descripcion ?? '-' }} {{ $provisional->proveedor_documento }}</p>
     <p><strong>Dirección:</strong> {{ $provisional->proveedor_direccion ?? '-' }}</p>
-    <p><strong>Fecha:</strong> {{ \Carbon\Carbon::parse($provisional->fecha_provisional)->format('d/m/Y H:i') }}</p>
+    @include('tickets.date-time', ['date' => $provisional->fecha_provisional])
 
     <div class="line"></div>
-    <div class="spacer"></div>
 
     {{-- TOTALES --}}
-    <table class="totales">
-        <tr class="bold">
-            <td style="text-align: left; width: 70%;">PAGO REALIZADO:</td>
-            <td style="text-align: right; width: 30%;">S/ {{ number_format($provisional->monto, 2) }}</td>
-        </tr>
-    </table>
 
-    <p style="font-size: 8px; text-align: center;">{{ $total_letras }}</p>
+        @include('tickets.summary-row', ['label' => 'PAGO REALIZADO:', 'value' => 'S/ ' . number_format($provisional->monto, 2), 'isTotal' => false])
 
-    <table class="totales">
-        <tr class="bold">
-            <td style="text-align: left; width: 70%;">TOTAL DEUDA:</td>
-            <td style="text-align: right; width: 30%;">S/ {{ number_format($totalDeuda, 2) }}</td>
-        </tr>
-    </table>
+
+    <p style=" text-align: center;">{{ $total_letras }}</p>
+
+        @include('tickets.summary-row', ['label' => 'TOTAL DEUDA:', 'value' => 'S/ ' . number_format($totalDeuda, 2), 'isTotal' => true])
+
 
     <div class="line"></div>
-    <div class="spacer"></div>
 
     <p><strong>Usuario:</strong> {{ $provisional->user_nombre }}</p>
     <p class="bold">COBRANZA</p>
 
-    <table>
-        <tr>
-            <td class="bold">Principal:</td>
-            <td class="right">S/ {{ number_format($provisional->importe_p, 2) }}</td>
-        </tr>
-        <tr>
-            <td class="bold">Depósito:</td>
-            <td class="right">S/ {{ number_format($provisional->importe_d, 2) }}</td>
-        </tr>
-        <tr>
-            <td class="bold">Consorcio:</td>
-            <td class="right">S/ {{ number_format($provisional->importe_c, 2) }}</td>
-        </tr>
-    </table>
+        @include('tickets.summary-row', ['label' => 'Principal:', 'value' => 'S/ ' . number_format($provisional->importe_p, 2), 'isTotal' => false])
+
+        @include('tickets.summary-row', ['label' => 'Depósito:', 'value' => 'S/ ' . number_format($provisional->importe_d, 2), 'isTotal' => false])
+
+        @include('tickets.summary-row', ['label' => 'Consorcio:', 'value' => 'S/ ' . number_format($provisional->importe_c, 2), 'isTotal' => false])
+
 
     <div class="line"></div>
     <div class="center">
         <p><em>GRACIAS POR SU PREFERENCIA</em></p>
     </div>
 
-    <div style="height: 4mm;"></div>
 </div>
+<div id="ticket-end"></div>
 </body>
 </html>

@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Helpers\NumeroALetras;
 use App\Models\Gasto;
+use App\Services\TicketPdfService;
 use App\Support\NumericStringOrder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -251,10 +254,7 @@ class GastoController extends Controller
         $formatter = new NumeroALetras;
         $total_letras = $formatter->convertir($gasto->monto);
 
-        $pdf = Pdf::loadView('gastos.ticket', compact('gasto', 'empresa', 'total_letras'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('gastos.ticket', compact('gasto', 'empresa', 'total_letras'));
 
         return $pdf->stream("gasto_{$gasto->id}.pdf");
     }

@@ -7,7 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\PlanillaAdelanto;
 use App\Services\EmpleadoService;
 use App\Services\PlanillaAdelantoService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\TicketPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -238,10 +238,7 @@ class PlanillaAdelantoController extends Controller
             'celular' => '967984895 - 978431737 - 915177079',
         ];
 
-        $pdf = Pdf::loadView('planilla.adelantos.ticket', compact('adelanto', 'empresa'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('planilla.adelantos.ticket', compact('adelanto', 'empresa'));
 
         return $pdf->stream("adelanto_{$adelanto->numero_interno}.pdf");
     }

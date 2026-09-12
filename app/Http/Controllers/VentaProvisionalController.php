@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Controlador de Ventas Provisionales (Pagos Anticipados).
  *
@@ -19,8 +21,8 @@ use App\Helpers\NumeroALetras;
 use App\Models\Cliente;
 use App\Models\Venta;
 use App\Models\VentaProvisional;
+use App\Services\TicketPdfService;
 use App\Services\VentaProvisionalService;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\DataTables;
@@ -189,7 +191,7 @@ class VentaProvisionalController extends Controller
         $data = $this->validateData($request);
 
         try {
-            $this->ventaProvisionalService->updateProvisional($id, $data);
+            $this->ventaProvisionalService->updateProvisional((int) $id, $data);
 
             return response()->json([
                 'success' => true,
@@ -211,7 +213,7 @@ class VentaProvisionalController extends Controller
     public function destroy($id)
     {
         try {
-            $this->ventaProvisionalService->deleteProvisional($id);
+            $this->ventaProvisionalService->deleteProvisional((int) $id);
 
             return response()->json([
                 'success' => true,
@@ -376,10 +378,7 @@ class VentaProvisionalController extends Controller
         $formatter = new NumeroALetras;
         $total_letras = $formatter->convertir($provisional->monto);
 
-        $pdf = Pdf::loadView('venta-provisionales.ticket', compact('provisional', 'totalDeuda', 'empresa', 'total_letras'))
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('venta-provisionales.ticket', compact('provisional', 'totalDeuda', 'empresa', 'total_letras'));
 
         return $pdf->stream("ticket_{$provisional->id}.pdf");
     }

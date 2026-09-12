@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Controlador de NucleoPreparada (Producción de Núcleos).
  *
@@ -16,7 +18,7 @@ namespace App\Http\Controllers;
 
 use App\Models\NucleoPreparada;
 use App\Services\NucleoPreparadaService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\TicketPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
@@ -303,10 +305,7 @@ class NucleoPreparadaController extends Controller
             'celular' => '967984895 - 978431737 - 915177079',
         ];
 
-        $pdf = Pdf::loadView('nucleo-preparadas.ticket', ['nucleoPreparada' => $preparada, 'empresa' => $empresa])
-            ->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        $pdf = app(TicketPdfService::class)->render('nucleo-preparadas.ticket', ['nucleoPreparada' => $preparada, 'empresa' => $empresa]);
 
         return $pdf->stream("nucleo_preparada_{$preparada->id}.pdf");
     }

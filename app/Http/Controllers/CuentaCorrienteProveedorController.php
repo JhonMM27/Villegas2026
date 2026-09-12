@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\Compra;
 use App\Models\CompraDetalle;
 use App\Models\Producto;
 use App\Models\Proveedor;
+use App\Services\TicketPdfService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -862,7 +865,7 @@ class CuentaCorrienteProveedorController extends Controller
             'celular'=>'967984895 - 978431737 - 915177079',
         ];
 
-        $pdf = Pdf::loadView('cuenta-proveedor.reportes.saldos', compact(
+        $pdf = app(TicketPdfService::class)->render('cuenta-proveedor.reportes.saldos', compact(
             'reportes',
             'proveedorNombre',
             'totTotal',
@@ -870,9 +873,7 @@ class CuentaCorrienteProveedorController extends Controller
             'totAbonos',
             'totSaldo',
             'totItems','empresa'
-        ))->setPaper([0, 0, 226.77, 600], 'portrait')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
+        ));
 
         return $pdf->stream('creditos_por_pagar_todos.pdf');
     }
