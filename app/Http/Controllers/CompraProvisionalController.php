@@ -136,6 +136,8 @@ class CompraProvisionalController extends Controller
                 'message' => 'Registro creado satisfactoriamente',
                 'compra_provisional_id' => $provisional->id,
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -168,7 +170,9 @@ class CompraProvisionalController extends Controller
                 ])
                 ->findOrFail($id);
 
-            return response()->json($registro);
+            return response()->json(array_merge($registro->toArray(), [
+                'version_recibo' => app(\App\Services\ReciboControlService::class)->version($registro),
+            ]));
 
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
@@ -191,12 +195,14 @@ class CompraProvisionalController extends Controller
         $data = $this->validateData($request);
 
         try {
-            $this->compraProvisionalService->updateProvisional($id, $data);
+            $this->compraProvisionalService->updateProvisional((int) $id, $data);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Registro actualizado satisfactoriamente',
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -213,12 +219,14 @@ class CompraProvisionalController extends Controller
     public function destroy($id)
     {
         try {
-            $this->compraProvisionalService->deleteProvisional($id);
+            $this->compraProvisionalService->deleteProvisional((int) $id);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Registro eliminado correctamente',
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -237,6 +245,8 @@ class CompraProvisionalController extends Controller
     protected function validateData(Request $request, $id = null): array
     {
         $rules = [
+            'idempotencia_clave' => 'nullable|uuid',
+            'version_recibo' => 'nullable|string|size:64',
             'numero_interno' => 'nullable|string|max:10',
             'fecha_provisional' => 'required|date',
 
@@ -311,7 +321,7 @@ class CompraProvisionalController extends Controller
                 ->whereNotNull('compra_id')
                 ->get();
             foreach ($detalles as $d) {
-                $aplicacionesPrevias[(int) $d->compra_id] = (float) $d->monto;
+                $aplicacionesPrevias[(int) $d->compra_id] = ($aplicacionesPrevias[(int) $d->compra_id] ?? 0) + (float) $d->monto;
             }
         }
 

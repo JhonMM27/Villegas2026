@@ -25,6 +25,8 @@ class AuditoriaController extends Controller
         'cuadre_stocks' => 'Cuadres de stock',
         'venta_entregas' => 'Entregas de venta',
         'empleado_sueldos' => 'Sueldos de empleados',
+        'venta_provisionales' => 'Cobranzas de clientes',
+        'compra_provisionales' => 'Pagos a proveedores',
     ];
 
     public function __construct()
@@ -66,7 +68,7 @@ class AuditoriaController extends Controller
         $request->validate([
             'buscar' => ['nullable', 'string', 'max:150'],
             'user_nombre' => ['nullable', 'string', 'max:100'],
-            'tipo_evento' => ['nullable', 'in:anulacion,rectificacion'],
+            'tipo_evento' => ['nullable', 'in:anulacion,rectificacion,creacion,modificacion,eliminacion'],
             'modulo' => ['nullable', 'in:'.implode(',', array_keys(self::MODULOS))],
             'desde' => ['nullable', 'date'],
             'hasta' => ['nullable', 'date', 'after_or_equal:desde'],
@@ -99,7 +101,11 @@ class AuditoriaController extends Controller
             ->addColumn('hora', fn (AuditoriaEvento $evento): string => $evento->created_at?->format('H:i:s') ?? '—')
             ->addColumn('accion', function (AuditoriaEvento $evento): string {
                 $clase = $evento->tipo_evento === AuditoriaEvento::TIPO_ANULACION ? 'audit-badge-cancel' : 'audit-badge-edit';
-                $texto = $evento->tipo_evento === AuditoriaEvento::TIPO_ANULACION ? 'Anuló' : 'Rectificó';
+                $texto = match ($evento->tipo_evento) {
+                    'anulacion' => 'Anuló', 'rectificacion' => 'Rectificó',
+                    'creacion' => 'Creó', 'modificacion' => 'Modificó', 'eliminacion' => 'Eliminó',
+                    default => $evento->tipo_evento,
+                };
 
                 return '<span class="audit-action-badge '.$clase.'">'.$texto.'</span>';
             })
@@ -114,7 +120,7 @@ class AuditoriaController extends Controller
         return response()->json([
             'id' => $evento->id,
             'tipo_evento' => $evento->tipo_evento,
-            'accion' => $evento->tipo_evento === AuditoriaEvento::TIPO_ANULACION ? 'Anulación' : 'Rectificación',
+            'accion' => $this->nombreAccion($evento->tipo_evento),
             'modulo' => $evento->modulo,
             'modulo_nombre' => self::MODULOS[$evento->modulo] ?? str_replace('_', ' ', ucfirst($evento->modulo)),
             'numero_rectificacion' => $evento->numero_rectificacion,
@@ -128,9 +134,7 @@ class AuditoriaController extends Controller
 
     public function pdf(AuditoriaEvento $evento): Response
     {
-        $accion = $evento->tipo_evento === AuditoriaEvento::TIPO_ANULACION
-            ? 'Anulación'
-            : 'Rectificación';
+        $accion = $this->nombreAccion($evento->tipo_evento);
         $moduloNombre = self::MODULOS[$evento->modulo]
             ?? str_replace('_', ' ', ucfirst($evento->modulo));
         $nombreArchivo = implode('_', array_filter([
@@ -153,5 +157,14 @@ class AuditoriaController extends Controller
             'Subject' => 'Detalle de evento protegido de auditoría',
             'Author' => 'CONSORCIOS VILLEGAS E.I.R.L.',
         ])->stream($nombreArchivo);
+    }
+
+    private function nombreAccion(string $tipo): string
+    {
+        return match ($tipo) {
+            'anulacion' => 'Anulación', 'rectificacion' => 'Rectificación',
+            'creacion' => 'Creación', 'modificacion' => 'Modificación', 'eliminacion' => 'Eliminación',
+            default => $tipo,
+        };
     }
 }

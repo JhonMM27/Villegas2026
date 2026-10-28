@@ -25,7 +25,7 @@
                 cancelButtonText: 'Cancelar',
                 confirmButtonColor: '#d97706',
                 didOpen: () => {
-                    window.setTimeout(() => Swal.getTextarea()?.focus(), 0);
+                    window.setTimeout(() => Swal.getInput()?.focus(), 0);
                 },
             });
         } finally {

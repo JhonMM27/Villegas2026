@@ -185,6 +185,18 @@ class AuditoriaControllerTest extends TestCase
         $usuario->assignRole($rol);
     }
 
+    public function test_eventos_de_recibos_se_pueden_filtrar_y_consultar(): void
+    {
+        $evento = $this->crearEvento();
+        $evento->update(['tipo_evento' => 'eliminacion', 'modulo' => 'venta_provisionales', 'numero_rectificacion' => null]);
+        $admin = User::query()->create($this->datosUsuario('admin-recibos@example.test'));
+        $this->asignarPermisoAuditoria($admin);
+        $this->actingAs($admin)->getJson(route('auditoria.show', $evento))->assertOk()
+            ->assertJsonPath('accion', 'Eliminación')->assertJsonPath('modulo_nombre', 'Cobranzas de clientes');
+        $this->getJson(route('auditoria.data', ['tipo_evento' => 'eliminacion', 'modulo' => 'venta_provisionales']))
+            ->assertOk()->assertJsonPath('recordsTotal', 1)->assertJsonPath('data.0.modulo_nombre', 'Cobranzas de clientes');
+    }
+
     private function crearEvento(): AuditoriaEvento
     {
         return AuditoriaEvento::query()->create([

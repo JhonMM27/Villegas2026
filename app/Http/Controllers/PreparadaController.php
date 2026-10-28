@@ -160,7 +160,7 @@ class PreparadaController extends Controller
 
         try {
             if ($request->input('es_rectificacion') == '1') {
-                $preparadaAnuladaId = $request->input('preparada_anulada_id');
+                $preparadaAnuladaId = (int) $request->input('preparada_anulada_id');
                 $result = $this->preparadaService->rectificarPreparada(
                     $preparadaAnuladaId,
                     $data

@@ -34,12 +34,12 @@ class VentaProvisionalService
     public function createProvisional(array $data): VentaProvisional
     {
         return DB::transaction(function () use ($data) {
-
-            // 1) Generar número_recibo correlativo numérico
-            $ultimoRecibo = VentaProvisional::whereRaw("numero_recibo REGEXP '^[0-9]+$'")
-                ->selectRaw('MAX(CAST(numero_recibo AS UNSIGNED)) as max_recibo')
-                ->value('max_recibo');
-            $data['numero_recibo'] = $ultimoRecibo ? ((int) $ultimoRecibo + 1) : 1;
+            $control = app(ReciboControlService::class);
+            $control->bloquear('venta_provisionales');
+            if ($previo = $control->buscarReintento('venta_provisionales', $data)) {
+                return $previo;
+            }
+            $data['numero_recibo'] = $control->siguienteNumero('venta_provisionales');
 
             // 2) Procesar y validar datos (cabecera + detalles)
             $provisionalData = $this->processProvisionalData($data, true, null);
@@ -51,8 +51,13 @@ class VentaProvisionalService
                 $this->aplicarDetallesEnVentas($provisional->id);
             }
 
+            $control->registrarSolicitud('venta_provisionales', $data, $provisional->id);
+            $auditoria = app(AuditoriaService::class);
+            $nuevos = $auditoria->capturar('venta_provisionales', $provisional);
+            $auditoria->registrarOperacionRecibo('creacion', $provisional, ['cabecera' => [], 'detalles' => []], $nuevos);
+
             return $provisional;
-        });
+        }, 3);
     }
 
     /**
@@ -67,7 +72,12 @@ class VentaProvisionalService
     public function updateProvisional(int $id, array $data): VentaProvisional
     {
         return DB::transaction(function () use ($id, $data) {
-            $provisional = VentaProvisional::with('detalles')->findOrFail($id);
+            app(ReciboControlService::class)->bloquear('venta_provisionales');
+            $provisional = VentaProvisional::lockForUpdate()->findOrFail($id);
+            app(ReciboControlService::class)->validarAnterior($provisional, $data);
+            $this->bloquearYValidarVentas($provisional->id, $data['ventas'] ?? []);
+            $auditoria = app(AuditoriaService::class);
+            $antes = $auditoria->capturar('venta_provisionales', $provisional);
 
             // 1) Procesar y validar nuevos datos (recalculando saldo efectivo con previas aplicaciones)
             $provisionalData = $this->processProvisionalData($data, false, $provisional->id);
@@ -83,8 +93,11 @@ class VentaProvisionalService
                 $this->aplicarDetallesEnVentas($provisional->id);
             }
 
+            $provisional->unsetRelation('detalles');
+            $auditoria->registrarOperacionRecibo('modificacion', $provisional, $antes, $auditoria->capturar('venta_provisionales', $provisional));
+
             return $provisional;
-        });
+        }, 3);
     }
 
     /**
@@ -95,7 +108,13 @@ class VentaProvisionalService
     public function deleteProvisional(int $id): void
     {
         DB::transaction(function () use ($id) {
-            $provisional = VentaProvisional::with('detalles')->findOrFail($id);
+            app(ReciboControlService::class)->bloquear('venta_provisionales');
+            $provisional = VentaProvisional::lockForUpdate()->findOrFail($id);
+            app(ReciboControlService::class)->validarAnterior($provisional);
+            $this->bloquearYValidarVentas($provisional->id);
+            $provisional->load('detalles');
+            $auditoria = app(AuditoriaService::class);
+            $antes = $auditoria->capturar('venta_provisionales', $provisional);
 
             // Revertir impacto en ventas si tiene detalles
             if ($provisional->detalles->isNotEmpty()) {
@@ -105,7 +124,9 @@ class VentaProvisionalService
             // Eliminar detalles y cabecera
             $provisional->detalles()->delete();
             $provisional->delete();
-        });
+            $despues = ['cabecera' => array_map(fn ($campo) => array_replace($campo, ['valor' => null]), $antes['cabecera']), 'detalles' => []];
+            $auditoria->registrarOperacionRecibo('eliminacion', $provisional, $antes, $despues);
+        }, 3);
     }
 
     /**
@@ -128,6 +149,10 @@ class VentaProvisionalService
         $dCents = (int) round(((float) ($data['deposito'] ?? 0)) * 100);
         $cCents = (int) round(((float) ($data['consorcio'] ?? 0)) * 100);
         $totalCents = (int) round(((float) ($data['total_cobranza'] ?? 0)) * 100);
+
+        if ($totalCents <= 0 || min($pCents, $dCents, $cCents) < 0 || collect($ventasInput)->contains(fn ($d) => (float) ($d['monto'] ?? 0) < 0)) {
+            throw ValidationException::withMessages(['total_cobranza' => 'Ingrese un pago positivo y aplicaciones y medios de pago no negativos.']);
+        }
 
         if (($pCents + $dCents + $cCents) !== $totalCents) {
             throw ValidationException::withMessages([
@@ -160,7 +185,8 @@ class VentaProvisionalService
                 ->whereNotNull('venta_id')
                 ->get();
             foreach ($prevDetalles as $pd) {
-                $prevApplications[(int) $pd->venta_id] = (int) round(((float) $pd->monto) * 100);
+                $vId = (int) $pd->venta_id;
+                $prevApplications[$vId] = ($prevApplications[$vId] ?? 0) + (int) round(((float) $pd->monto) * 100);
             }
         }
 
@@ -171,6 +197,7 @@ class VentaProvisionalService
         $ventas = [];
         if (! empty($uniqueVentaIds)) {
             $ventas = Venta::whereIn('id', $uniqueVentaIds)
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
@@ -194,6 +221,7 @@ class VentaProvisionalService
             }
 
             $venta = $ventas[$ventaId];
+            app(SaldoDocumentoService::class)->validar($venta);
 
             // Validar pertenencia al cliente
             if ((int) $venta->cliente_id !== (int) $data['cliente_id']) {
@@ -305,7 +333,7 @@ class VentaProvisionalService
     }
 
     /**
-     * Sincroniza abonos y saldo desde los detalles provisionales, fuente de verdad contable.
+     * Sincroniza abonos y saldo conservando el historico conciliado y los recibos actuales.
      */
     private function sincronizarSaldosVentas(array $ventaIds, ?int $excluirProvisionalId = null): void
     {
@@ -315,20 +343,23 @@ class VentaProvisionalService
 
         $ventas = Venta::whereIn('id', $ventaIds)
             ->where('estado', '!=', 'anulada')
+            ->orderBy('id')
             ->lockForUpdate()
             ->get()
             ->keyBy('id');
 
         foreach ($ventas as $venta) {
-            $abonos = DB::table('venta_provisional_detalles')
-                ->where('venta_id', $venta->id)
-                ->where('monto', '>', 0)
-                ->when($excluirProvisionalId !== null, fn ($query) => $query->where('venta_provisional_id', '!=', $excluirProvisionalId))
-                ->sum('monto');
+            app(SaldoDocumentoService::class)->sincronizar($venta, $excluirProvisionalId);
+        }
+    }
 
-            $venta->abonos = round((float) $abonos, 2);
-            $venta->saldo = max(round((float) $venta->total - (float) $venta->acuenta - $venta->abonos, 2), 0);
-            $venta->save();
+    private function bloquearYValidarVentas(int $provisionalId, array $nuevos = []): void
+    {
+        $ids = DB::table('venta_provisional_detalles')->where('venta_provisional_id', $provisionalId)
+            ->whereNotNull('venta_id')->pluck('venta_id')->merge(collect($nuevos)->pluck('venta_id'))
+            ->filter()->unique()->sort()->values();
+        foreach (Venta::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get() as $venta) {
+            app(SaldoDocumentoService::class)->validar($venta);
         }
     }
 

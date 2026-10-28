@@ -24,13 +24,18 @@ class PlanillaSincronizarGastosCommand extends Command
 
         $hallazgos = [];
         foreach ($periodos as $periodo) {
-            $pagos = PlanillaPago::where('mes', $periodo->mes)->where('anio', $periodo->anio)
+            $pagos = PlanillaPago::with('sueldoAplicado')
+                ->where('mes', $periodo->mes)->where('anio', $periodo->anio)
                 ->where('estado', 'pagado')->get();
             $esperado = [
-                'monto' => round((float) $pagos->sum('total_pagar'), 2),
+                'monto' => round((float) $pagos->sum(
+                    fn (PlanillaPago $pago): float => (float) ($pago->sueldoAplicado?->sueldo_real ?? 0)
+                ), 2),
                 'importe_p' => round((float) $pagos->sum('importe_p'), 2),
                 'importe_d' => round((float) $pagos->sum('importe_d'), 2),
                 'importe_c' => round((float) $pagos->sum('importe_c'), 2),
+                'responsable' => 'Sistema',
+                'responsable_dni' => null,
             ];
             $gastos = Gasto::where('planilla_mes', $periodo->mes)->where('planilla_anio', $periodo->anio)
                 ->whereNull('empleado_id')->get();
@@ -40,6 +45,7 @@ class PlanillaSincronizarGastosCommand extends Command
                 $actual = [
                     'monto' => round((float) $gasto->monto, 2), 'importe_p' => round((float) $gasto->importe_p, 2),
                     'importe_d' => round((float) $gasto->importe_d, 2), 'importe_c' => round((float) $gasto->importe_c, 2),
+                    'responsable' => $gasto->responsable, 'responsable_dni' => $gasto->responsable_dni,
                 ];
                 if ($actual === $esperado) {
                     continue;

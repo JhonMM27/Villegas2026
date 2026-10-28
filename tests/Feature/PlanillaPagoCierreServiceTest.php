@@ -6,8 +6,11 @@ namespace Tests\Feature;
 
 use App\Models\Empleado;
 use App\Models\EmpleadoSueldo;
+use App\Models\Gasto;
 use App\Models\PlanillaPago;
 use App\Services\PlanillaPagoService;
+use App\Services\ReporteCajaService;
+use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -100,6 +103,9 @@ class PlanillaPagoCierreServiceTest extends TestCase
             $table->foreignId('empleado_id');
             $table->decimal('monto', 10, 2)->default(0);
             $table->date('fecha');
+            $table->decimal('importe_p', 10, 2)->default(0);
+            $table->decimal('importe_d', 10, 2)->default(0);
+            $table->decimal('importe_c', 10, 2)->default(0);
             $table->timestamps();
         });
         Schema::create('categoria_gastos', function (Blueprint $table): void {
@@ -172,7 +178,7 @@ class PlanillaPagoCierreServiceTest extends TestCase
         $this->assertDatabaseMissing('planilla_pagos', ['empleado_id' => $rene->id, 'mes' => 8, 'anio' => 2026]);
     }
 
-    public function test_gasto_planilla_usa_total_pagado_y_distribucion_de_caja(): void
+    public function test_gasto_planilla_usa_sueldo_real_completo_y_distribucion_neta_de_caja(): void
     {
         [$empleado, $sueldo] = $this->crearEmpleado('Parcial', '33333333', 'activo');
         $pago = $this->crearPago($empleado, $sueldo, 'pagado', '2026-08-08');
@@ -191,11 +197,122 @@ class PlanillaPagoCierreServiceTest extends TestCase
         $this->assertDatabaseHas('gastos', [
             'planilla_mes' => 8,
             'planilla_anio' => 2026,
-            'monto' => 400,
+            'monto' => 2000,
+            'importe_p' => 250,
+            'importe_d' => 100,
+            'importe_c' => 50,
+            'responsable' => 'Sistema',
+            'responsable_dni' => null,
+        ]);
+    }
+
+    public function test_reporte_caja_no_duplica_el_gasto_automatico_de_planilla(): void
+    {
+        $this->crearTablasReporteCaja();
+        [$empleado, $sueldo] = $this->crearEmpleado('Caja', '44444444', 'activo');
+        $pago = $this->crearPago($empleado, $sueldo, 'pagado', '2026-08-08');
+        $pago->update([
+            'total_pagar' => 400,
             'importe_p' => 250,
             'importe_d' => 100,
             'importe_c' => 50,
         ]);
+        app(PlanillaPagoService::class)->sincronizarGastoPlanilla(8, 2026);
+
+        $reporte = app(ReporteCajaService::class)->obtenerDatosReporteCaja(
+            Carbon::parse('2026-08-01')->startOfDay(),
+            Carbon::parse('2026-08-31')->endOfDay()
+        );
+
+        $this->assertSame(250.0, $reporte['resumen']['egr_p']);
+        $this->assertSame(100.0, $reporte['resumen']['egr_d']);
+        $this->assertSame(50.0, $reporte['resumen']['egr_c']);
+        $this->assertSame(400.0, $reporte['resumen']['egresos_totales']);
+        $this->assertSame(2000.0, (float) Gasto::firstOrFail()->monto);
+    }
+
+    public function test_comando_sincroniza_sueldo_real_y_responsable_solo_al_aplicar(): void
+    {
+        [$empleado, $sueldo] = $this->crearEmpleado('Comando', '55555555', 'activo');
+        $pago = $this->crearPago($empleado, $sueldo, 'pagado', '2026-08-08');
+        $pago->update(['total_pagar' => 400, 'importe_p' => 400]);
+        Gasto::create([
+            'fecha_gasto' => '2026-08-08',
+            'descripcion' => 'Pago Empleados mes Agosto/2026',
+            'responsable' => 'Consorcios Villegas',
+            'monto' => 400,
+            'importe_p' => 400,
+            'planilla_mes' => 8,
+            'planilla_anio' => 2026,
+        ]);
+
+        $this->artisan('planilla:sincronizar-gastos')->assertSuccessful();
+        $this->assertDatabaseHas('gastos', ['monto' => 400, 'responsable' => 'Consorcios Villegas']);
+
+        $this->artisan('planilla:sincronizar-gastos', ['--aplicar' => true])->assertSuccessful();
+        $this->assertDatabaseHas('gastos', [
+            'monto' => 2000,
+            'importe_p' => 400,
+            'responsable' => 'Sistema',
+            'responsable_dni' => null,
+        ]);
+    }
+
+    private function crearTablasReporteCaja(): void
+    {
+        Schema::create('ventas', function (Blueprint $table): void {
+            $table->dateTime('fecha_venta');
+            $table->string('estado')->default('registrada');
+            $table->decimal('total', 10, 2)->default(0);
+            $table->decimal('acuenta', 10, 2)->default(0);
+            $table->decimal('importe_p', 10, 2)->default(0);
+            $table->decimal('importe_d', 10, 2)->default(0);
+            $table->decimal('importe_c', 10, 2)->default(0);
+        });
+        Schema::create('compras', function (Blueprint $table): void {
+            $table->dateTime('fecha_compra');
+            $table->string('estado')->default('registrada');
+            $table->decimal('total', 10, 2)->default(0);
+            $table->decimal('acuenta', 10, 2)->default(0);
+            $table->decimal('importe_p', 10, 2)->default(0);
+            $table->decimal('importe_d', 10, 2)->default(0);
+            $table->decimal('importe_c', 10, 2)->default(0);
+        });
+        foreach (['venta_provisionales', 'compra_provisionales'] as $tabla) {
+            Schema::create($tabla, function (Blueprint $table): void {
+                $table->dateTime('fecha_provisional');
+                $table->decimal('monto', 10, 2)->default(0);
+                $table->decimal('importe_p', 10, 2)->default(0);
+                $table->decimal('importe_d', 10, 2)->default(0);
+                $table->decimal('importe_c', 10, 2)->default(0);
+            });
+        }
+        Schema::create('costos', function (Blueprint $table): void {
+            $table->dateTime('fecha_costo');
+            $table->decimal('monto', 10, 2)->default(0);
+            $table->decimal('importe_p', 10, 2)->default(0);
+            $table->decimal('importe_d', 10, 2)->default(0);
+            $table->decimal('importe_c', 10, 2)->default(0);
+        });
+        Schema::create('planilla_prestamos', function (Blueprint $table): void {
+            $table->dateTime('fecha_prestamo');
+            $table->decimal('monto_original', 10, 2)->default(0);
+            $table->decimal('importe_p', 10, 2)->default(0);
+            $table->decimal('importe_d', 10, 2)->default(0);
+            $table->decimal('importe_c', 10, 2)->default(0);
+        });
+        Schema::create('planilla_prestamo_pagos', function (Blueprint $table): void {
+            $table->dateTime('fecha_pago');
+            $table->decimal('monto_pagado', 10, 2)->default(0);
+            $table->decimal('importe_p', 10, 2)->default(0);
+            $table->decimal('importe_d', 10, 2)->default(0);
+            $table->decimal('importe_c', 10, 2)->default(0);
+        });
+        Schema::create('caja_ingresos', function (Blueprint $table): void {
+            $table->dateTime('fecha');
+            $table->string('caja_destino');
+            $table->decimal('monto', 10, 2)->default(0);
+        });
     }
 
     private function crearEmpleado(string $nombre, string $dni, string $estado, ?string $salida = null): array

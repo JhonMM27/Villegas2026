@@ -266,7 +266,7 @@ class PrestamoController extends Controller
             // Calcular saldos pendientes
             $saldos = [];
             if (in_array($registro->movimiento_tipo, ['PA', 'PD'])) {
-                $saldos = $this->prestamoService->obtenerSaldosPendientes($id);
+                $saldos = $this->prestamoService->obtenerSaldosPendientes((int) $registro->id);
             }
 
             // Convertir a array para agregar la propiedad dinámica
@@ -514,7 +514,7 @@ class PrestamoController extends Controller
             // return $prestamo;
             $saldos = [];
             if (in_array($prestamo->movimiento_tipo, ['PA', 'PD'])) {
-                $saldos = app(\App\Services\PrestamoService::class)->obtenerSaldosPendientes($id);
+                $saldos = $this->prestamoService->obtenerSaldosPendientes((int) $prestamo->id);
             }
 
             return view('prestamos.view', compact('prestamo', 'saldos'));

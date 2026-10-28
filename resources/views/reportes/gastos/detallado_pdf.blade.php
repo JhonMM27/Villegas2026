@@ -45,6 +45,7 @@
                 <th>Tipo Gasto</th>
                 <th>Descripcion</th>
                 <th>Responsable</th>
+                <th class="text-right">Monto Total</th>
                 <th class="text-right">Principal</th>
                 <th class="text-right">Deposito</th>
                 <th class="text-right">Consorcio</th>
@@ -52,6 +53,7 @@
         </thead>
         <tbody>
             @php
+                $totalMonto = 0;
                 $totalPrincipal = 0;
                 $totalDeposito = 0;
                 $totalConsorcio = 0;
@@ -59,10 +61,12 @@
 
             @forelse($reportes as $r)
                 @php
+                    $monto = (float)($r->monto ?? 0);
                     $principal = (float)($r->importe_p ?? 0);
                     $deposito = (float)($r->importe_d ?? 0);
                     $consorcio = (float)($r->importe_c ?? 0);
                     $fecha = $r->fecha_gasto ? \Carbon\Carbon::parse($r->fecha_gasto)->format('d/m/Y') : '';
+                    $totalMonto += $monto;
                     $totalPrincipal += $principal;
                     $totalDeposito += $deposito;
                     $totalConsorcio += $consorcio;
@@ -75,19 +79,21 @@
                     <td>{{ $r->gastoTipo?->nombre ?? '' }}</td>
                     <td>{{ $r->descripcion ?? '' }}</td>
                     <td>{{ $r->responsable ?? '' }}</td>
+                    <td class="text-right">{{ number_format($monto, 2) }}</td>
                     <td class="text-right">{{ number_format($principal, 2) }}</td>
                     <td class="text-right">{{ number_format($deposito, 2) }}</td>
                     <td class="text-right">{{ number_format($consorcio, 2) }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="10" class="text-center">No se encontraron registros</td>
+                    <td colspan="11" class="text-center">No se encontraron registros</td>
                 </tr>
             @endforelse
 
             @if(count($reportes) > 0)
                 <tr class="total-row">
                     <td colspan="7" class="text-right">TOTALES:</td>
+                    <td class="text-right">{{ number_format($totalMonto, 2) }}</td>
                     <td class="text-right">{{ number_format($totalPrincipal, 2) }}</td>
                     <td class="text-right">{{ number_format($totalDeposito, 2) }}</td>
                     <td class="text-right">{{ number_format($totalConsorcio, 2) }}</td>

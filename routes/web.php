@@ -76,6 +76,9 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/tickets/calibracion', TicketCalibrationController::class)->name('tickets.calibracion');
+    Route::get('/telefonos-ticket', [\App\Http\Controllers\TelefonoTicketController::class, 'index'])->name('telefonos-ticket.index');
+    Route::get('/telefonos-ticket/{id}', [\App\Http\Controllers\TelefonoTicketController::class, 'show'])->where('id', '1')->name('telefonos-ticket.show');
+    Route::put('/telefonos-ticket/{id}', [\App\Http\Controllers\TelefonoTicketController::class, 'update'])->where('id', '1')->name('telefonos-ticket.update');
     Route::prefix('auditoria')->name('auditoria.')->group(function () {
         Route::get('/', [AuditoriaController::class, 'index'])->name('index');
         Route::get('/data', [AuditoriaController::class, 'data'])->name('data');

@@ -62,7 +62,7 @@
                         </div>
                         <div class="col-6 col-md-3 col-lg-2">
                             <label class="form-label mb-0">Acción</label>
-                            <select class="form-select form-select-sm" id="auditAccion"><option value="">Todas</option><option value="anulacion">Anulación</option><option value="rectificacion">Rectificación</option></select>
+                            <select class="form-select form-select-sm" id="auditAccion"><option value="">Todas</option><option value="anulacion">Anulación</option><option value="rectificacion">Rectificación</option><option value="creacion">Creación</option><option value="modificacion">Modificación</option><option value="eliminacion">Eliminación</option></select>
                         </div>
                         <div class="col-6 col-md-3 col-lg-2">
                             <label class="form-label mb-0">Módulo</label>

@@ -49,7 +49,7 @@
                 foreach($reportes as $r) {
                     $cat = $r->categoriaGasto?->nombre ?? 'SIN CATEGORIA';
                     $tipo = $r->gastoTipo?->nombre ?? 'SIN TIPO';
-                    $total = (float)($r->importe_p ?? 0) + (float)($r->importe_d ?? 0) + (float)($r->importe_c ?? 0);
+                    $total = (float)($r->monto ?? 0);
                     $key = $cat . '||' . $tipo;
                     if (!isset($agrupado[$key])) {
                         $agrupado[$key] = ['categoria' => $cat, 'tipo' => $tipo, 'total' => 0];

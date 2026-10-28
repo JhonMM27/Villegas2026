@@ -29,6 +29,7 @@ class TicketPdfService
         }
 
         $data['ticketProfile'] = $profile;
+        $data['ticketPhones'] = app(TelefonoTicketService::class)->current();
         $data['ticketLayout'] = app(TicketLayoutService::class);
         $bottom = 0.0;
         $measurement = $this->makePdf($view, $data, $width, $maximum);

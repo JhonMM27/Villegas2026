@@ -43,17 +43,19 @@ class GastosGeneralExport implements FromCollection, ShouldAutoSize, WithHeading
         foreach ($reportes as $r) {
             $categoria = $r->categoriaGasto?->nombre ?? 'SIN CATEGORIA';
             $tipo = $r->gastoTipo?->nombre ?? 'SIN TIPO';
-            $total = (float) ($r->importe_p ?? 0) + (float) ($r->importe_d ?? 0) + (float) ($r->importe_c ?? 0);
+            $total = (float) ($r->monto ?? 0);
 
             $key = $categoria.'|'.$tipo;
-            if (! isset($agrupado[$key])) {
-                $agrupado[$key] = [
+            $item = $agrupado->get($key);
+            if ($item === null) {
+                $item = [
                     'categoria' => $categoria,
                     'tipo' => $tipo,
                     'total' => 0,
                 ];
             }
-            $agrupado[$key]['total'] += $total;
+            $item['total'] += $total;
+            $agrupado->put($key, $item);
         }
 
         $out = collect();
@@ -92,9 +94,7 @@ class GastosGeneralExport implements FromCollection, ShouldAutoSize, WithHeading
             ]);
         }
 
-        $granTotal = $reportes->sum(function ($r) {
-            return (float) ($r->importe_p ?? 0) + (float) ($r->importe_d ?? 0) + (float) ($r->importe_c ?? 0);
-        });
+        $granTotal = $reportes->sum(fn ($r): float => (float) ($r->monto ?? 0));
 
         $out->push([
             'categoria' => '',

@@ -13,6 +13,7 @@
         <h3 class="bold">{{ $empresa->razon_social }}</h3>
         <!--<p>{{ $empresa->direccion }}</p>-->
         <p>RUC: {{ $empresa->ruc }}</p>
+        @include('tickets.phones')
         <p class="bold">{{ $prestamo->comprobante_tipo_nombre}} {{ $prestamo->serie }}-{{ str_pad((string) $prestamo->correlativo,8,'0',STR_PAD_LEFT) }}</p>
     </div>
     <div class="line"></div>

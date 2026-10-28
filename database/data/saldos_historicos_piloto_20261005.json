@@ -1,0 +1,11 @@
+{
+    "base_destino": "03/10/2026",
+    "base_origen": "21/09/2026",
+    "fecha_corte": "2026-09-21",
+    "lote": "historico-clientes-2-57-20261005",
+    "documentos": [
+        {"tipo": "ventas", "id": 118388, "titular_id": 2, "total": "2608.00", "acuenta": "0.00", "abonos_antes": "1428.00", "saldo_antes": "1180.00", "historico": "1180.00", "saldo_despues": "0.00"},
+        {"tipo": "ventas", "id": 118981, "titular_id": 2, "total": "6671.00", "acuenta": "0.00", "abonos_antes": "557.00", "saldo_antes": "6114.00", "historico": "5880.00", "saldo_despues": "234.00"},
+        {"tipo": "ventas", "id": 90582, "titular_id": 57, "total": "179.00", "acuenta": "0.00", "abonos_antes": "103.00", "saldo_antes": "76.00", "historico": "103.00", "saldo_despues": "76.00"}
+    ]
+}

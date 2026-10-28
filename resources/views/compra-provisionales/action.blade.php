@@ -4,6 +4,8 @@
     <div class="modal-content">
       <form id="formUpdate" method="post">
         @csrf
+        <input type="hidden" id="idempotencia_clave" name="idempotencia_clave">
+        <input type="hidden" id="version_recibo" name="version_recibo">
         <input type="hidden" id="method_field" name="_method">
 
         <div class="modal-header">

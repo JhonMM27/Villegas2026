@@ -13,7 +13,7 @@
         <h3>{{ $empresa->razon_social }}</h3>
         <p>{!! nl2br(e($empresa->direccion)) !!}</p>
         <p>RUC: {{ $empresa->ruc }}</p>
-        <p>CEL: {{ $empresa->celular }}</p>
+        @include('tickets.phones')
 
         <h3 class="bold">ENTREGA {{ $entrega->numero_recibo}} ({{ $entrega->comprobante_tipo_nombre}} {{ $entrega->serie }}-{{ str_pad((string) $entrega->correlativo,8,'0',STR_PAD_LEFT) }})</h3>
     </div>

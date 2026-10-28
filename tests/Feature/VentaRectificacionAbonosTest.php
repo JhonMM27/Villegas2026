@@ -26,6 +26,12 @@ class VentaRectificacionAbonosTest extends TestCase
         DB::reconnect('sqlite');
 
         $this->crearEsquema();
+        Schema::create('compras', fn (Blueprint $t) => $t->id());
+        Schema::create('compra_provisionales', function (Blueprint $t): void {
+            $t->id();
+            $t->string('numero_recibo')->nullable();
+        });
+        (require database_path('migrations/2026_10_05_000001_protect_provisional_receipts.php'))->up();
         $this->sembrarCatalogos();
 
         $movimientos = Mockery::mock(MovimientoService::class);

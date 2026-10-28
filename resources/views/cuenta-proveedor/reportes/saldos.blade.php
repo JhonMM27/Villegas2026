@@ -13,7 +13,7 @@
         <h3>{{ $empresa->razon_social }}</h3>
         <p>{!! nl2br(e($empresa->direccion)) !!}</p>
         <p>RUC: {{ $empresa->ruc }}</p>
-        <p>CEL: {{ $empresa->celular }}</p>
+        @include('tickets.phones')
 
         <h3 class="bold">CRÉDITOS CON SALDOS</h3>
     </div>

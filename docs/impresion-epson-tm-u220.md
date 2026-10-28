@@ -97,3 +97,16 @@ se requiere una integración ESC/POS adicional; no está incluida en este cambio
 - [TM-U220: manuales y especificaciones](https://support.epson.net/publist/bsmanual.php?lang=EN&model=TM-U220)
 - [Guía técnica: autoprueba, papel y cinta](https://files.support.epson.com/pdf/pos/bulk/tm-u220_trg_en_std_revh.pdf)
 - [Soporte y controladores](https://epson.com/Support/Point-of-Sale/Impact-Printers-%28Dot-Matrix%29/Epson-TM-U220/s/SPT_C31C514103)
+
+## Teléfonos editables del ticket
+
+La configuración se encuentra en **Configuración → Teléfonos Ticket** y requiere
+la tabla `telefonos_ticket`. La migración
+`database/migrations/2026_09_12_000001_create_telefonos_ticket_table.php` y el
+archivo `database/sql/create_telefonos_ticket.sql` son alternativas: ejecutar
+solo una de ellas en la base de datos. El código no ejecuta ninguna por sí solo.
+
+Después de crear la tabla, conservar el registro único `id = 1` y editar los
+teléfonos desde la pantalla. Si la tabla todavía no existe, los tickets siguen
+imprimiendo `967984895 / 978431737` como respaldo y la pantalla bloquea la
+edición hasta completar la instalación.

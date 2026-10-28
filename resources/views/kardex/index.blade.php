@@ -223,13 +223,16 @@ $(function () {
     $('#btnExportar').on('click', function() {
         const fecha = $('#fecha_inicio').val();
         if(!fecha) return alert('Seleccione una fecha');
-        window.location.href = '{{ route("kardex.stock_general.export") }}?fecha=' + fecha;
+        window.location.href = '{{ route("kardex.stock_general.export") }}?' + $.param({ fecha });
     });
 
-    $('#btnPdf').on('click', function() {
+    $('#btnPdf').on('click', function(e) {
         const fecha = $('#fecha_inicio').val();
-        if(!fecha) return alert('Seleccione una fecha');
-        $(this).attr('href', '{{ route("kardex.stock_general.imprimir") }}?fecha=' + fecha);
+        if(!fecha) {
+            e.preventDefault();
+            return alert('Seleccione una fecha');
+        }
+        $(this).attr('href', '{{ route("kardex.stock_general.imprimir") }}?' + $.param({ fecha }));
     });
 
     // Filtros Kardex
@@ -248,23 +251,28 @@ $(function () {
     });
 
     $('#btnExportarKardex').on('click', function() {
-        const params = $.param({
+        const params = {
             fecha_inicio: $('#fecha_inicio_fechas').val(),
             fecha_fin: $('#fecha_fin_fechas').val(),
             producto_ids: $('#filtro_productos').val(),
             operaciones: $('#filtro_operacion').val()
-        });
-        window.location.href = '{{ route("kardex.fechas_productos.export") }}?' + params;
+        };
+        if(!params.fecha_inicio || !params.fecha_fin) return alert('Seleccione rango de fechas');
+        window.location.href = '{{ route("kardex.fechas_productos.export") }}?' + $.param(params);
     });
 
-    $('#btnPdfKardex').on('click', function() {
-        const params = $.param({
+    $('#btnPdfKardex').on('click', function(e) {
+        const params = {
             fecha_inicio: $('#fecha_inicio_fechas').val(),
             fecha_fin: $('#fecha_fin_fechas').val(),
             producto_ids: $('#filtro_productos').val(),
             operaciones: $('#filtro_operacion').val()
-        });
-        $(this).attr('href', '{{ route("kardex.fechas_productos.imprimir") }}?' + params);
+        };
+        if(!params.fecha_inicio || !params.fecha_fin) {
+            e.preventDefault();
+            return alert('Seleccione rango de fechas');
+        }
+        $(this).attr('href', '{{ route("kardex.fechas_productos.imprimir") }}?' + $.param(params));
     });
 
     // Filtros Movimientos
@@ -283,33 +291,38 @@ $(function () {
     });
 
     $('#btnExportarMov').on('click', function() {
-        const params = $.param({
+        const params = {
             fecha_inicio: $('#mov_fecha_inicio').val(),
             fecha_fin: $('#mov_fecha_fin').val(),
             producto_ids: $('#mov_filtro_productos').val(),
             tipos: $('#mov_filtro_tipos').val()
-        });
-        window.location.href = '{{ route("kardex.exportarMovimientosExcel") }}?' + params;
+        };
+        if(!params.fecha_inicio || !params.fecha_fin) return alert('Seleccione rango de fechas');
+        window.location.href = '{{ route("kardex.exportarMovimientosExcel") }}?' + $.param(params);
     });
 
-    $('#btnPdfMov').on('click', function() {
-        const params = $.param({
+    $('#btnPdfMov').on('click', function(e) {
+        const params = {
             fecha_inicio: $('#mov_fecha_inicio').val(),
             fecha_fin: $('#mov_fecha_fin').val(),
             producto_ids: $('#mov_filtro_productos').val(),
             tipos: $('#mov_filtro_tipos').val()
-        });
-        $(this).attr('href', '{{ route("kardex.imprimirMovimientosPdf") }}?' + params);
+        };
+        if(!params.fecha_inicio || !params.fecha_fin) {
+            e.preventDefault();
+            return alert('Seleccione rango de fechas');
+        }
+        $(this).attr('href', '{{ route("kardex.imprimirMovimientosPdf") }}?' + $.param(params));
     });
 
-});
-</script>
-<script>
-    // Set default dates
-    const now = new Date().toISOString().slice(0, 10);
-    $('#mov_fecha_inicio, #mov_fecha_fin, #fecha_inicio, #fecha_inicio_fechas, #fecha_fin_fechas').val(now);
+    const today = new Date();
+    const currentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    $('#mov_fecha_inicio, #mov_fecha_fin, #fecha_inicio, #fecha_inicio_fechas, #fecha_fin_fechas').each(function() {
+        if (!this.value) this.value = currentDate;
+    });
 
     document.getElementById('mnuKardex').classList.add('menu-open');
-document.getElementById('itemReporteKardex').classList.add('active');
+    document.getElementById('itemReporteKardex').classList.add('active');
+});
 </script>
 @endpush

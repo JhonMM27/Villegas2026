@@ -148,7 +148,8 @@ class NucleoPreparadaController extends Controller
 
         try {
             $esRectificacion = $request->input('es_rectificacion') == '1';
-            $preparadaAnuladaId = $request->input('preparada_anulada_id');
+            // Cast a int: $request->input() devuelve string; el service requiere int
+            $preparadaAnuladaId = (int) $request->input('preparada_anulada_id');
 
             if ($esRectificacion
                 && ! empty($preparadaAnuladaId)

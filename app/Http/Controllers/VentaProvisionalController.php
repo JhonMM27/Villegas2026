@@ -136,6 +136,8 @@ class VentaProvisionalController extends Controller
                 'message' => 'Registro creado satisfactoriamente',
                 'venta_provisional_id' => $provisional->id,
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -168,7 +170,9 @@ class VentaProvisionalController extends Controller
                 ])
                 ->findOrFail($id);
 
-            return response()->json($registro);
+            return response()->json(array_merge($registro->toArray(), [
+                'version_recibo' => app(\App\Services\ReciboControlService::class)->version($registro),
+            ]));
 
         } catch (\Exception $e) {
             return response()->json(['error' => 'Registro no encontrado'], 404);
@@ -197,6 +201,8 @@ class VentaProvisionalController extends Controller
                 'success' => true,
                 'message' => 'Registro actualizado satisfactoriamente',
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -219,6 +225,8 @@ class VentaProvisionalController extends Controller
                 'success' => true,
                 'message' => 'Registro eliminado correctamente',
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -237,6 +245,8 @@ class VentaProvisionalController extends Controller
     protected function validateData(Request $request, $id = null): array
     {
         $rules = [
+            'idempotencia_clave' => 'nullable|uuid',
+            'version_recibo' => 'nullable|string|size:64',
             'numero_interno' => 'nullable|string|max:10',
             'fecha_provisional' => 'required|date',
 
@@ -311,7 +321,7 @@ class VentaProvisionalController extends Controller
                 ->whereNotNull('venta_id')
                 ->get();
             foreach ($detalles as $d) {
-                $aplicacionesPrevias[(int) $d->venta_id] = (float) $d->monto;
+                $aplicacionesPrevias[(int) $d->venta_id] = ($aplicacionesPrevias[(int) $d->venta_id] ?? 0) + (float) $d->monto;
             }
         }
 

@@ -24,6 +24,7 @@ npm-debug.log
 Thumbs.db
 yarn-error.log
 *.sql
+!database/sql/create_telefonos_ticket.sql
 !database/sql/corregir_cuentas_clientes_45_53_131.sql
 !database/sql/corregir_proveedor_102_molinorte.sql
 !database/sql/2026_08_13_historial_sueldos_empleados.sql

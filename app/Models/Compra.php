@@ -50,6 +50,7 @@ class Compra extends Model
         'importe_c' => 'decimal:2',
         'acuenta' => 'decimal:2',
         'abonos' => 'decimal:2',
+        'abonos_migrados' => 'decimal:2',
         'saldo' => 'decimal:2',
     ];
 

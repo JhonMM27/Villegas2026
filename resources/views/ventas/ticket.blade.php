@@ -23,7 +23,7 @@
         {{-- ENCABEZADO EMPRESA --}}
         <div class="center">
             <h3>CONSORCIOS VILLEGAS E.I.R.L.</h3>
-            <p>CEL: 967984895 / 978431737</p>
+            @include('tickets.phones')
             <p>NOTA PEDIDO NP: {{ $numeroVenta }}</p>
         </div>
 

@@ -65,6 +65,17 @@ class AuditoriaService
         );
     }
 
+    /** Conserva la evidencia de recibos, incluso cuando se elimina la cabecera. */
+    public function registrarOperacionRecibo(string $tipo, Model $registro, array $antes, array $despues): AuditoriaEvento
+    {
+        if (! in_array($registro->getTable(), ['venta_provisionales', 'compra_provisionales'], true)
+            || ! in_array($tipo, ['creacion', 'modificacion', 'eliminacion'], true)) {
+            throw new InvalidArgumentException('Operacion de recibo no permitida.');
+        }
+
+        return $this->registrar($tipo, $registro->getTable(), $registro, $antes, $despues, null, null, null);
+    }
+
     private function registrar(
         string $tipoEvento,
         string $modulo,

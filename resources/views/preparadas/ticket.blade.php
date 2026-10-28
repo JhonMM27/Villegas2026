@@ -17,7 +17,7 @@
         </div>
 
         <div class="center">
-            <p>CEL: 967984895 / 978431737</p>
+            @include('tickets.phones')
             <p>PREPARADA: {{ $preparada->id }}</p>
         </div>
 

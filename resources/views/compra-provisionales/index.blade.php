@@ -65,6 +65,7 @@
 @endsection
 
 @push('scripts')
+<script src="{{ asset('js/recibo-form.js') }}"></script>
 <script>
 class CompraProvisionalManager extends CrudManager {
     constructor() {
@@ -445,6 +446,7 @@ class CompraProvisionalManager extends CrudManager {
 
             this.elements.modalTitle.textContent = 'Editar Provisional #' + response.numero_recibo;
             this.elements.methodField.value = 'PUT';
+            document.getElementById('version_recibo').value = response.version_recibo;
 
             this.setFieldValue('fecha_provisional', this.formatDateTimeLocal(response.fecha_provisional));
             document.getElementById('numero_interno').value = response.numero_interno || '';
@@ -469,6 +471,14 @@ class CompraProvisionalManager extends CrudManager {
     }
 
     cargarComprasEnTabla(detalles = []) {
+        const agrupados = new Map();
+        for (const detalle of detalles) {
+            const previo = agrupados.get(detalle.compra_id);
+            agrupados.set(detalle.compra_id, previo
+                ? { ...previo, monto: Math.round((Number(previo.monto) + Number(detalle.monto)) * 100) / 100 }
+                : { ...detalle });
+        }
+        detalles = Array.from(agrupados.values());
         const tbody = document.querySelector('#tablaComprasSaldo tbody');
         const fmt = (n) => {
             const x = parseFloat(n ?? 0);
@@ -530,6 +540,7 @@ class CompraProvisionalManager extends CrudManager {
 
     showCreateModal(){
         super.showCreateModal();
+        document.getElementById('idempotencia_clave').value = nuevaClaveRecibo();
         this.currentProvisionalId = null;
         this.elements.modalTitle.textContent = 'Nuevo Provisional';
         const usuarioNombre = @json(auth()->user()->name);
@@ -546,6 +557,13 @@ class CompraProvisionalManager extends CrudManager {
             const input = document.getElementById('numero_interno');
             if (input) input.focus();
         }, { once: true });
+    }
+
+    handleFormErrors(error) {
+        super.handleFormErrors(error);
+        if (error.status === 422 && error.data?.errors) {
+            this.showNotification('error', Object.values(error.data.errors).flat().join(' '));
+        }
     }
 
     obtenerFechaHoraActual() {

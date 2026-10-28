@@ -347,10 +347,6 @@ class PreparadaManager extends CrudManager {
         document.querySelector('#tablaDetalles #total_ingreso_soles').value =
             totalSalidaSoles.toFixed(4);
 
-        document.querySelector('#tablaDetalles #costo_unitario_footer').value =
-            totalSacos > 0
-                ? (totalSalidaSoles / totalSacos).toFixed(4)
-                : '0.00';
     }
 
     addDetalles(detalles) {

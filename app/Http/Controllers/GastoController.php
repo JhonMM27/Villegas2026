@@ -10,6 +10,7 @@ use App\Services\TicketPdfService;
 use App\Support\NumericStringOrder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 use Yajra\DataTables\DataTables;
 
@@ -122,18 +123,20 @@ class GastoController extends Controller
         }
 
         $data = $this->validateData($request);
+        $data = $this->prepararDistribucionCaja($data);
         $data['user_id'] = auth()->id();
         $data['user_nombre'] = auth()->user()->name;
 
-        $ultimoRecibo = Gasto::whereRaw("numero_recibo REGEXP '^[0-9]+$'")
-            ->selectRaw('MAX(CAST(numero_recibo AS UNSIGNED)) as max_recibo')
-            ->value('max_recibo');
+        $recibos = Gasto::query()->whereNotNull('numero_recibo')->where('numero_recibo', '!=', '');
+        if (Gasto::getConnectionResolver()->connection()->getDriverName() === 'sqlite') {
+            $recibos->whereRaw("numero_recibo GLOB '[0-9]*' AND numero_recibo NOT GLOB '*[^0-9]*'");
+            $ultimoRecibo = $recibos->selectRaw('MAX(CAST(numero_recibo AS INTEGER)) as max_recibo')->value('max_recibo');
+        } else {
+            $recibos->whereRaw("numero_recibo REGEXP '^[0-9]+$'");
+            $ultimoRecibo = $recibos->selectRaw('MAX(CAST(numero_recibo AS UNSIGNED)) as max_recibo')->value('max_recibo');
+        }
         $siguienteRecibo = $ultimoRecibo ? ((int) $ultimoRecibo + 1) : 1;
         $data['numero_recibo'] = $siguienteRecibo;
-        $data['monto'] = $data['total_cobranza'];
-        $data['importe_p'] = $data['principal'];
-        $data['importe_d'] = $data['deposito'];
-        $data['importe_c'] = $data['consorc'] ?? 0;
         $data['responsable_dni'] = $data['responsable_dni'] ?? null;
         $data['categoria_gasto_id'] = $data['categoria_gasto_id'] ?? null;
 
@@ -178,10 +181,7 @@ class GastoController extends Controller
             ]);
         }
         $data = $this->validateData($request, $id);
-        $data['monto'] = $data['total_cobranza'];
-        $data['importe_p'] = $data['principal'];
-        $data['importe_d'] = $data['deposito'];
-        $data['importe_c'] = $data['consorcio'];
+        $data = $this->prepararDistribucionCaja($data);
         $registro = Gasto::where('id', $id)->firstOrFail();
         $registro->update($data);
 
@@ -223,9 +223,32 @@ class GastoController extends Controller
             'principal' => 'nullable|numeric|min:0',
             'deposito' => 'nullable|numeric|min:0',
             'consorcio' => 'nullable|numeric|min:0',
-            'total_cobranza' => 'nullable|numeric|min:0.01',
+            'total_cobranza' => 'nullable|numeric|min:0',
             'gasto_tipo_id' => 'nullable|exists:gasto_tipos,id',
             'categoria_gasto_id' => 'nullable|exists:categoria_gastos,id',
+        ]);
+    }
+
+    private function prepararDistribucionCaja(array $data): array
+    {
+        $importeP = round((float) ($data['principal'] ?? 0), 2);
+        $importeD = round((float) ($data['deposito'] ?? 0), 2);
+        $importeC = round((float) ($data['consorcio'] ?? 0), 2);
+        $monto = round($importeP + $importeD + $importeC, 2);
+
+        if ($monto <= 0) {
+            throw ValidationException::withMessages([
+                'total_cobranza' => 'Debe distribuir un importe mayor a cero entre las cajas.',
+            ]);
+        }
+
+        unset($data['principal'], $data['deposito'], $data['consorcio'], $data['total_cobranza']);
+
+        return array_merge($data, [
+            'monto' => $monto,
+            'importe_p' => $importeP,
+            'importe_d' => $importeD,
+            'importe_c' => $importeC,
         ]);
     }
 

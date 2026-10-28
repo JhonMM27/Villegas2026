@@ -34,12 +34,12 @@ class CompraProvisionalService
     public function createProvisional(array $data): CompraProvisional
     {
         return DB::transaction(function () use ($data) {
-
-            // 1) Generar número_recibo correlativo numérico
-            $ultimoRecibo = CompraProvisional::whereRaw("numero_recibo REGEXP '^[0-9]+$'")
-                ->selectRaw('MAX(CAST(numero_recibo AS UNSIGNED)) as max_recibo')
-                ->value('max_recibo');
-            $data['numero_recibo'] = $ultimoRecibo ? ((int) $ultimoRecibo + 1) : 1;
+            $control = app(ReciboControlService::class);
+            $control->bloquear('compra_provisionales');
+            if ($previo = $control->buscarReintento('compra_provisionales', $data)) {
+                return $previo;
+            }
+            $data['numero_recibo'] = $control->siguienteNumero('compra_provisionales');
 
             // 2) Procesar y validar datos (cabecera + detalles)
             $provisionalData = $this->processProvisionalData($data, true, null);
@@ -51,8 +51,13 @@ class CompraProvisionalService
                 $this->aplicarDetallesEnCompras($provisional->id);
             }
 
+            $control->registrarSolicitud('compra_provisionales', $data, $provisional->id);
+            $auditoria = app(AuditoriaService::class);
+            $nuevos = $auditoria->capturar('compra_provisionales', $provisional);
+            $auditoria->registrarOperacionRecibo('creacion', $provisional, ['cabecera' => [], 'detalles' => []], $nuevos);
+
             return $provisional;
-        });
+        }, 3);
     }
 
     /**
@@ -67,7 +72,12 @@ class CompraProvisionalService
     public function updateProvisional(int $id, array $data): CompraProvisional
     {
         return DB::transaction(function () use ($id, $data) {
-            $provisional = CompraProvisional::with('detalles')->findOrFail($id);
+            app(ReciboControlService::class)->bloquear('compra_provisionales');
+            $provisional = CompraProvisional::lockForUpdate()->findOrFail($id);
+            app(ReciboControlService::class)->validarAnterior($provisional, $data);
+            $this->bloquearYValidarCompras($provisional->id, $data['compras'] ?? []);
+            $auditoria = app(AuditoriaService::class);
+            $antes = $auditoria->capturar('compra_provisionales', $provisional);
 
             // 1) Procesar y validar nuevos datos
             $provisionalData = $this->processProvisionalData($data, false, $provisional->id);
@@ -83,8 +93,11 @@ class CompraProvisionalService
                 $this->aplicarDetallesEnCompras($provisional->id);
             }
 
+            $provisional->unsetRelation('detalles');
+            $auditoria->registrarOperacionRecibo('modificacion', $provisional, $antes, $auditoria->capturar('compra_provisionales', $provisional));
+
             return $provisional;
-        });
+        }, 3);
     }
 
     /**
@@ -95,7 +108,13 @@ class CompraProvisionalService
     public function deleteProvisional(int $id): void
     {
         DB::transaction(function () use ($id) {
-            $provisional = CompraProvisional::with('detalles')->findOrFail($id);
+            app(ReciboControlService::class)->bloquear('compra_provisionales');
+            $provisional = CompraProvisional::lockForUpdate()->findOrFail($id);
+            app(ReciboControlService::class)->validarAnterior($provisional);
+            $this->bloquearYValidarCompras($provisional->id);
+            $provisional->load('detalles');
+            $auditoria = app(AuditoriaService::class);
+            $antes = $auditoria->capturar('compra_provisionales', $provisional);
 
             // Revertir impacto en compras si tiene detalles
             if ($provisional->detalles->isNotEmpty()) {
@@ -105,7 +124,9 @@ class CompraProvisionalService
             // Eliminar detalles y cabecera
             $provisional->detalles()->delete();
             $provisional->delete();
-        });
+            $despues = ['cabecera' => array_map(fn ($campo) => array_replace($campo, ['valor' => null]), $antes['cabecera']), 'detalles' => []];
+            $auditoria->registrarOperacionRecibo('eliminacion', $provisional, $antes, $despues);
+        }, 3);
     }
 
     /**
@@ -128,6 +149,10 @@ class CompraProvisionalService
         $dCents = (int) round(((float) ($data['deposito'] ?? 0)) * 100);
         $cCents = (int) round(((float) ($data['consorcio'] ?? 0)) * 100);
         $totalCents = (int) round(((float) ($data['total_cobranza'] ?? 0)) * 100);
+
+        if ($totalCents <= 0 || min($pCents, $dCents, $cCents) < 0 || collect($comprasInput)->contains(fn ($d) => (float) ($d['monto'] ?? 0) < 0)) {
+            throw ValidationException::withMessages(['total_cobranza' => 'Ingrese un pago positivo y aplicaciones y medios de pago no negativos.']);
+        }
 
         if (($pCents + $dCents + $cCents) !== $totalCents) {
             throw ValidationException::withMessages([
@@ -160,7 +185,8 @@ class CompraProvisionalService
                 ->whereNotNull('compra_id')
                 ->get();
             foreach ($prevDetalles as $pd) {
-                $prevApplications[(int) $pd->compra_id] = (int) round(((float) $pd->monto) * 100);
+                $cId = (int) $pd->compra_id;
+                $prevApplications[$cId] = ($prevApplications[$cId] ?? 0) + (int) round(((float) $pd->monto) * 100);
             }
         }
 
@@ -171,6 +197,7 @@ class CompraProvisionalService
         $compras = [];
         if (! empty($uniqueCompraIds)) {
             $compras = Compra::whereIn('id', $uniqueCompraIds)
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
@@ -194,6 +221,7 @@ class CompraProvisionalService
             }
 
             $compra = $compras[$compraId];
+            app(SaldoDocumentoService::class)->validar($compra);
 
             // Validar pertenencia al proveedor
             if ((int) $compra->proveedor_id !== (int) $data['proveedor_id']) {
@@ -305,7 +333,7 @@ class CompraProvisionalService
     }
 
     /**
-     * Sincroniza abonos y saldo desde los detalles provisionales, fuente de verdad contable.
+     * Sincroniza abonos y saldo conservando el historico conciliado y los recibos actuales.
      */
     private function sincronizarSaldosCompras(array $compraIds, ?int $excluirProvisionalId = null): void
     {
@@ -315,20 +343,23 @@ class CompraProvisionalService
 
         $compras = Compra::whereIn('id', $compraIds)
             ->where('estado', '!=', 'anulada')
+            ->orderBy('id')
             ->lockForUpdate()
             ->get()
             ->keyBy('id');
 
         foreach ($compras as $compra) {
-            $abonos = DB::table('compra_provisional_detalles')
-                ->where('compra_id', $compra->id)
-                ->where('monto', '>', 0)
-                ->when($excluirProvisionalId !== null, fn ($query) => $query->where('compra_provisional_id', '!=', $excluirProvisionalId))
-                ->sum('monto');
+            app(SaldoDocumentoService::class)->sincronizar($compra, $excluirProvisionalId);
+        }
+    }
 
-            $compra->abonos = round((float) $abonos, 2);
-            $compra->saldo = max(round((float) $compra->total - (float) $compra->acuenta - $compra->abonos, 2), 0);
-            $compra->save();
+    private function bloquearYValidarCompras(int $provisionalId, array $nuevos = []): void
+    {
+        $ids = DB::table('compra_provisional_detalles')->where('compra_provisional_id', $provisionalId)
+            ->whereNotNull('compra_id')->pluck('compra_id')->merge(collect($nuevos)->pluck('compra_id'))
+            ->filter()->unique()->sort()->values();
+        foreach (Compra::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get() as $compra) {
+            app(SaldoDocumentoService::class)->validar($compra);
         }
     }
 

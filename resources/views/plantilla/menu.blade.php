@@ -243,6 +243,11 @@
                             {{-- Parámetros del sistema --}}
                             @can('configuraciones_list')
                                 <li class="nav-header">PARÁMETROS</li>
+                                <li class="nav-item">
+                                    <a href="{{ route('telefonos-ticket.index') }}" class="nav-link" id="itemTelefonosTicket">
+                                        <i class="bi bi-telephone nav-icon"></i><p>Teléfonos Ticket</p>
+                                    </a>
+                                </li>
 
                                 <li class="nav-item">
                                     <a href="{{ route('configuraciones.index') }}" class="nav-link"

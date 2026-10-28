@@ -485,11 +485,12 @@ class PlanillaPagoService
             return;
         }
 
-        $totalPagar = (float) $pago->total_pagar;
+        $sueldo = $pago->sueldoAplicado
+            ?? $this->empleadoService->sueldoParaPeriodo($pago->empleado_id, (int) $pago->mes, (int) $pago->anio);
         $importeP = (float) $pago->importe_p;
         $importeD = (float) $pago->importe_d;
         $importeC = (float) $pago->importe_c;
-        $montoGasto = $totalPagar;
+        $montoGasto = (float) ($sueldo?->sueldo_real ?? 0);
 
         $categoria = GastoCategoria::where('nombre', 'Gastos_Personal')->first();
         if (! $categoria) {
@@ -528,8 +529,8 @@ class PlanillaPagoService
                 'user_nombre' => $userNombre,
                 'fecha_gasto' => $pago->fecha_pago ?? now(),
                 'descripcion' => "Pago {$empleado->nombre} - {$nombreMes}/{$pago->anio}",
-                'responsable' => $empleado->nombre,
-                'responsable_dni' => $empleado->dni,
+                'responsable' => 'Sistema',
+                'responsable_dni' => null,
                 'empleado_id' => $empleado->id,
                 'categoria_gasto_id' => $categoria->id,
                 'gasto_tipo_id' => $tipo->id,
@@ -546,8 +547,8 @@ class PlanillaPagoService
             $gastoExistente->update([
                 'fecha_gasto' => $pago->fecha_pago ?? now(),
                 'descripcion' => "Pago {$empleado->nombre} - {$nombreMes}/{$pago->anio}",
-                'responsable' => $empleado->nombre,
-                'responsable_dni' => $empleado->dni,
+                'responsable' => 'Sistema',
+                'responsable_dni' => null,
                 'monto' => $montoGasto,
                 'importe_p' => $importeP,
                 'importe_d' => $importeD,
@@ -665,7 +666,9 @@ class PlanillaPagoService
             ->where('planilla_pagos.anio', $anio)
             ->where('planilla_pagos.estado', 'pagado')
             ->get();
-        $totalSueldos = (float) $pagos->sum(fn (PlanillaPago $pago): float => (float) $pago->total_pagar);
+        $totalSueldos = (float) $pagos->sum(
+            fn (PlanillaPago $pago): float => (float) ($pago->sueldoAplicado?->sueldo_real ?? 0)
+        );
         $importeP = (float) $pagos->sum(fn (PlanillaPago $pago): float => (float) $pago->importe_p);
         $importeD = (float) $pagos->sum(fn (PlanillaPago $pago): float => (float) $pago->importe_d);
         $importeC = (float) $pagos->sum(fn (PlanillaPago $pago): float => (float) $pago->importe_c);
@@ -718,7 +721,7 @@ class PlanillaPagoService
                 'user_nombre' => $userNombre,
                 'fecha_gasto' => $fechaUltimoPago,
                 'descripcion' => "Pago Empleados mes {$nombreMes}/{$anio}",
-                'responsable' => 'Consorcios Villegas',
+                'responsable' => 'Sistema',
                 'responsable_dni' => null,
                 'categoria_gasto_id' => $categoria->id,
                 'gasto_tipo_id' => $tipo->id,
@@ -739,6 +742,8 @@ class PlanillaPagoService
                 'importe_c' => $importeC,
                 'monto' => $totalSueldos,
                 'descripcion' => "Pago Empleados mes {$nombreMes}/{$anio}",
+                'responsable' => 'Sistema',
+                'responsable_dni' => null,
             ]);
         }
     }

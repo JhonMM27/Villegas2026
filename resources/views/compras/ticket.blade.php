@@ -17,7 +17,7 @@
         </div>
 
         <div class="center">
-            <p>CEL: 967984895 / 978431737</p>
+            @include('tickets.phones')
             <p>COMPRA {{ $compra->serie }}-{{ str_pad((string) $compra->correlativo, 8, '0', STR_PAD_LEFT) }}</p>
         </div>
 

@@ -13,6 +13,7 @@
     <div class="center">
         <h3 class="bold">{{ $empresa->razon_social }}</h3>
         <p>RUC: {{ $empresa->ruc }}</p>
+        @include('tickets.phones')
         <p class="bold">Formulación ID: {{ $formulacion->id }}</p>
     </div>
     <div class="line"></div>

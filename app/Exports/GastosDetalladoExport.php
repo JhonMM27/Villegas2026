@@ -32,6 +32,7 @@ class GastosDetalladoExport implements FromCollection, ShouldAutoSize, WithHeadi
             'Tipo Gasto',
             'Descripcion',
             'Responsable',
+            'Monto Total',
             'Principal',
             'Deposito',
             'Consorcio',
@@ -48,6 +49,7 @@ class GastosDetalladoExport implements FromCollection, ShouldAutoSize, WithHeadi
             $r['tipo'] ?? '',
             $r['descripcion'] ?? '',
             $r['responsable'] ?? '',
+            $r['monto'] ?? '',
             $r['principal'] ?? '',
             $r['deposito'] ?? '',
             $r['consorcio'] ?? '',
@@ -57,16 +59,19 @@ class GastosDetalladoExport implements FromCollection, ShouldAutoSize, WithHeadi
     private function buildRows(Collection $reportes): Collection
     {
         $out = collect();
+        $totalMonto = 0;
         $totalPrincipal = 0;
         $totalDeposito = 0;
         $totalConsorcio = 0;
 
         foreach ($reportes as $r) {
+            $monto = (float) ($r->monto ?? 0);
             $principal = (float) ($r->importe_p ?? 0);
             $deposito = (float) ($r->importe_d ?? 0);
             $consorcio = (float) ($r->importe_c ?? 0);
             $fecha = $r->fecha_gasto ? \Carbon\Carbon::parse($r->fecha_gasto)->format('d/m/Y') : '';
 
+            $totalMonto += $monto;
             $totalPrincipal += $principal;
             $totalDeposito += $deposito;
             $totalConsorcio += $consorcio;
@@ -79,6 +84,7 @@ class GastosDetalladoExport implements FromCollection, ShouldAutoSize, WithHeadi
                 'tipo' => $r->gastoTipo?->nombre ?? '',
                 'descripcion' => $r->descripcion ?? '',
                 'responsable' => $r->responsable ?? '',
+                'monto' => $monto,
                 'principal' => $principal,
                 'deposito' => $deposito,
                 'consorcio' => $consorcio,
@@ -93,6 +99,7 @@ class GastosDetalladoExport implements FromCollection, ShouldAutoSize, WithHeadi
             'tipo' => '',
             'descripcion' => 'TOTALES',
             'responsable' => '',
+            'monto' => $totalMonto,
             'principal' => $totalPrincipal,
             'deposito' => $totalDeposito,
             'consorcio' => $totalConsorcio,

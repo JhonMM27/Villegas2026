@@ -12,7 +12,7 @@ class RectificacionAuditoriaService
 {
     public const MODULOS = [
         'compras', 'ventas', 'prestamos', 'preparadas',
-        'nucleo_preparadas', 'venta_entregas', 'empleado_sueldos',
+        'nucleo_preparadas', 'venta_entregas', 'empleado_sueldos', 'venta_provisionales', 'compra_provisionales',
     ];
 
     private const CONFIG = [
@@ -146,12 +146,14 @@ class RectificacionAuditoriaService
         $detallesRelacion = $registro->relationLoaded('detalles')
             ? $registro->getRelation('detalles')
             : collect();
-        $detalles = $detallesRelacion->map(function (Model $detalle) use ($config, &$ocurrencias): array {
-            $productoId = (string) ($detalle->getAttribute('producto_id') ?? 'sin-producto');
+        $detalles = $detallesRelacion->map(function (Model $detalle) use ($config, $modulo, &$ocurrencias): array {
+            $recibo = in_array($modulo, ['venta_provisionales', 'compra_provisionales'], true);
+            $documentoId = $recibo ? $detalle->getAttribute($modulo === 'venta_provisionales' ? 'venta_id' : 'compra_id') : null;
+            $productoId = (string) ($recibo ? ($documentoId ?? 'sin-documento') : ($detalle->getAttribute('producto_id') ?? 'sin-producto'));
             $unidad = (string) ($detalle->getAttribute('unidad_codigo') ?? $detalle->getAttribute('unidad_nombre') ?? '');
             $base = $productoId.'|'.$unidad;
             $ocurrencias[$base] = ($ocurrencias[$base] ?? 0) + 1;
-            $producto = (string) ($detalle->getAttribute('producto_nombre') ?? $detalle->producto?->nombre ?? 'Producto '.$productoId);
+            $producto = $recibo ? 'Documento '.$productoId : (string) ($detalle->getAttribute('producto_nombre') ?? $detalle->producto?->nombre ?? 'Producto '.$productoId);
             $valores = [];
             foreach ($config['detalle'] as $campo => [$etiqueta, $formato]) {
                 $valores[$campo] = ['etiqueta' => $etiqueta, 'formato' => $formato, 'valor' => $this->valor($detalle->getAttribute($campo))];
@@ -172,7 +174,8 @@ class RectificacionAuditoriaService
     public function comparar(array $anteriores, array $nuevos): array
     {
         $cabecera = [];
-        foreach ($anteriores['cabecera'] as $campo => $anterior) {
+        foreach (array_unique(array_merge(array_keys($anteriores['cabecera']), array_keys($nuevos['cabecera']))) as $campo) {
+            $anterior = $anteriores['cabecera'][$campo] ?? array_replace($nuevos['cabecera'][$campo], ['valor' => null]);
             $nuevo = $nuevos['cabecera'][$campo] ?? $anterior;
             if ($this->iguales($anterior['valor'], $nuevo['valor'])) {
                 continue;
@@ -240,6 +243,24 @@ class RectificacionAuditoriaService
 
     private function config(string $modulo): array
     {
+        if (in_array($modulo, ['venta_provisionales', 'compra_provisionales'], true)) {
+            $titular = $modulo === 'venta_provisionales' ? 'cliente' : 'proveedor';
+
+            return [
+                'referencia' => ['numero_recibo'],
+                'cabecera' => [
+                    'numero_recibo' => ['Recibo', 'texto'], 'numero_interno' => ['Interno', 'texto'],
+                    'fecha_provisional' => ['Fecha de pago', 'fecha'], $titular.'_id' => ['ID del titular', 'texto'],
+                    $titular.'_nombre' => ['Titular', 'texto'], 'monto' => ['Pago', 'moneda'], 'libre' => ['Libre', 'moneda'],
+                    'importe_p' => ['Principal', 'moneda'], 'importe_d' => ['Deposito', 'moneda'],
+                    'importe_c' => ['Consorcio', 'moneda'], 'tipo' => ['Tipo', 'texto'],
+                ],
+                'detalle' => [
+                    'comprobante_tipo_codigo' => ['Tipo de documento', 'texto'], 'serie' => ['Serie', 'texto'],
+                    'correlativo' => ['Correlativo', 'texto'], 'monto' => ['Aplicado', 'moneda'],
+                ],
+            ];
+        }
         if (! isset(self::CONFIG[$modulo])) {
             throw new InvalidArgumentException("Módulo de rectificación no permitido: {$modulo}");
         }
